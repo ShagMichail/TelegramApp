@@ -5,7 +5,6 @@ import AsyncDisplayKit
 import SwiftSignalKit
 import TelegramCore
 import TelegramPresentationData
-import PresentationDataUtils
 import LegacyComponents
 import ProgressNavigationButtonNode
 import ImageCompression
@@ -14,18 +13,16 @@ import Postbox
 import TextFormat
 import MoreButtonNode
 import ContextUI
-import AccountContext
 
-final class AuthorizationSequenceSignUpController: ViewController {
-    private var controllerNode: AuthorizationSequenceSignUpControllerNode {
-        return self.displayNode as! AuthorizationSequenceSignUpControllerNode
+final class AuthorizationSequenceApplyAsController: ViewController {
+    private var controllerNode: ChooseRoleControllerNode {
+        return self.displayNode as! ChooseRoleControllerNode
     }
     
     private var validLayout: ContainerViewLayout?
     
     private let moreButtonNode: MoreButtonNode
     
-    private let sharedContext: SharedAccountContext
     private let presentationData: PresentationData
     private let back: () -> Void
     
@@ -50,8 +47,7 @@ final class AuthorizationSequenceSignUpController: ViewController {
         }
     }
     
-    init(sharedContext: SharedAccountContext, presentationData: PresentationData, back: @escaping () -> Void, displayCancel: Bool) {
-        self.sharedContext = sharedContext
+    init(presentationData: PresentationData, back: @escaping () -> Void, displayCancel: Bool) {
         self.presentationData = presentationData
         self.back = back
         
@@ -73,18 +69,18 @@ final class AuthorizationSequenceSignUpController: ViewController {
             guard let strongSelf = self else {
                 return
             }
-            strongSelf.present(textAlertController(sharedContext: strongSelf.sharedContext, title: nil, text: presentationData.strings.Login_CancelSignUpConfirmation, actions: [TextAlertAction(type: .genericAction, title: presentationData.strings.Login_CancelPhoneVerificationContinue, action: {
+            strongSelf.present(standardTextAlertController(theme: AlertControllerTheme(presentationData: presentationData), title: nil, text: presentationData.strings.Login_CancelSignUpConfirmation, actions: [TextAlertAction(type: .genericAction, title: presentationData.strings.Login_CancelPhoneVerificationContinue, action: {
             }), TextAlertAction(type: .defaultAction, title: presentationData.strings.Login_CancelPhoneVerificationStop, action: {
                 back()
             })]), in: .window(.root))
         }
         
-//        if displayCancel {
-//            self.navigationItem.leftBarButtonItem = UIBarButtonItem(title: presentationData.strings.Common_Cancel, style: .plain, target: self, action: #selector(self.cancelPressed))
-//        }
-//        
+        if displayCancel {
+            self.navigationItem.leftBarButtonItem = UIBarButtonItem(title: presentationData.strings.Common_Cancel, style: .plain, target: self, action: #selector(self.cancelPressed))
+        }
+//
 //        self.navigationItem.rightBarButtonItem = UIBarButtonItem(customDisplayNode: self.moreButtonNode)
-//        
+//
         self.moreButtonNode.action = { [weak self] _, gesture in
             if let strongSelf = self {
                 strongSelf.morePressed(node: strongSelf.moreButtonNode.contextSourceNode, gesture: gesture)
@@ -97,7 +93,7 @@ final class AuthorizationSequenceSignUpController: ViewController {
     }
     
     @objc private func cancelPressed() {
-        self.present(textAlertController(sharedContext: self.sharedContext, title: nil, text: self.presentationData.strings.Login_CancelSignUpConfirmation, actions: [TextAlertAction(type: .genericAction, title: self.presentationData.strings.Login_CancelPhoneVerificationContinue, action: {
+        self.present(standardTextAlertController(theme: AlertControllerTheme(presentationData: self.presentationData), title: nil, text: self.presentationData.strings.Login_CancelSignUpConfirmation, actions: [TextAlertAction(type: .genericAction, title: self.presentationData.strings.Login_CancelPhoneVerificationContinue, action: {
         }), TextAlertAction(type: .defaultAction, title: self.presentationData.strings.Login_CancelPhoneVerificationStop, action: { [weak self] in
             self?.back()
         })]), in: .window(.root))
@@ -139,7 +135,7 @@ final class AuthorizationSequenceSignUpController: ViewController {
         })))
         
         
-        let contextController = makeContextController(presentationData: self.presentationData, source: .reference(AuthorizationContextReferenceContentSource(controller: self, sourceNode: node)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
+        let contextController = ContextController(presentationData: self.presentationData, source: .reference(AuthorizationContextReferenceContentSource(controller: self, sourceNode: node)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
         self.present(contextController, in: .window(.root))
     }
     
@@ -160,14 +156,16 @@ final class AuthorizationSequenceSignUpController: ViewController {
         let currentAvatarMixin = Atomic<NSObject?>(value: nil)
         
         let theme = self.presentationData.theme
-        self.displayNode = AuthorizationSequenceSignUpControllerNode(theme: theme, strings: self.presentationData.strings, addPhoto: { [weak self] in
+        self.displayNode = ChooseRoleControllerNode(theme: theme, strings: self.presentationData.strings, addPhoto: { [weak self] in
             presentLegacyAvatarPicker(holder: currentAvatarMixin, signup: true, theme: theme, present: { c, a in
                 self?.view.endEditing(true)
                 self?.present(c, in: .window(.root), with: a)
             }, openCurrent: nil, completion: { image in
+                self?.controllerNode.currentPhoto = image
                 self?.avatarAsset = nil
                 self?.avatarAdjustments = nil
             }, videoCompletion: { image, asset, adjustments in
+                self?.controllerNode.currentPhoto = image
                 self?.avatarAsset = asset
                 self?.avatarAdjustments = adjustments
             })
@@ -178,7 +176,8 @@ final class AuthorizationSequenceSignUpController: ViewController {
         
         self.controllerNode.signUpWithName = { [weak self] _, _ in
 //            self?.nextPressed()
-            self?.newAction?()
+//            self?.newAction?()
+            self?.back()
         }
         self.controllerNode.openTermsOfService = { [weak self] in
             guard let strongSelf = self, let termsOfService = strongSelf.termsOfService else {
@@ -256,6 +255,28 @@ final class AuthorizationSequenceSignUpController: ViewController {
     }
     
     @objc func nextPressed() {
+        let firstName = self.controllerNode.currentName.0.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lastName = self.controllerNode.currentName.1.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        var name: (String, String)?
+        if firstName.isEmpty && lastName.isEmpty {
+            self.hapticFeedback.error()
+            self.controllerNode.animateError()
+            return
+        } else if firstName.isEmpty && !lastName.isEmpty {
+            name = (lastName, "")
+        } else {
+            name = (firstName, lastName)
+        }
+        
+        if let name = name {
+            self.signUpWithName?(name.0, name.1, self.controllerNode.currentPhoto.flatMap({ image in
+                let tempFile = TempBox.shared.tempFile(fileName: "file")
+                let result = compressImageToJPEG(image, quality: 0.7, tempFilePath: tempFile.path)
+                TempBox.shared.dispose(tempFile)
+                return result
+            }), self.avatarAsset, self.avatarAdjustments, self.announceSignUp)
+        }
     }
 }
 
