@@ -92,8 +92,8 @@ config_setting(
 
 config_setting(
     name = "disableProvisioningProfilesSetting",
-    flag_values = {
-        ":disableProvisioningProfiles": "True",
+    define_values = {
+        "disableProvisioningProfiles": "true",
     },
 )
 
@@ -278,26 +278,26 @@ filegroup(
     ], exclude = ["Telegram-iOS/Icons.xcassets/**/.*"]),
 )
 
-filegroup(
-    name = "AppIcons",
-    srcs = glob([
-        "Telegram-iOS/AppIcons.xcassets/**/*",
-    ], exclude = ["Telegram-iOS/AppIcons.xcassets/**/.*"]),
-)
+# filegroup(
+#     name = "AppIcons",
+#     srcs = glob([
+#         "Telegram-iOS/AppIcons.xcassets/**/*",
+#     ], exclude = ["Telegram-iOS/AppIcons.xcassets/**/.*"]),
+# )
 
-filegroup(
-    name = "DefaultAppIcon",
-    srcs = glob([
-        "Telegram-iOS/DefaultAppIcon.xcassets/**/*",
-    ], exclude = ["Telegram-iOS/DefaultAppIcon.xcassets/**/.*"]),
-)
+# filegroup(
+#     name = "DefaultAppIcon",
+#     srcs = glob([
+#         "Telegram-iOS/DefaultAppIcon.xcassets/**/*",
+#     ], exclude = ["Telegram-iOS/DefaultAppIcon.xcassets/**/.*"]),
+# )
 
-filegroup(
-    name = "DefaultIcon",
-    srcs = glob([
-        "Telegram-iOS/AppIcons.xcassets/BlueIcon.appiconset/*.png",
-    ]),
-)
+# filegroup(
+#     name = "DefaultIcon",
+#     srcs = glob([
+#         "Telegram-iOS/AppIcons.xcassets/BlueIcon.appiconset/*.png",
+#     ]),
+# )
 
 alternate_icon_folders = [
     "BlackIcon",
@@ -340,7 +340,12 @@ filegroup(
         "Telegram-iOS/Base.lproj/LaunchScreen.xib",
     ]),
 )
-
+filegroup(
+    name = "HelveticaNeue",
+    srcs = glob([
+        "Telegram-iOS/HelveticaNeue/HelveticaNeue-Semibold.ttf",
+    ]),
+)
 objc_library(
     name = "Main",
     module_name = "Main",
@@ -595,6 +600,54 @@ plist_fragment(
     template =
     """
     <key>CFBundleDisplayName</key>
+    <string>Divo</string>
+    """
+)
+
+plist_fragment(
+    name = "WatchExtensionNSExtensionInfoPlist",
+    extension = "plist",
+    template =
+    """
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionAttributes</key>
+        <dict>
+            <key>WKAppBundleIdentifier</key>
+            <string>{telegram_bundle_id}.watchkitapp</string>
+        </dict>
+        <key>NSExtensionPointIdentifier</key>
+        <string>com.apple.watchkit</string>
+    </dict>
+    """.format(
+        telegram_bundle_id = telegram_bundle_id,
+    )
+)
+
+plist_fragment(
+    name = "WatchAppCompanionInfoPlist",
+    extension = "plist",
+    template =
+    """
+    <key>WKCompanionAppBundleIdentifier</key>
+    <string>{telegram_bundle_id}</string>
+    """.format(
+        telegram_bundle_id = telegram_bundle_id,
+    )
+)
+
+plist_fragment(
+    name = "WatchExtensionInfoPlist",
+    extension = "plist",
+    template =
+    """
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>CFBundleIdentifier</key>
+    <string>{telegram_bundle_id}.watchkitapp.watchkitextension</string>
+    <key>CFBundleName</key>
     <string>Telegram</string>
     """
 )
@@ -1533,11 +1586,11 @@ plist_fragment(
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleDisplayName</key>
-    <string>Telegram</string>
+    <string>Divo</string>
     <key>CFBundleIdentifier</key>
     <string>{telegram_bundle_id}</string>
     <key>CFBundleName</key>
-    <string>Telegram</string>
+    <string>Divo</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleSignature</key>
@@ -1733,7 +1786,9 @@ ios_application(
     ],
     resources = [
         ":LaunchScreen",
+        ":HelveticaNeue",
         #":DefaultAppIcon",
+        #":AdditionalIcons",
     ],
     frameworks = [
         ":MtProtoKitFramework",

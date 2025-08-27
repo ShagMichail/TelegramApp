@@ -455,7 +455,7 @@ private final class AuthButtonNode: ASControlNode { // ButtonWithIconNode
         self.imageSize = imageSize
         
         self.textNode = ASTextNode()
-        self.textNode.attributedText = NSAttributedString(string: title, font: Font.bold(17.0), textColor: .white)
+        self.textNode.attributedText = Font.helveticaNeue(title, 17)
         
         self.iconNode = ASImageNode()
         self.iconNode.image = icon
@@ -626,11 +626,7 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         self.titleNode = ASTextNode()
         self.titleNode.isUserInteractionEnabled = true
         self.titleNode.displaysAsynchronously = false
-        self.titleNode.attributedText = NSAttributedString(
-            string: (account == nil ? strings.Login_NewNumber : strings.Login_PhoneTitle).uppercased(),
-            font: UIFont(name: "HelveticaNeueLT", size: 36),
-            textColor: .white
-        )
+        self.titleNode.attributedText = Font.helveticaNeue((account == nil ? strings.Login_NewNumber : strings.Login_PhoneTitle).uppercased(), 34)
         
         self.titleActivateAreaNode = AccessibilityAreaNode()
         self.titleActivateAreaNode.accessibilityTraits = .staticText
@@ -814,9 +810,114 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         let _ = self.phoneAndCountryNode.processNumberChange(number: self.phoneAndCountryNode.phoneInputNode.number)
     }
     
+    // MARK: MASTER
     func updateDisplayPasskeyLoginOption() {
         if self.account == nil {
             return
+
+// MARK: LEGACY
+    // func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
+            
+    //     var insets = layout.insets(options: [])
+    //         insets.top = layout.statusBarHeight ?? 20.0
+            
+    //         if let inputHeight = layout.inputHeight, !inputHeight.isZero {
+    //             insets.bottom = max(inputHeight, insets.bottom)
+    //         }
+            
+    //         let maximumWidth: CGFloat = min(430.0, layout.size.width)
+    //         let horizontalInset: CGFloat = 24.0
+            
+    //         var currentY: CGFloat = insets.top + (layout.statusBarHeight ?? 20.0) + 10.0
+            
+    //         self.titleNode.attributedText = Font.helveticaNeue(strings.Login_PhoneTitle.uppercased(), 34)
+    //         self.titleActivateAreaNode.accessibilityLabel = self.titleNode.attributedText?.string ?? ""
+    //         let titleSize = self.titleNode.measure(CGSize(width: maximumWidth, height: .greatestFiniteMagnitude))
+    //         let titleFrame = CGRect(
+    //             origin: CGPoint(x: floorToScreenPixels((layout.size.width - titleSize.width) / 2.0), y: currentY),
+    //             size: titleSize
+    //         )
+    //         transition.updateFrame(node: self.titleNode, frame: titleFrame)
+    //         currentY = titleFrame.maxY
+            
+    //         let noticeSize = self.noticeNode.measure(CGSize(width: maximumWidth, height: .greatestFiniteMagnitude))
+    //         let noticeFrame = CGRect(
+    //             origin: CGPoint(x: floorToScreenPixels((layout.size.width - noticeSize.width) / 2.0), y: currentY + 8.0),
+    //             size: noticeSize
+    //         )
+    //         transition.updateFrame(node: self.noticeNode, frame: noticeFrame)
+    //         currentY = noticeFrame.maxY
+            
+    //         let phoneAndCountryHeight: CGFloat = 115.0
+    //         let phoneAndCountryFrame = CGRect(
+    //             x: floorToScreenPixels((layout.size.width - maximumWidth) / 2.0),
+    //             y: currentY + 30.0,
+    //             width: maximumWidth,
+    //             height: phoneAndCountryHeight
+    //         )
+    //         transition.updateFrame(node: self.phoneAndCountryNode, frame: phoneAndCountryFrame)
+    //         currentY = phoneAndCountryFrame.maxY
+            
+    //         let contactSyncSize = self.contactSyncNode.updateLayout(width: maximumWidth)
+    //         if self.hasOtherAccounts {
+    //             self.contactSyncNode.isHidden = false
+    //             let contactSyncFrame = CGRect(
+    //                 x: floorToScreenPixels((layout.size.width - maximumWidth) / 2.0),
+    //                 y: currentY + 14.0,
+    //                 width: maximumWidth,
+    //                 height: contactSyncSize.height
+    //             )
+    //             transition.updateFrame(node: self.contactSyncNode, frame: contactSyncFrame)
+    //             currentY = contactSyncFrame.maxY
+    //         } else {
+    //             self.contactSyncNode.isHidden = true
+    //         }
+            
+    //         let eulaSize = self.eulaCheckboxNode.updateLayout(width: maximumWidth)
+    //         let eulaFrame = CGRect(
+    //             x: floorToScreenPixels((layout.size.width - maximumWidth) / 2.0),
+    //             y: currentY + 14.0,
+    //             width: maximumWidth,
+    //             height: eulaSize.height
+    //         )
+    //         transition.updateFrame(node: self.eulaCheckboxNode, frame: eulaFrame)
+    //         currentY = eulaFrame.maxY
+            
+    //         let proceedWidth = maximumWidth - horizontalInset * 2.0
+    //         let proceedHeight = self.proceedNode.updateLayout(width: proceedWidth, transition: transition)
+    //         let proceedFrame = CGRect(
+    //             x: floorToScreenPixels((layout.size.width - proceedWidth) / 2.0),
+    //             y: currentY + 12.0,
+    //             width: proceedWidth,
+    //             height: proceedHeight
+    //         )
+    //         transition.updateFrame(node: self.proceedNode, frame: proceedFrame)
+    //         currentY = proceedFrame.maxY
+            
+    //         let separatorSize = self.separatorNode.updateLayout(width: maximumWidth - horizontalInset * 2.0)
+    //         let separatorFrame = CGRect(
+    //             x: floorToScreenPixels((layout.size.width - (maximumWidth - horizontalInset * 2.0)) / 2.0),
+    //             y: currentY + 20.0,
+    //             width: separatorSize.width,
+    //             height: separatorSize.height
+    //         )
+    //         transition.updateFrame(node: self.separatorNode, frame: separatorFrame)
+    //         currentY = separatorFrame.maxY
+            
+    //         let authButtonsSize = self.authButtonsNode.updateLayout(width: maximumWidth - horizontalInset * 2.0)
+    //         let authButtonsFrame = CGRect(
+    //             x: floorToScreenPixels((layout.size.width - (maximumWidth - horizontalInset * 2.0)) / 2.0),
+    //             y: currentY + 12.0,
+    //             width: authButtonsSize.width,
+    //             height: authButtonsSize.height
+    //         )
+    //         transition.updateFrame(node: self.authButtonsNode, frame: authButtonsFrame)
+    //         currentY = authButtonsFrame.maxY
+            
+    //         self.titleActivateAreaNode.frame = self.titleNode.frame
+    //         self.noticeActivateAreaNode.accessibilityLabel = self.noticeNode.attributedText?.string ?? ""
+    //         self.noticeActivateAreaNode.frame = self.noticeNode.frame
+// MARK: LEGACY ————
         }
         let attributedText = NSMutableAttributedString(attributedString: parseMarkdownIntoAttributedString(self.strings.Login_PhoneWithPasskeySubtitle, attributes: MarkdownAttributes(
             body: MarkdownAttributeSet(font: Font.regular(17.0), textColor: self.theme.list.itemPrimaryTextColor),
