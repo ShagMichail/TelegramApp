@@ -169,13 +169,15 @@ final class AuthorizationSequenceApplyAsController: ViewController {
             })
         })
         self.displayNodeDidLoad()
-        
-//        self.controllerNode.view.disableAutomaticKeyboardHandling = [.forward, .backward]
-        
+
         self.controllerNode.signUpWithName = { [weak self] _, _ in
-//            self?.nextPressed()
+            self?.nextPressed()
+        }
+        
+        self.controllerNode.back = { [weak self] in
             self?.back()
         }
+
         self.controllerNode.openTermsOfService = { [weak self] in
             guard let strongSelf = self, let termsOfService = strongSelf.termsOfService else {
                 return
@@ -214,11 +216,6 @@ final class AuthorizationSequenceApplyAsController: ViewController {
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        
-//        if let navigationController = self.navigationController as? NavigationController, let layout = self.validLayout {
-//            addTemporaryKeyboardSnapshotView(navigationController: navigationController, layout: layout)
-//        }
-        
         self.controllerNode.activateInput()
     }
     
@@ -256,8 +253,8 @@ final class AuthorizationSequenceApplyAsController: ViewController {
     }
     
     @objc func nextPressed() {
-        let firstName = self.controllerNode.currentName.0.trimmingCharacters(in: .whitespacesAndNewlines)
-        let lastName = self.controllerNode.currentName.1.trimmingCharacters(in: .whitespacesAndNewlines)
+        let firstName = "firstName"//self.controllerNode.currentName.0.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lastName = "lastName"//self.controllerNode.currentName.1.trimmingCharacters(in: .whitespacesAndNewlines)
         
         var name: (String, String)?
         if firstName.isEmpty && lastName.isEmpty {
