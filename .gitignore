@@ -70,7 +70,6 @@ submodules/FFMpegBinding/SharedHeaders/*
 submodules/OpenSSLEncryptionProvider/SharedHeaders/*
 submodules/TelegramCore/FlatSerialization/Sources/*
 buildServer.json
-<<<<<<< HEAD
 .build/**
 Telegram.LSP.json
 **/.build/**
@@ -79,7 +78,6 @@ xcode-files
 .bsp/**
 /.claude/
 /buildbox/*
-=======
 configuration_cerf/appstore-configuration.json
 provisioning_cerf/fake-codesigning/dev cert sends/development (1).cer
 provisioning_cerf/fake-codesigning/dev cert sends/development (2).cer
@@ -102,4 +100,3 @@ provisioning_cerf/fake-codesigning/profiles/development (3).cer
 provisioning_cerf/fake-codesigning/profiles/development (4).cer
 provisioning_cerf/fake-codesigning/profiles/development (5).cer
 provisioning_cerf/fake-codesigning/profiles/development.cer
->>>>>>> c73522a923 (login screen redesign)
