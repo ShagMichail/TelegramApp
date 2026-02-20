@@ -32,7 +32,7 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     private let termsNode: ImmediateTextNode
     
     private let sectionTitleNode: ASTextNode
-
+    
     private let newSeparatorNode: ASDisplayNode
     private let websiteField: TextFieldNode
     
@@ -43,7 +43,7 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     private let backNode: SolidRoundedButtonNode
     private let saveNode: SolidRoundedButtonNode
     
-//    let titleNode_new: ASTextNode
+    //    let titleNode_new: ASTextNode
     
     private var layoutArguments: (ContainerViewLayout, CGFloat)?
     
@@ -78,9 +78,9 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
             if self.inProgress != oldValue {
                 if self.inProgress {
                     self.proceedNode.transitionToProgress()
-//                    self.saveNode.transitionToProgress()
+                    //                    self.saveNode.transitionToProgress()
                 } else {
-//                    self.saveNode.transitionFromProgress()
+                    //                    self.saveNode.transitionFromProgress()
                     self.proceedNode.transitionFromProgress()
                 }
             }
@@ -155,18 +155,18 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         let backgroundColor = UIColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 1.0)
         let borderColor = UIColor(red: 0.4, green: 0.4, blue: 0.4, alpha: 1.0)
         self.addPhotoButton.setBackgroundImage(generateFilledCircleImage(diameter: 110.0, color: backgroundColor, strokeColor: borderColor, strokeWidth: 1.0, backgroundColor: nil), for: .normal)
-                
+        
         self.addPhotoButton.addSubnode(self.currentPhotoNode)
         self.addPhotoButton.allowsGroupOpacity = true
         
-        self.proceedNode = SolidRoundedButtonNode(title: self.strings.Login_Continue, theme: SolidRoundedButtonTheme(theme: self.theme), height: 50.0, cornerRadius: 11.0, gloss: false)
+        self.proceedNode = SolidRoundedButtonNode(title: self.strings.Login_Continue, theme: SolidRoundedButtonTheme(theme: self.theme), height: 50.0, cornerRadius: 11.0)
         self.proceedNode.progressType = .embedded
         
-//        self.titleNode_new = ASTextNode()
-//        self.titleNode_new.attributedText = NSAttributedString(string: "Apply as a agencies & brands".uppercased(), attributes: [
-//            .font: UIFont.boldSystemFont(ofSize: 34),
-//            .foregroundColor: UIColor.white
-//        ])
+        //        self.titleNode_new = ASTextNode()
+        //        self.titleNode_new.attributedText = NSAttributedString(string: "Apply as a agencies & brands".uppercased(), attributes: [
+        //            .font: UIFont.boldSystemFont(ofSize: 34),
+        //            .foregroundColor: UIColor.white
+        //        ])
         
         let backButtonTheme = SolidRoundedButtonTheme(
             backgroundColor: UIColor(red: 0.17, green: 0.17, blue: 0.17, alpha: 1.0),
@@ -176,10 +176,9 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
             title: "← Back",
             theme: backButtonTheme,
             height: 50.0,
-            cornerRadius: 11.0,
-            gloss: false
+            cornerRadius: 11.0
         )
-//        self.backNode.progressType = .none
+        //        self.backNode.progressType = .none
         
         let saveButtonTheme = SolidRoundedButtonTheme(
             backgroundColor: UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0),
@@ -189,8 +188,7 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
             title: "Save",
             theme: saveButtonTheme,
             height: 50.0,
-            cornerRadius: 11.0,
-            gloss: false
+            cornerRadius: 11.0
         )
         self.saveNode.progressType = .embedded
         
@@ -204,7 +202,7 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         
         self.addSubnode(self.sectionTitleNode)
         self.addSubnode(newSeparatorNode)
-
+        
         self.addSubnode(self.websiteField)
         self.addSubnode(self.titleNode)
         self.addSubnode(self.currentOptionNode)
@@ -251,7 +249,7 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     
     func updateData(firstName: String, lastName: String, hasTermsOfService: Bool) {
         self.termsNode.isHidden = !hasTermsOfService
-       
+        
         if let (layout, navigationHeight) = self.layoutArguments {
             self.containerLayoutUpdated(layout, navigationBarHeight: navigationHeight, transition: .immediate)
         }
@@ -276,22 +274,22 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         }
         
         let titleSize = self.titleNode.measure(CGSize(width: maximumWidth-40, height: .greatestFiniteMagnitude))
-//        let titleOriginY: CGFloat = 40.0
-//        let titleFrame = CGRect(
-//            origin: CGPoint(x: 40, y: titleOriginY + 100),
-//            size: titleSize
-//        )
-//        self.titleNode_new.frame = titleFrame
+        //        let titleOriginY: CGFloat = 40.0
+        //        let titleFrame = CGRect(
+        //            origin: CGPoint(x: 40, y: titleOriginY + 100),
+        //            size: titleSize
+        //        )
+        //        self.titleNode_new.frame = titleFrame
         
         let additionalBottomInset: CGFloat = layout.size.width > 320.0 ? 90.0 : 10.0
-                
+        
         self.titleNode.attributedText = NSAttributedString(string: "Apply as a agencies & brands".uppercased(), font: Font.bold(34), textColor: .white, paragraphAlignment: .center)
-//        let titleSize = self.titleNode.measure(CGSize(width: maximumWidth, height: CGFloat.greatestFiniteMagnitude))
+        //        let titleSize = self.titleNode.measure(CGSize(width: maximumWidth, height: CGFloat.greatestFiniteMagnitude))
         
         let fieldHeight: CGFloat = 54.0
         
         let sideInset: CGFloat = 24.0
-//        let innerInset: CGFloat = 16.0
+        //        let innerInset: CGFloat = 16.0
         
         let noticeSize = self.currentOptionNode.measure(CGSize(width: maximumWidth - 28.0, height: CGFloat.greatestFiniteMagnitude))
         let termsSize = self.termsNode.updateLayout(CGSize(width: maximumWidth - 80, height: CGFloat.greatestFiniteMagnitude))
@@ -303,14 +301,14 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         items.append(AuthorizationLayoutItem(node: self.titleNode, size: titleSize, spacingBefore: AuthorizationLayoutItemSpacing(weight: 20.0, maxValue: 42.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
         
         items.append(AuthorizationLayoutItem(node: self.currentOptionNode, size: noticeSize, spacingBefore: AuthorizationLayoutItemSpacing(weight: 20.0, maxValue: 20.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-
+        
         items.append(AuthorizationLayoutItem(node: self.addPhotoButton, size: avatarSize, spacingBefore: AuthorizationLayoutItemSpacing(weight: 16.0, maxValue: 16.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
         self.currentPhotoNode.frame = CGRect(origin: CGPoint(), size: avatarSize)
         
         items.append(AuthorizationLayoutItem(node: self.sectionTitleNode, size: CGSize(width: maximumWidth - sideInset * 2.0, height: sectionTitleSize.height), spacingBefore: AuthorizationLayoutItemSpacing(weight: 32.0, maxValue: 60.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 16.0, maxValue: 16.0)))
         
         items.append(AuthorizationLayoutItem(node: self.websiteField, size: CGSize(width: maximumWidth - sideInset * 2.0, height: fieldHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 16.0, maxValue: 16.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-
+        
         items.append(AuthorizationLayoutItem(node: newSeparatorNode, size: CGSize(width: layout.size.width - sideInset * 2.0, height: UIScreenPixel), spacingBefore: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
         
         items.append(AuthorizationLayoutItem(node: self.termsNode, size: termsSize, spacingBefore: AuthorizationLayoutItemSpacing(weight: 48.0, maxValue: 100.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
@@ -330,9 +328,9 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         let buttonWidth = (maximumWidth - 48.0 - 10.0) / 2.0 // 10.0 is the spacing between buttons
         let buttonHeight: CGFloat = 50.0
         let bottomInset: CGFloat = 24.0
-
+        
         // Save Button
-//        let saveButtonSize = CGSize(width: buttonWidth, height: buttonHeight)
+        //        let saveButtonSize = CGSize(width: buttonWidth, height: buttonHeight)
         let saveButtonFrame = CGRect(
             x: floorToScreenPixels((layout.size.width - maximumWidth + 48.0) / 2.0) + buttonWidth + 10.0,
             y: layout.size.height - insets.bottom - buttonHeight - bottomInset,
@@ -340,9 +338,9 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
             height: buttonHeight
         )
         transition.updateFrame(node: self.saveNode, frame: saveButtonFrame)
-
+        
         // Back Button
-//        let backButtonSize = CGSize(width: buttonWidth, height: buttonHeight)
+        //        let backButtonSize = CGSize(width: buttonWidth, height: buttonHeight)
         let backButtonFrame = CGRect(
             x: floorToScreenPixels((layout.size.width - maximumWidth + 48.0) / 2.0),
             y: layout.size.height - insets.bottom - buttonHeight - bottomInset,
@@ -350,9 +348,9 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
             height: buttonHeight
         )
         transition.updateFrame(node: self.backNode, frame: backButtonFrame)
-
+        
         // Hide the old proceedNode
-//        self.proceedNode.isHidden = true
+        //        self.proceedNode.isHidden = true
         
         let _ = layoutAuthorizationItems(bounds: CGRect(origin: CGPoint(x: 0.0, y: insets.top), size: CGSize(width: layout.size.width, height: layout.size.height - insets.top - insets.bottom - additionalBottomInset)), items: items, transition: transition, failIfDoesNotFit: false)
     }
@@ -362,16 +360,16 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     }
     
     func animateError() {
-       
+        
     }
     
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-//        if textField === self.firstNameField.textField {
-//            self.lastNameField.textField.becomeFirstResponder()
-//        } else {
-//            let name = self.currentName
-//            self.signUpWithName?(name.0, name.1)
-//        }
+        //        if textField === self.firstNameField.textField {
+        //            self.lastNameField.textField.becomeFirstResponder()
+        //        } else {
+        //            let name = self.currentName
+        //            self.signUpWithName?(name.0, name.1)
+        //        }
         return false
     }
     

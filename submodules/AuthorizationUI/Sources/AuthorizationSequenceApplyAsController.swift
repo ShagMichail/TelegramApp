@@ -135,7 +135,7 @@ final class AuthorizationSequenceApplyAsController: ViewController {
         })))
         
         
-        let contextController = ContextController(presentationData: self.presentationData, source: .reference(AuthorizationContextReferenceContentSource(controller: self, sourceNode: node)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
+        let contextController = makeContextController(presentationData: self.presentationData, source: .reference(AuthorizationContextReferenceContentSource(controller: self, sourceNode: node)), items: .single(ContextController.Items(content: .list(items))), gesture: gesture)
         self.present(contextController, in: .window(.root))
     }
     
