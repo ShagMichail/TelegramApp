@@ -15770,3 +15770,6 @@ Error: %8$@";
 "Gift.View.Context.Craft" = "Craft";
 
 "Group.OwnershipTransfer.DescriptionShortInfo" = "This will transfer the full **owner rights** for **%1$@** to **%2$@**.";
+
+"Events.TabTitle" = "Events";
+"ModelsFeed.TabTitle" = "Models";
