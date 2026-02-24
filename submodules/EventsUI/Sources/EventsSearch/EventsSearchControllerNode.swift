@@ -21,9 +21,11 @@ final class EventsSearchControllerNode: ASDisplayNode, UITextFieldDelegate {
 
     private var presentationData: PresentationData
     private var presentationDataDisposable: Disposable?
-    
+    private let supportPeerDisposable = MetaDisposable()
+
     private let presentationDataPromise: Promise<PresentationData>
-    
+    private var searchQueryValue: String = ""
+
     private let _ready = Promise<Bool>()
     private var readyValue = false {
         didSet {
@@ -190,6 +192,7 @@ final class EventsSearchControllerNode: ASDisplayNode, UITextFieldDelegate {
     deinit {
         self.disposable?.dispose()
         self.presentationDataDisposable?.dispose()
+        self.supportPeerDisposable.dispose()
         NotificationCenter.default.removeObserver(self)
     }
     
@@ -222,7 +225,20 @@ final class EventsSearchControllerNode: ASDisplayNode, UITextFieldDelegate {
     }
     
     @objc private func applyButtonTapped() {
-        print("Apply filter button tapped!")
+        
+//
+//        print("Apply filter button tapped!")
+//        let supportPeer = Promise<String?>()
+//        supportPeer.set(context.engine.peers.getCountries())
+//        self.supportPeerDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { peerId in
+//            print("⛳️", peerId ?? "")
+//        }))
+        // let id = Int(searchQueryValue) ?? 0
+        // let supportPeer = Promise<String?>()
+        // supportPeer.set(context.engine.peers.getEvent(eventId: id))
+        // self.supportPeerDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { peerId in
+        //     print("🔕", peerId ?? "")
+        // }))
     }
     
     @objc private func fromDateTapped() {
@@ -257,6 +273,7 @@ final class EventsSearchControllerNode: ASDisplayNode, UITextFieldDelegate {
     
     private func handleSearchQueryUpdate(_ query: String) {
         print("Search query updated: \(query)")
+        searchQueryValue = query
     }
     
     private func updateThemeAndStrings() {
