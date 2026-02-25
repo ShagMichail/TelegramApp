@@ -44,7 +44,7 @@ final class NewContactScreenComponent: Component {
     
     let context: AccountContext
     let initialData: NewContactScreen.InitialData
-
+    
     init(
         context: AccountContext,
         initialData: NewContactScreen.InitialData
@@ -52,7 +52,7 @@ final class NewContactScreenComponent: Component {
         self.context = context
         self.initialData = initialData
     }
-
+    
     static func ==(lhs: NewContactScreenComponent, rhs: NewContactScreenComponent) -> Bool {
         return true
     }
@@ -77,7 +77,7 @@ final class NewContactScreenComponent: Component {
         private let title = ComponentView<Empty>()
         private let cancelButton = ComponentView<Empty>()
         private let doneButton = ComponentView<Empty>()
-                
+        
         private var isUpdating: Bool = false
         private var ignoreScrolling: Bool = false
         private var previousHadInputHeight: Bool = false
@@ -176,7 +176,7 @@ final class NewContactScreenComponent: Component {
         }
         
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
-
+            
         }
         
         func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
@@ -236,13 +236,13 @@ final class NewContactScreenComponent: Component {
             
             controller.dismiss(animated: true, completion: nil)
         }
-                
+        
         func update(component: NewContactScreenComponent, availableSize: CGSize, state: EmptyComponentState, environment: Environment<EnvironmentType>, transition: ComponentTransition) -> CGSize {
             self.isUpdating = true
             defer {
                 self.isUpdating = false
             }
-                        
+            
             var alphaTransition = transition
             if !transition.animation.isImmediate {
                 alphaTransition = alphaTransition.withAnimation(.curve(duration: 0.25, curve: .easeInOut))
@@ -275,7 +275,7 @@ final class NewContactScreenComponent: Component {
                     } else {
                         countryCode = AuthorizationSequenceCountrySelectionController.defaultCountryCode()
                     }
-                    if let _ = component.initialData.peer {   
+                    if let _ = component.initialData.peer {
                     } else {
                         updateFocusTag = self.firstNameTag
                     }
@@ -320,7 +320,7 @@ final class NewContactScreenComponent: Component {
             if let _ = component.initialData.peer {
                 avatarInset = 84.0
             }
-                    
+            
             let nameSectionItems: [AnyComponentWithIdentity<Empty>] = [
                 AnyComponentWithIdentity(id: "firstName", component: AnyComponent(ListTextFieldItemComponent(
                     style: .glass,
@@ -463,7 +463,7 @@ final class NewContactScreenComponent: Component {
                                     return
                                 }
                                 let countryController = AuthorizationSequenceCountrySelectionController(strings: strings, theme: environment.theme, glass: true)
-                                countryController.completeWithCountryCode = { [weak self] code, name in
+                                countryController.completeWithCountryCode = { [weak self] code, _, name in
                                     guard let self else {
                                         return
                                     }
@@ -619,7 +619,7 @@ final class NewContactScreenComponent: Component {
                 self.updateCountryCode(code: initialCountryCode, name: "")
             }
             
-
+            
             var optionsSectionItems: [AnyComponentWithIdentity<Empty>] = [
                 AnyComponentWithIdentity(id: "syncContact", component: AnyComponent(ListActionItemComponent(
                     theme: theme,
@@ -694,7 +694,7 @@ final class NewContactScreenComponent: Component {
             }
             contentHeight += optionsSectionSize.height
             contentHeight += sectionSpacing
-
+            
             if case .peer = self.resolvedPeer {
                 if let qrSectionView = self.qrSection.view, qrSectionView.superview != nil {
                     transition.setAlpha(view: qrSectionView, alpha: 0.0, completion: { _ in
@@ -853,8 +853,8 @@ final class NewContactScreenComponent: Component {
                 }
             }
             self.ignoreScrolling = false
-                        
-
+            
+            
             let isValid = self.validatedInput() != nil
             
             let edgeEffectHeight: CGFloat = 66.0
@@ -956,7 +956,7 @@ final class NewContactScreenComponent: Component {
             if let updateFocusTag {
                 self.activateInput(tag: updateFocusTag)
             }
-                    
+            
             return availableSize
         }
     }
@@ -996,7 +996,7 @@ public class NewContactScreen: ViewControllerComponentContainer {
     private let context: AccountContext
     fileprivate let completion: (EnginePeer?, DeviceContactStableId?, DeviceContactExtendedData?) -> Void
     private var isDismissed: Bool = false
-            
+    
     public init(
         context: AccountContext,
         initialData: InitialData,
@@ -1122,7 +1122,7 @@ public class NewContactScreen: ViewControllerComponentContainer {
                 note: ""
             )
             let _ = (contactDataManager.createContactWithData(composedContactData)
-            |> deliverOnMainQueue).start(next: { [weak self] contactIdAndData in
+                     |> deliverOnMainQueue).start(next: { [weak self] contactIdAndData in
                 if let self, let contactIdAndData {
                     self.completion(result.peer, contactIdAndData.0, contactIdAndData.1)
                 }

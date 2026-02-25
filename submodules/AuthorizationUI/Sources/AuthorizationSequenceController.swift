@@ -129,7 +129,6 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
         self.view.backgroundColor = self.presentationData.theme.list.plainBackgroundColor
     }
     
-// MARK: MASTER
     private func splashController() -> AuthorizationSequenceSplashController {
         var currentController: AuthorizationSequenceSplashController?
         for c in self.viewControllers {
@@ -158,41 +157,6 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
             }
         }
         return controller
-
-        // MARK: MASTER ————
-
-    // private func splashController() -> AuthorizationSequencePhoneEntryController {
-        
-        
-    //     return phoneEntryController(countryCode: AuthorizationSequenceController.defaultCountryCode(), number: "", splashController: nil)
-//        var currentController: AuthorizationSequenceSplashController?
-//        for c in self.viewControllers {
-//            if let c = c as? AuthorizationSequenceSplashController {
-//                currentController = c
-//                break
-//            }
-//        }
-//        let controller: AuthorizationSequenceSplashController
-//        if let currentController = currentController {
-//            controller = currentController
-//        } else {
-//            controller = AuthorizationSequenceSplashController(accountManager: self.sharedContext.accountManager, account: self.account, theme: self.presentationData.theme)
-//            controller.nextPressed = { [weak self] strings in
-//                if let strongSelf = self {
-//                    if let strings = strings {
-//                        strongSelf.presentationData = strongSelf.presentationData.withStrings(strings)
-//                    }
-//                    let masterDatacenterId = strongSelf.account.masterDatacenterId
-//                    let isTestingEnvironment = strongSelf.account.testingEnvironment
-//                    
-//                    let countryCode = AuthorizationSequenceController.defaultCountryCode()
-//                    
-//                    let _ = strongSelf.engine.auth.setState(state: UnauthorizedAccountState(isTestingEnvironment: isTestingEnvironment, masterDatacenterId: masterDatacenterId, contents: .phoneEntry(countryCode: countryCode, number: ""))).startStandalone()
-//                }
-//            }
-//        }
-//        return controller
-// MARK: LEGACY
     }
     
     private func phoneEntryController(countryCode: Int32, number: String, splashController: AuthorizationSequenceSplashController?) -> AuthorizationSequencePhoneEntryController {
@@ -1183,6 +1147,100 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                         syncContacts: true)
                 ))
             }, typeOfRole: typeOfRole)
+            
+            controller.signUpWithName = { [weak self, weak controller] firstName, lastName, modelinfo, avatarData, avatarAsset, avatarAdjustments, announceSignUp in
+                if let strongSelf = self {
+                    controller?.inProgress = true
+                    
+                    var videoStartTimestamp: Double? = nil
+                    if let adjustments = avatarAdjustments, adjustments.videoStartValue > 0.0 {
+                        videoStartTimestamp = adjustments.videoStartValue - adjustments.trimStartValue
+                    }
+                    
+                    let avatarVideo: Signal<UploadedPeerPhotoData?, NoError>?
+                    if let avatarAsset = avatarAsset as? AVAsset {
+                        let engine = strongSelf.engine
+                        avatarVideo = Signal<TelegramMediaResource?, NoError> { subscriber in
+                            let entityRenderer: LegacyPaintEntityRenderer? = avatarAdjustments.flatMap { adjustments in
+                                if let paintingData = adjustments.paintingData, paintingData.hasAnimation {
+                                    return LegacyPaintEntityRenderer(postbox: nil, adjustments: adjustments)
+                                } else {
+                                    return nil
+                                }
+                            }
+                            
+                            let tempFile = EngineTempBox.shared.tempFile(fileName: "video.mp4")
+                            let signal = TGMediaVideoConverter.convert(avatarAsset, adjustments: avatarAdjustments, path: tempFile.path, watcher: nil, entityRenderer: entityRenderer)!
+                            
+                            let signalDisposable = signal.start(next: { next in
+                                if let result = next as? TGMediaVideoConversionResult {
+                                    var value = stat()
+                                    if stat(result.fileURL.path, &value) == 0 {
+                                        if let data = try? Data(contentsOf: result.fileURL) {
+                                            let resource = LocalFileMediaResource(fileId: Int64.random(in: Int64.min ... Int64.max))
+                                            engine.account.postbox.mediaBox.storeResourceData(resource.id, data: data, synchronous: true)
+                                            subscriber.putNext(resource)
+                                            
+                                            EngineTempBox.shared.dispose(tempFile)
+                                        }
+                                    }
+                                    subscriber.putCompletion()
+                                }
+                            }, error: { _ in
+                            }, completed: nil)
+                            
+                            let disposable = ActionDisposable {
+                                signalDisposable?.dispose()
+                            }
+                            
+                            return ActionDisposable {
+                                disposable.dispose()
+                            }
+                        }
+                        |> mapToSignal { resource -> Signal<UploadedPeerPhotoData?, NoError> in
+                            if let resource = resource {
+                                return engine.auth.uploadedPeerVideo(resource: resource) |> map(Optional.init)
+                            } else {
+                                return .single(nil)
+                            }
+                        }
+                    } else {
+                        avatarVideo = nil
+                    }
+                    
+                    strongSelf.actionDisposable.set((signUpWithName(accountManager: strongSelf.sharedContext.accountManager, account: strongSelf.account, firstName: firstName, lastName: lastName, modelinfo: modelinfo, avatarData: avatarData, avatarVideo: avatarVideo, videoStartTimestamp: videoStartTimestamp, disableJoinNotifications: !announceSignUp, forcedPasswordSetupNotice: { value in
+                        guard let entry = CodableEntry(ApplicationSpecificCounterNotice(value: value)) else {
+                            return nil
+                        }
+                        return (ApplicationSpecificNotice.forcedPasswordSetupKey(), entry)
+                    })
+                    |> deliverOnMainQueue).startStrict(error: { error in
+                        Queue.mainQueue().async {
+                            if let strongSelf = self, let controller = controller {
+                                controller.inProgress = false
+                                
+                                let text: String
+                                switch error {
+                                    case .limitExceeded:
+                                        text = strongSelf.presentationData.strings.Login_CodeFloodError
+                                    case .codeExpired:
+                                        text = strongSelf.presentationData.strings.Login_CodeExpiredError
+                                    case .invalidFirstName:
+                                        text = strongSelf.presentationData.strings.Login_InvalidFirstNameError
+                                    case .invalidLastName:
+                                        text = strongSelf.presentationData.strings.Login_InvalidLastNameError
+                                    case .generic:
+                                        text = strongSelf.presentationData.strings.Login_UnknownError
+                                }
+                                
+                                controller.present(standardTextAlertController(theme: AlertControllerTheme(presentationData: strongSelf.presentationData), title: nil, text: text, actions: [TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Common_OK, action: {})]), in: .window(.root))
+                                
+                                strongSelf.updateState(state: .state(.empty))
+                            }
+                        }
+                    }))
+                }
+            }
         }
         
         return controller

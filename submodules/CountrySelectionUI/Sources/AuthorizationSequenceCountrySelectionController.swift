@@ -325,7 +325,7 @@ public final class AuthorizationSequenceCountrySelectionController: ViewControll
         return self.displayNode as! AuthorizationSequenceCountrySelectionControllerNode
     }
     
-    public var completeWithCountryCode: ((Int, String) -> Void)?
+    public var completeWithCountryCode: ((Int, String, String) -> Void)?
     public var dismissed: (() -> Void)?
     
     public init(strings: PresentationStrings, theme: PresentationTheme, displayCodes: Bool = true, glass: Bool = false) {
@@ -366,8 +366,8 @@ public final class AuthorizationSequenceCountrySelectionController: ViewControll
     
     override public func loadDisplayNode() {
         self.displayNode = AuthorizationSequenceCountrySelectionControllerNode(theme: self.theme, strings: self.strings, displayCodes: self.displayCodes, glass: self.glass, itemSelected: { [weak self] args in
-            let (_, countryId, code) = args
-            self?.completeWithCountryCode?(code, countryId)
+            let ((name, _), countryId, code) = args
+            self?.completeWithCountryCode?(code, countryId, name)
             self?.dismiss()
         })
         self.controllerNode.deactivateSearch = { [weak self] in

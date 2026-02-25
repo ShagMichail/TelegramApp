@@ -4215,16 +4215,43 @@ private func helpSearchableItems(context: AccountContext) -> [SettingsSearchable
     items.append(
         SettingsSearchableItem(
             id: "ask-question",
-            title: strings.Settings_Support,
-            alternate: synonyms(strings.SettingsSearch_Synonyms_Support),
+            title: "getCountries",
+            alternate: ["getCountries"],
             icon: .support,
             breadcrumbs: [],
             present: { context, _, present in
                 let _ = (context.engine.peers.supportPeerId()
-                |> deliverOnMainQueue).start(next: { peerId in
-                    if let peerId = peerId {
-                        present(.push, context.sharedContext.makeChatController(context: context, chatLocation: .peer(id: peerId), subject: nil, botStart: nil, mode: .standard(.default), params: nil))
-                    }
+                |> deliverOnMainQueue).start(next: { _ in
+                })
+            }
+        )
+    )
+
+    items.append(
+        SettingsSearchableItem(
+            id: "ask-question-2",
+            title: "getEvents",
+            alternate: ["getEvents"],
+            icon: .support,
+            breadcrumbs: [],
+            present: { context, _, present in
+                let _ = (context.engine.peers.supportPeerId()
+                |> deliverOnMainQueue).start(next: { _ in
+                })
+            }
+        )
+    )
+
+    items.append(
+        SettingsSearchableItem(
+            id: "ask-question-3",
+            title: "EventTypes",
+            alternate: ["getEvents"],
+            icon: .support,
+            breadcrumbs: [],
+            present: { context, _, present in
+                let _ = (context.engine.peers.supportGetEventTypes()
+                |> deliverOnMainQueue).start(next: { _ in
                 })
             }
         )
@@ -4487,6 +4514,7 @@ func settingsSearchableItems(
         let storiesItems = myProfileSearchableItems(context: context)
         allItems.append(contentsOf: storiesItems)
         
+
         if let hasTwoStepAuth = hasTwoStepAuth,
            hasTwoStepAuth {
             let passport = SettingsSearchableItem(

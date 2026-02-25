@@ -9,6 +9,8 @@ import TelegramPresentationData
 import AccountContext
 import ContactListUI
 import CallListUI
+import EventsUI
+import ModelsFeedUI
 import ChatListUI
 import SettingsUI
 import AppBundle
@@ -77,7 +79,8 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     public var rootTabController: TabBarController?
     
     public var contactsController: ContactsController?
-    public var callListController: CallListController?
+    public var modelsFeedNode: ModelsFeedController?
+    public var eventsController: EventsController?
     public var chatListController: ChatListController?
     public var accountSettingsController: PeerInfoScreen?
     
@@ -202,19 +205,22 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         if let sharedContext = self.context.sharedContext as? SharedAccountContextImpl {
             chatListController.tabBarItem.badgeValue = sharedContext.switchingData.chatListBadge
         }
-        let callListController = CallListController(context: self.context, mode: .tab)
-        
+        let eventsController = EventsController(context: self.context)
+        let modelsFeedNode = ModelsFeedController(context: self.context)
+
         var controllers: [ViewController] = []
         
         let contactsController = ContactsController(context: self.context)
         contactsController.switchToChatsController = {  [weak self] in
             self?.openChatsController(activateSearch: false)
         }
-        controllers.append(contactsController)
+        // controllers.append(contactsController)
+        controllers.append(modelsFeedNode)
+        controllers.append(eventsController)
         
-        if showCallsTab {
-            controllers.append(callListController)
-        }
+        // if showCallsTab {
+        //     controllers.append(callListController)
+        // }
         controllers.append(chatListController)
         
         var restoreSettignsController: (ViewController & SettingsController)?
@@ -239,7 +245,8 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         tabBarController.setControllers(controllers, selectedIndex: restoreSettignsController != nil ? (controllers.count - 1) : (controllers.count - 2))
         
         self.contactsController = contactsController
-        self.callListController = callListController
+        self.modelsFeedNode = modelsFeedNode
+        self.eventsController = eventsController
         self.chatListController = chatListController
         self.accountSettingsController = accountSettingsController
         self.rootTabController = tabBarController
@@ -252,9 +259,9 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         }
         var controllers: [ViewController] = []
         controllers.append(self.contactsController!)
-        if showCallsTab {
-            controllers.append(self.callListController!)
-        }
+        // if showCallsTab {
+        //     controllers.append(self.callListController!)
+        // }
         controllers.append(self.chatListController!)
         controllers.append(self.accountSettingsController!)
         
@@ -834,7 +841,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     }
     
     public func startNewCall() {
-        self.callListController?.tabBarActivateSearch()
+        // self.callListController?.tabBarActivateSearch()
     }
 }
 

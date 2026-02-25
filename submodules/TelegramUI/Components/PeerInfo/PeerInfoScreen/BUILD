@@ -24,6 +24,7 @@ swift_library(
         "//submodules/AvatarVideoNode",
         "//submodules/CalendarMessageScreen",
         "//submodules/CallListUI",
+        "//submodules/EventsUI",
         "//submodules/TelegramUI/Components/Chat/ChatAvatarNavigationNode",
         "//submodules/TelegramUI/Components/ChatControllerInteraction",
         "//submodules/ChatInterfaceState",
@@ -174,6 +175,7 @@ swift_library(
         "//submodules/TelegramUI/Components/AlertComponent/AlertTransferHeaderComponent",
         "//submodules/TelegramUI/Components/HorizontalTabsComponent",
         "//submodules/TelegramUI/Components/PeerInfo/AccountPeerContextItem",
+        "//submodules/ProfileScreenUI:ProfileScreenUI",
     ],
     visibility = [
         "//visibility:public",

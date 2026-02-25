@@ -8,6 +8,7 @@ import TextFormat
 import Markdown
 import SolidRoundedButtonNode
 import AuthorizationUtils
+import TelegramCore
 
 private enum TypeOfRole: String {
     case talent = "TALENT"
@@ -55,15 +56,12 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     private let titleNode: ASTextNode
     private let currentOptionNode: ASTextNode
     
-    private let sectionTitleNode: ASTextNode
-    // MARK: MASTER
-    // private let newSeparatorNode: ASDisplayNode
-// MARK: LEGACY    
+    private let sectionTitleNode: ASTextNode 
     private let nameAgency: TextFieldNode
     private let chooseCountryField: TextFieldNode
+    private var countryId: String = ""
     private let chooseGenderField: TextFieldNode
     private let chooseAgencyField: TextFieldNode
-// MARK: LEGACY ————
     private let websiteField: TextFieldNode
     
     private let ageSliderNode: AgeSliderNode
@@ -72,16 +70,8 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     
     private let currentPhotoNode: ASImageNode
     private let addPhotoButton: HighlightableButtonNode
-    
-// MARK: MASTER
-    // private let backNode: SolidRoundedButtonNode
-    // private let saveNode: SolidRoundedButtonNode
-    
-    //    let titleNode_new: ASTextNode
-// MARK: LEGACY
     private let backNode: ButtonWithIconNode
     private let saveNode: ButtonWithIconNode
-// MARK: LEGACY ————
     
     private var layoutArguments: (ContainerViewLayout, CGFloat)?
     
@@ -107,27 +97,12 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         }
     }
     
-    var signUpWithName: ((String, String) -> Void)?
+    var signUpWithName: ((AuthorizationModelInfo) -> Void)?
+    var selectCountryCode: (() -> Void)?
     var openTermsOfService: (() -> Void)?
-    
-// MARK: MASTER
-    // var inProgress: Bool = false {
-    //     didSet {
-            
-    //         if self.inProgress != oldValue {
-    //             if self.inProgress {
-    //                 self.proceedNode.transitionToProgress()
-    //                 //                    self.saveNode.transitionToProgress()
-    //             } else {
-    //                 //                    self.saveNode.transitionFromProgress()
-    //                 self.proceedNode.transitionFromProgress()
-    //             }
-    //         }
-    //     }
-    // }
-// MARK: LEGACY
+    var back: (() -> Void)?
+
     var inProgress: Bool = false
-    // MARK: LEGACY ————
     
     init(theme: PresentationTheme, strings: PresentationStrings, typeOfRole: String, addPhoto: @escaping () -> Void) {
         self.theme = theme
@@ -199,42 +174,7 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         
         self.addPhotoButton.addSubnode(self.currentPhotoNode)
         self.addPhotoButton.allowsGroupOpacity = true
-        
-// MARK: MASTER
-        // self.proceedNode = SolidRoundedButtonNode(title: self.strings.Login_Continue, theme: SolidRoundedButtonTheme(theme: self.theme), height: 50.0, cornerRadius: 11.0)
-        // self.proceedNode.progressType = .embedded
-        
-        // //        self.titleNode_new = ASTextNode()
-        // //        self.titleNode_new.attributedText = NSAttributedString(string: "Apply as a agencies & brands".uppercased(), attributes: [
-        // //            .font: UIFont.boldSystemFont(ofSize: 34),
-        // //            .foregroundColor: UIColor.white
-        // //        ])
-        
-        // let backButtonTheme = SolidRoundedButtonTheme(
-        //     backgroundColor: UIColor(red: 0.17, green: 0.17, blue: 0.17, alpha: 1.0),
-        //     foregroundColor: .white
-        // )
-        // self.backNode = SolidRoundedButtonNode(
-        //     title: "← Back",
-        //     theme: backButtonTheme,
-        //     height: 50.0,
-        //     cornerRadius: 11.0
-        // )
-        // //        self.backNode.progressType = .none
-        
-        // let saveButtonTheme = SolidRoundedButtonTheme(
-        //     backgroundColor: UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0),
-        //     foregroundColor: .white
-        // )
-        // self.saveNode = SolidRoundedButtonNode(
-        //     title: "Save",
-        //     theme: saveButtonTheme,
-        //     height: 50.0,
-        //     cornerRadius: 11.0
-        // )
-        // self.saveNode.progressType = .embedded
 
-// MARK: LEGACY
         let backIcon = generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/Back"),
                                            color: .white)
         
@@ -244,7 +184,6 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         
         self.saveNode = ButtonWithIconNode(title: "Save", icon: nil, theme: theme, spacing: 10, imageSize: imageSize)
         self.saveNode.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
-// MARK: LEGACY ————
         
         super.init()
         
@@ -291,6 +230,15 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
             self.containerLayoutUpdated(layout, navigationBarHeight: navigationHeight, transition: .immediate)
         }
     }
+
+    func updateCountry(countryId: String, countryName: String) {
+        chooseCountryField.textField.text = countryName
+        self.countryId = countryId
+//        if let (layout, navigationHeight) = self.layoutArguments {
+//            self.containerLayoutUpdated(layout, navigationBarHeight: navigationHeight, transition: .immediate)
+//        }
+        
+    }
     
     func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
         let previousInputHeight = self.layoutArguments?.0.inputHeight ?? 0.0
@@ -311,14 +259,7 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         }
         
         let titleSize = self.titleNode.measure(CGSize(width: maximumWidth-40, height: .greatestFiniteMagnitude))
-// MARK: MASTER
-        //        let titleOriginY: CGFloat = 40.0
-        //        let titleFrame = CGRect(
-        //            origin: CGPoint(x: 40, y: titleOriginY + 100),
-        //            size: titleSize
-        //        )
-        //        self.titleNode_new.frame = titleFrame
-// MARK: MASTER ————
+
         let additionalBottomInset: CGFloat = layout.size.width > 320.0 ? 90.0 : 10.0
 
         self.titleNode.attributedText = NSAttributedString(string: "Apply as a agencies & brands".uppercased(), font: Font.bold(34), textColor: .white, paragraphAlignment: .center)
@@ -327,10 +268,7 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         let fieldHeight: CGFloat = 40.0
         
         let sideInset: CGFloat = 24.0
-// MARK: MASTER
-        //        let innerInset: CGFloat = 16.0
-// MARK: MASTER ————
-        
+
         let noticeSize = self.currentOptionNode.measure(CGSize(width: maximumWidth - 28.0, height: CGFloat.greatestFiniteMagnitude))
         let sectionTitleSize = self.sectionTitleNode.measure(CGSize(width: maximumWidth, height: CGFloat.greatestFiniteMagnitude))
         
@@ -379,35 +317,9 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         
         items.append(AuthorizationLayoutItem(node: self.websiteField, size: CGSize(width: maximumWidth - sideInset * 2.0, height: fieldHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 16.0, maxValue: 16.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
 
-// MARK: MASTER
-        // items.append(AuthorizationLayoutItem(node: newSeparatorNode, size: CGSize(width: layout.size.width - sideInset * 2.0, height: UIScreenPixel), spacingBefore: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-        
-        // items.append(AuthorizationLayoutItem(node: self.termsNode, size: termsSize, spacingBefore: AuthorizationLayoutItemSpacing(weight: 48.0, maxValue: 100.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-        
-        // if layout.size.width > 320.0 {
-        //     self.proceedNode.isHidden = false
-            
-        //     let inset: CGFloat = 24.0
-        //     let proceedHeight = self.proceedNode.updateLayout(width: maximumWidth - 48.0, transition: transition)
-        //     let proceedSize = CGSize(width: maximumWidth - 48.0, height: proceedHeight)
-        //     transition.updateFrame(node: self.proceedNode, frame: CGRect(origin: CGPoint(x: floorToScreenPixels((layout.size.width - proceedSize.width) / 2.0), y: layout.size.height - insets.bottom - proceedSize.height - inset), size: proceedSize))
-        // } else {
-        //     insets.top = navigationBarHeight
-        //     self.proceedNode.isHidden = true
-        // }
-        
-        // let buttonWidth = (maximumWidth - 48.0 - 10.0) / 2.0 // 10.0 is the spacing between buttons
-        // let buttonHeight: CGFloat = 50.0
-        // let bottomInset: CGFloat = 24.0
-        
-        // Save Button
-        //        let saveButtonSize = CGSize(width: buttonWidth, height: buttonHeight)
-
-// MARK: LEGACY
         let buttonWidth = (maximumWidth - 48.0 - 10.0) / 2.0
         let buttonHeight: CGFloat = 50.0
         let bottomInset: CGFloat = 24.0
-// MARK: LEGACY ————
 
         let saveButtonFrame = CGRect(
             x: floorToScreenPixels((layout.size.width - maximumWidth + 48.0) / 2.0) + buttonWidth + 10.0,
@@ -425,11 +337,6 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         )
         transition.updateFrame(node: self.backNode, frame: backButtonFrame)
 
-// MARK: MASTER
-        // Hide the old proceedNode
-        //        self.proceedNode.isHidden = true
-// MARK: MASTER ————
-        
         let _ = layoutAuthorizationItems(bounds: CGRect(origin: CGPoint(x: 0.0, y: insets.top), size: CGSize(width: layout.size.width, height: layout.size.height - insets.top - insets.bottom - additionalBottomInset)), items: items, transition: transition, failIfDoesNotFit: false)
     }
     
@@ -442,12 +349,6 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     }
     
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        //        if textField === self.firstNameField.textField {
-        //            self.lastNameField.textField.becomeFirstResponder()
-        //        } else {
-        //            let name = self.currentName
-        //            self.signUpWithName?(name.0, name.1)
-        //        }
         return false
     }
     
@@ -456,11 +357,21 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     }
     
     @objc private func backButtonPressed() {
-        signUpWithName?("", "")
+        back?()
     }
     
     @objc private func saveButtonPressed() {
         print("Save button pressed!")
+        let typeId: Int32 = typeOfRole == .talent ? 1 : typeOfRole == .model ? 2 : 3
+        let modelInfo = AuthorizationModelInfo(
+            typeId: typeId,
+            gender: 2,//chooseGenderField
+            age: Int32(ageSliderNode.slider.value.rounded()),
+            name: nameAgency.textField.text,
+            agencyName: chooseAgencyField.textField.text,
+            countryCode: countryId,
+            url: websiteField.textField.text)
+        signUpWithName?(modelInfo)
     }
     
     @objc private func dismissKeyboard() {
@@ -473,6 +384,15 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     
     func textFieldDidEndEditing(_ textField: UITextField) {
         self.activeTextField = nil
+    }
+
+    func textFieldShouldBeginEditing(_ textField: UITextField) -> Bool {
+        if textField == chooseCountryField.textField {
+            selectCountryCode?()
+            return false
+        } else {
+            return true
+        }
     }
     
     override func didLoad() {

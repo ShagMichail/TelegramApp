@@ -248,59 +248,59 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
         interaction.openSettings(.language)
     }))
     
-    let premiumConfiguration = PremiumConfiguration.with(appConfiguration: context.currentAppConfiguration.with { $0 })
-    let isPremiumDisabled = premiumConfiguration.isPremiumDisabled
-    if !isPremiumDisabled || context.isPremium {
-        items[.payment]!.append(PeerInfoScreenDisclosureItem(id: 100, label: .text(""), text: presentationData.strings.Settings_Premium, icon: PresentationResourcesSettings.premium, action: {
-            interaction.openSettings(.premium)
-        }))
-    }
-    if let starsState = data.starsState {
-        if !isPremiumDisabled || abs(starsState.balance.value) > 0 {
-            let balanceText: NSAttributedString
-            if abs(starsState.balance.value) > 0 {
-                let formattedLabel = formatStarsAmountText(starsState.balance, dateTimeFormat: presentationData.dateTimeFormat)
-                let smallLabelFont = Font.regular(floor(presentationData.listsFontSize.itemListBaseFontSize / 17.0 * 13.0))
-                let labelFont = Font.regular(presentationData.listsFontSize.itemListBaseFontSize)
-                let labelColor = presentationData.theme.list.itemSecondaryTextColor
-                balanceText = tonAmountAttributedString(formattedLabel, integralFont: labelFont, fractionalFont: smallLabelFont, color: labelColor, decimalSeparator: presentationData.dateTimeFormat.decimalSeparator)
-            } else {
-                balanceText = NSAttributedString()
-            }
-            items[.payment]!.append(PeerInfoScreenDisclosureItem(id: 102, label: .attributedText(balanceText), text: presentationData.strings.Settings_Stars, icon: PresentationResourcesSettings.stars, action: {
-                interaction.openSettings(.stars)
-            }))
-        }
-    }
-    if let tonState = data.tonState {
-        if abs(tonState.balance.value) > 0 {
-            let balanceText: NSAttributedString
-            if abs(tonState.balance.value) > 0 {
-                let formattedLabel = formatTonAmountText(tonState.balance.value, dateTimeFormat: presentationData.dateTimeFormat)
-                let smallLabelFont = Font.regular(floor(presentationData.listsFontSize.itemListBaseFontSize / 17.0 * 13.0))
-                let labelFont = Font.regular(presentationData.listsFontSize.itemListBaseFontSize)
-                let labelColor = presentationData.theme.list.itemSecondaryTextColor
-                balanceText = tonAmountAttributedString(formattedLabel, integralFont: labelFont, fractionalFont: smallLabelFont, color: labelColor, decimalSeparator: presentationData.dateTimeFormat.decimalSeparator)
-            } else {
-                balanceText = NSAttributedString()
-            }
-            items[.payment]!.append(PeerInfoScreenDisclosureItem(id: 103, label: .attributedText(balanceText), text: presentationData.strings.Settings_MyTon, icon: PresentationResourcesSettings.ton, action: {
-                interaction.openSettings(.ton)
-            }))
-        }
-    }
-    if !isPremiumDisabled || context.isPremium {
-        items[.payment]!.append(PeerInfoScreenDisclosureItem(id: 104, label: .text(""), additionalBadgeLabel: nil, text: presentationData.strings.Settings_Business, icon: PresentationResourcesSettings.business, action: {
-            interaction.openSettings(.businessSetup)
-        }))
-    }
-    if let starsState = data.starsState {
-        if !isPremiumDisabled || starsState.balance > StarsAmount.zero {
-            items[.payment]!.append(PeerInfoScreenDisclosureItem(id: 105, label: .text(""), text: presentationData.strings.Settings_SendGift, icon: PresentationResourcesSettings.premiumGift, action: {
-                interaction.openSettings(.premiumGift)
-            }))
-        }
-    }
+    // let premiumConfiguration = PremiumConfiguration.with(appConfiguration: context.currentAppConfiguration.with { $0 })
+    // let isPremiumDisabled = premiumConfiguration.isPremiumDisabled
+    // if !isPremiumDisabled || context.isPremium {
+    //     items[.payment]!.append(PeerInfoScreenDisclosureItem(id: 100, label: .text(""), text: presentationData.strings.Settings_Premium, icon: PresentationResourcesSettings.premium, action: {
+    //         interaction.openSettings(.premium)
+    //     }))
+    // }
+    // if let starsState = data.starsState {
+    //     if !isPremiumDisabled || abs(starsState.balance.value) > 0 {
+    //         let balanceText: NSAttributedString
+    //         if abs(starsState.balance.value) > 0 {
+    //             let formattedLabel = formatStarsAmountText(starsState.balance, dateTimeFormat: presentationData.dateTimeFormat)
+    //             let smallLabelFont = Font.regular(floor(presentationData.listsFontSize.itemListBaseFontSize / 17.0 * 13.0))
+    //             let labelFont = Font.regular(presentationData.listsFontSize.itemListBaseFontSize)
+    //             let labelColor = presentationData.theme.list.itemSecondaryTextColor
+    //             balanceText = tonAmountAttributedString(formattedLabel, integralFont: labelFont, fractionalFont: smallLabelFont, color: labelColor, decimalSeparator: presentationData.dateTimeFormat.decimalSeparator)
+    //         } else {
+    //             balanceText = NSAttributedString()
+    //         }
+    //         items[.payment]!.append(PeerInfoScreenDisclosureItem(id: 102, label: .attributedText(balanceText), text: presentationData.strings.Settings_Stars, icon: PresentationResourcesSettings.stars, action: {
+    //             interaction.openSettings(.stars)
+    //         }))
+    //     }
+    // }
+    // if let tonState = data.tonState {
+    //     if abs(tonState.balance.value) > 0 {
+    //         let balanceText: NSAttributedString
+    //         if abs(tonState.balance.value) > 0 {
+    //             let formattedLabel = formatTonAmountText(tonState.balance.value, dateTimeFormat: presentationData.dateTimeFormat)
+    //             let smallLabelFont = Font.regular(floor(presentationData.listsFontSize.itemListBaseFontSize / 17.0 * 13.0))
+    //             let labelFont = Font.regular(presentationData.listsFontSize.itemListBaseFontSize)
+    //             let labelColor = presentationData.theme.list.itemSecondaryTextColor
+    //             balanceText = tonAmountAttributedString(formattedLabel, integralFont: labelFont, fractionalFont: smallLabelFont, color: labelColor, decimalSeparator: presentationData.dateTimeFormat.decimalSeparator)
+    //         } else {
+    //             balanceText = NSAttributedString()
+    //         }
+    //         items[.payment]!.append(PeerInfoScreenDisclosureItem(id: 103, label: .attributedText(balanceText), text: presentationData.strings.Settings_MyTon, icon: PresentationResourcesSettings.ton, action: {
+    //             interaction.openSettings(.ton)
+    //         }))
+    //     }
+    // }
+    // if !isPremiumDisabled || context.isPremium {
+    //     items[.payment]!.append(PeerInfoScreenDisclosureItem(id: 104, label: .text(""), additionalBadgeLabel: nil, text: presentationData.strings.Settings_Business, icon: PresentationResourcesSettings.business, action: {
+    //         interaction.openSettings(.businessSetup)
+    //     }))
+    // }
+    // if let starsState = data.starsState {
+    //     if !isPremiumDisabled || starsState.balance > StarsAmount.zero {
+    //         items[.payment]!.append(PeerInfoScreenDisclosureItem(id: 105, label: .text(""), text: presentationData.strings.Settings_SendGift, icon: PresentationResourcesSettings.premiumGift, action: {
+    //             interaction.openSettings(.premiumGift)
+    //         }))
+    //     }
+    // }
     
     if let settings = data.globalSettings {
         if settings.hasPassport {
@@ -315,15 +315,15 @@ func settingsItems(data: PeerInfoScreenData?, context: AccountContext, presentat
         }
     }
     
-    items[.support]!.append(PeerInfoScreenDisclosureItem(id: 0, text: presentationData.strings.Settings_Support, icon: PresentationResourcesSettings.support, action: {
-        interaction.openSettings(.support)
-    }))
-    items[.support]!.append(PeerInfoScreenDisclosureItem(id: 1, text: presentationData.strings.Settings_FAQ, icon: PresentationResourcesSettings.faq, action: {
-        interaction.openSettings(.faq)
-    }))
-    items[.support]!.append(PeerInfoScreenDisclosureItem(id: 2, text: presentationData.strings.Settings_Tips, icon: PresentationResourcesSettings.tips, action: {
-        interaction.openSettings(.tips)
-    }))
+    // items[.support]!.append(PeerInfoScreenDisclosureItem(id: 0, text: "createEvent", icon: PresentationResourcesSettings.support, action: {
+    //     interaction.openSettings(.support)
+    // }))
+    // items[.support]!.append(PeerInfoScreenDisclosureItem(id: 1, text: "getEvents", icon: PresentationResourcesSettings.faq, action: {
+    //     interaction.openSettings(.faq)
+    // }))
+    // items[.support]!.append(PeerInfoScreenDisclosureItem(id: 2, text: "get One Event", icon: PresentationResourcesSettings.tips, action: {
+    //     interaction.openSettings(.tips)
+    // }))
     
     var result: [(AnyHashable, [PeerInfoScreenItem])] = []
     for section in SettingsSection.allCases {

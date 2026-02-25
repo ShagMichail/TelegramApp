@@ -16,6 +16,7 @@ import TelegramPresentationData
 import PresentationDataUtils
 import PasswordSetupUI
 import InstantPageCache
+import ProfileScreenUI
 
 extension PeerInfoScreenNode {
     func openSettings(section: PeerInfoSettingsSection) {
@@ -52,18 +53,49 @@ extension PeerInfoScreenNode {
         case .proxy:
             self.controller?.push(proxySettingsController(context: self.context))
         case .profile:
-            self.controller?.push(PeerInfoScreenImpl(
-                context: self.context,
-                updatedPresentationData: self.controller?.updatedPresentationData,
-                peerId: self.context.account.peerId,
-                avatarInitiallyExpanded: false,
-                isOpenedFromChat: false,
-                nearbyPeerDistance: nil,
-                reactionSourceMessageId: nil,
-                callMessages: [],
-                isMyProfile: true,
-                profileGiftsContext: self.data?.profileGiftsContext
-            ))
+                        
+            let _ = (context.engine.peers.requestPeerPhotos(peerId: peerId)
+            |> deliverOnMainQueue).start(next: { photos in
+                let peer = self.data?.peer
+                
+                let cachedData = self.data?.cachedData as? CachedUserData
+                let dummyModel = ProfileModel(
+                    name: (peer as? TelegramUser)?.firstName ?? "",
+                    lastName: (peer as? TelegramUser)?.lastName,
+                    age: 22,
+                    location: "New York",
+                    mainImageName: "Models/image1",
+                    avatarImageName: "Models/image7",
+                    isVerified: true,
+                    likesCount: "1K",
+                    viewsCount: "285",
+                    savesCount: "765",
+                    biography: cachedData?.about ?? "",
+                    socialMediaHandles: ["_britney_ny", "_britney_ny", "britney_ny", "Website"],
+                    galleryImageNames: ["Models/image4", "Models/image2", "Models/image3"],
+                    photos: photos,
+                    isMyProfile: true
+                )
+                let detailController = ProfileScreenController(context: self.context, model: dummyModel, peer: peer)
+                self.controller?.push(detailController)
+            })
+            
+            
+//
+            
+            
+//            self.controller?.push(PeerInfoScreenImpl(
+//                context: self.context,
+//                updatedPresentationData: self.controller?.updatedPresentationData,
+//                peerId: self.context.account.peerId,
+//                avatarInitiallyExpanded: false,
+//                isOpenedFromChat: false,
+//                nearbyPeerDistance: nil,
+//                reactionSourceMessageId: nil,
+//                callMessages: [],
+//                isMyProfile: true,
+//                profileGiftsContext: self.data?.profileGiftsContext
+//            ))
         case .stories:
             push(PeerInfoStoryGridScreen(context: self.context, peerId: self.context.account.peerId, scope: .saved))
         case .savedMessages:
@@ -191,9 +223,37 @@ extension PeerInfoScreenNode {
                     }))
                 })]), in: .window(.root))
         case .faq:
-            self.openFaq()
+            let supportPeer = Promise<PeerId?>()
+            supportPeer.set(context.engine.peers.supportGetEventTypes())
+            self.controller?.present(textAlertController(context: self.context, updatedPresentationData: self.controller?.updatedPresentationData, title: nil, text: self.presentationData.strings.Settings_FAQ_Intro, actions: [
+                TextAlertAction(type: .genericAction, title: presentationData.strings.Settings_FAQ_Button, action: { [weak self] in
+                    self?.openFaq()
+                }), TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: { [weak self] in
+                    guard let self else {
+                        return
+                    }
+                    self.supportPeerDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { [weak self] peerId in
+                        if let strongSelf = self, let peerId = peerId {
+                            push(strongSelf.context.sharedContext.makeChatController(context: strongSelf.context, chatLocation: .peer(id: peerId), subject: nil, botStart: nil, mode: .standard(.default), params: nil))
+                        }
+                    }))
+                })]), in: .window(.root))
         case .tips:
-            self.openTips()
+            let supportPeer = Promise<PeerId?>()
+            supportPeer.set(context.engine.peers.supportGetEventTypes())
+            self.controller?.present(textAlertController(context: self.context, updatedPresentationData: self.controller?.updatedPresentationData, title: nil, text: self.presentationData.strings.Settings_FAQ_Intro, actions: [
+                TextAlertAction(type: .genericAction, title: presentationData.strings.Settings_FAQ_Button, action: { [weak self] in
+                    self?.openFaq()
+                }), TextAlertAction(type: .defaultAction, title: presentationData.strings.Common_OK, action: { [weak self] in
+                    guard let self else {
+                        return
+                    }
+                    self.supportPeerDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { [weak self] peerId in
+                        if let strongSelf = self, let peerId = peerId {
+                            push(strongSelf.context.sharedContext.makeChatController(context: strongSelf.context, chatLocation: .peer(id: peerId), subject: nil, botStart: nil, mode: .standard(.default), params: nil))
+                        }
+                    }))
+                })]), in: .window(.root))
         case .phoneNumber:
             guard let controller = self.controller, !controller.presentAccountFrozenInfoIfNeeded() else {
                 return

@@ -44,6 +44,15 @@ bazel build //Telegram:Telegram \
   --define=telegramVersion=12.2.2
 ```
 
+### 3. Build без сертификатов
+```bash
+bazel build //Telegram:Telegram \
+  --define=disableProvisioningProfiles=true \
+  --cpu=ios_sim_arm64 \
+  --define=buildNumber=100001 \
+  --define=telegramVersion=12.2.2
+```
+
 ### 4. Install & Run
 
 ```bash
