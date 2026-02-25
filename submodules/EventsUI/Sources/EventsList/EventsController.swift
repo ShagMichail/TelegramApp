@@ -108,12 +108,15 @@ public final class EventsController: TelegramBaseController {
                     let datePartPrefix = model.eventDate.prefix(while: { $0 != "T" })
                     
                     return EventData(
+                        id: model.id,
                         title: model.title,
                         subtitle: model.title,
                         imageName: "Components/Model",
                         profileImageName: "Components/Model",
-                        profileName: "@nyfw",
-                        timeRemaining: String(datePartPrefix)
+                        profileName: "@" + (model.creatorName ?? ""),
+                        timeRemaining: String(datePartPrefix),
+                        coverPhoto: model.coverPhoto,
+                        profilePhoto: model.creatorPhoto
                     )
                 }
                 

@@ -3,7 +3,7 @@ import SwiftSignalKit
 import TelegramApi
 import MtProtoKit
 
-func _getEvent(account: Account, eventId: Int) -> Signal<String?, NoError> {
+func _getEvent(account: Account, eventId: Int) -> Signal<EventModel?, NoError> {
     print("⛳️", "get one getEvent")
     
     return account.network.request(Api.functions.event.getEvent(eventId: Int64(eventId)))
@@ -11,15 +11,12 @@ func _getEvent(account: Account, eventId: Int) -> Signal<String?, NoError> {
     |> `catch` { _ in
         return Signal<Api.event.Event?, NoError>.single(nil)
     }
-    |> mapToSignal { support -> Signal<String?, NoError> in
-        if let getEvent = support {
-            print("👌 get one getEvent: ", getEvent)
-        }
-        return .single(nil)
+    |> mapToSignal { support -> Signal<EventModel?, NoError> in
+        return .single(getEventModel(support))
     }
 }
 
-func _internal_createEvent(account: Account, event: EventModel) -> Signal<String?, NoError> {
+func _internal_createEvent(account: Account, event: EventModel, id: Int64) -> Signal<String?, NoError> {
     print("⛳️", "post createEvent")
     
     var flags: Int32 = 0
@@ -32,7 +29,7 @@ func _internal_createEvent(account: Account, event: EventModel) -> Signal<String
 ////    locationFlags |= 1 << 0
 //    let location = Api.event.Location.location(flags: 0, country: country, city: nil)
 //
-    flags |= 1 << 0
+    flags |= 1 << 0 //eventType
 //    flags |= 1 << 1
 //    flags |= 1 << 2
 //
@@ -44,9 +41,9 @@ func _internal_createEvent(account: Account, event: EventModel) -> Signal<String
             description: event.description,
             eventType: eventType,
             eventDate: event.eventDate,
-            eventTime: event.eventTime,
+            eventTime: event.eventTime + ":00+03:00[Europe/Kyiv]",
             location: nil,
-            coverPhotoId: event.coverPhotoId,
+            coverPhotoId: id,
             enabledParameterKeys: event.enabledParameterKeys
         )
     )
@@ -118,21 +115,136 @@ func _internal_getEvents(account: Account) -> Signal<[EventModel]?, NoError> {
         switch events {
         case .events(_, let events, _, _):
             let eventModels: [EventModel] = events.compactMap { shortEvent in
-                if case let .short(_, _, _, title, _, eventDate, eventTime, _, _, _, _, _) = shortEvent {
-                    return EventModel(
-                        title: title,
-                        description: title,
-                        eventDate: eventDate,
-                        eventTime: eventTime,
-                        coverPhotoId: 0,
-                        enabledParameterKeys: nil
-                    )
-                }
-                return nil
+                return getEventModel(shortEvent)
             }
             return .single(eventModels)
         default:
             return .single(nil)
         }
     }
+}
+
+private func getEventModel(_ shortEvent: Api.event.Short?) -> EventModel? {
+    if case let .short(_, id, creator, title, coverPhoto, eventDate, eventTime, _, eventType, _, _, _) = shortEvent {
+        var eventTypeTitle: String? = nil
+        if case let .eventType(_, title) = eventType {
+            eventTypeTitle = title
+        }
+
+        let creatorData = getCreatorData(creator, coverPhoto)
+        
+        return EventModel(
+            id: Int(id),
+            title: title,
+            description: title,
+            eventDate: eventDate,
+            eventTime: eventTime,
+            coverPhoto: creatorData.cover,
+            eventType: eventTypeTitle,
+            creatorName: creatorData.creatorName,
+            creatorPhoto: creatorData.creatorPhoto
+        )
+    } else {
+        return nil
+    }
+}
+
+private func getEventModel(_ fullEvent: Api.event.Event?) -> EventModel? {
+    
+    if case let .event(_, id, creator, title, description, coverPhoto, eventDate, eventTime, _, eventType, _, _, _, gallery, _, _, _, _) = fullEvent {
+        var eventTypeTitle: String? = nil
+        if case let .eventType(_, title) = eventType {
+            eventTypeTitle = title
+        }
+        
+        let galleryPhotos: [TelegramMediaImage]? = gallery?.compactMap { element in
+            if case let .photo(photo, _) = element {
+                return telegramMediaImageFromApiPhoto(photo)
+            }
+            return nil
+        }
+
+        let creatorData = getCreatorData(creator, coverPhoto)
+        
+        return EventModel(
+            id: Int(id),
+            title: title,
+            description: description,
+            eventDate: eventDate,
+            eventTime: eventTime,
+            coverPhoto: creatorData.cover,
+            eventType: eventTypeTitle,
+            gallery: galleryPhotos,
+            creatorName: creatorData.creatorName,
+            creatorPhoto: creatorData.creatorPhoto
+        )
+    } else {
+        return nil
+    }
+}
+
+func _internal_addEventPhoto(account: Account, eventId: Int64, photoId: Int64) -> Signal<String?, NoError> {
+    print("⛳️", "post _internal_addEventPhoto")
+
+    return account.network.request(
+        Api.functions.event.addEventPhoto(eventId: eventId, photoId: photoId, displayOrder: 0)
+    )
+    |> map(Optional.init)
+    |> `catch` { _ in
+        return Signal<Api.event.Photo?, NoError>.single(nil)
+    }
+    |> mapToSignal { user -> Signal<String?, NoError> in
+        if let user = user {
+            print("👌 _internal_addEventPhoto: ", user)
+        }
+        return .single(nil)
+    }
+}
+
+private func getCreatorData(_ creator: Api.event.User?, _ coverPhoto: Api.event.Photo?) -> (creatorName: String?, creatorPhoto: TelegramMediaImage?, cover: TelegramMediaImage?) {
+    var creatorName: String? = nil
+    var userPhoto: Api.UserProfilePhoto? = nil
+    
+    if case let .user(innerUser)? = creator {
+        if case let .user(userData) = innerUser {
+            creatorName = userData.firstName
+            userPhoto = userData.photo
+        }
+    }
+    
+    var coverPhotoTM: TelegramMediaImage? = nil
+    if case let .photo(photo, _) = coverPhoto {
+        coverPhotoTM = telegramMediaImageFromApiPhoto(photo)
+    }
+    
+    var creatorPhoto: TelegramMediaImage? = nil
+    if let photo = userPhoto {
+        if case let .userProfilePhoto(userProfilePhoto) = photo {
+            
+            let representation = TelegramMediaImageRepresentation(
+                dimensions: PixelDimensions(width: 640, height: 640),
+                resource: CloudPhotoSizeMediaResource(
+                    datacenterId: userProfilePhoto.dcId,
+                    photoId: userProfilePhoto.photoId,
+                    accessHash: 0,
+                    sizeSpec: "a",
+                    size: nil,
+                    fileReference: nil
+                ),
+                progressiveSizes: [],
+                immediateThumbnailData: userProfilePhoto.strippedThumb?.makeData()
+            )
+            
+            creatorPhoto = TelegramMediaImage(
+                imageId: MediaId(namespace: Namespaces.Media.CloudImage, id: userProfilePhoto.photoId),
+                representations: [representation],
+                immediateThumbnailData: userProfilePhoto.strippedThumb?.makeData(),
+                reference: nil,
+                partialReference: nil,
+                flags: []
+            )
+        }
+    }
+    
+    return (creatorName: creatorName, creatorPhoto: creatorPhoto, cover: coverPhotoTM)
 }

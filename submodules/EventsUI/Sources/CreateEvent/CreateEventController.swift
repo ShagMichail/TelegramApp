@@ -97,12 +97,8 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
                 self?.present(c, in: .window(.root), with: a)
             }, openCurrent: nil, completion: { image in
                 self?.createEventNode.currentPhoto = image
-//                self?.avatarAsset = nil
-//                self?.avatarAdjustments = nil
             }, videoCompletion: { image, asset, adjustments in
                 self?.createEventNode.currentPhoto = image
-//                self?.avatarAsset = asset
-//                self?.avatarAdjustments = adjustments
             })
         })
         
@@ -116,14 +112,14 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
                     }
                 }
                 controller.dismissed = {
-//                    self?.controllerNode.activateInput()
+
                 }
                 strongSelf.push(controller)
             }
         }
         
-        self.createEventNode.scheduleTimeController = { [weak self] in
-            self?.scheduleTimeController()
+        self.createEventNode.scheduleTimeController = { [weak self] mode in
+            self?.scheduleTimeController(mode: mode)
         }
         self.createEventNode.showAlert = { [weak self] text in
             self?.showAlert(text: text)
@@ -135,24 +131,26 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
         
         let alertController = textAlertController(
             context: context, title: nil,
-            text: text, actions: [])
-//
-//        let alertController = UIAlertController(title: nil, message: "no no no.", preferredStyle: .alert)
-//        alertController.addAction(UIAlertAction(title: "OK", style: .default, handler: { _ in
-//        }))
+            text: text, actions: [
+                TextAlertAction(type: .genericAction, title: "Ok", action: {
+                    print("ok")
+                })
+            ])
         present(alertController, in: .window(.root))
     }
     
-    private func scheduleTimeController() {
-        let controller = ChatScheduleTimeController(
+    private func scheduleTimeController(mode: TimeControllerMode) {
+        let peerId = PeerId(0)
+        let controller = TimeController(
             context: context,
             updatedPresentationData: nil,
-            mode: .reminders,
+            peerId: peerId,
+            mode: mode,
             style: .default,
             currentTime: nil,
             minimalTime: nil,
             completion: { [weak self] time in
-                self?.createEventNode.updateTime(time)
+                self?.createEventNode.updateTime(time, mode)
             })
         present(controller, in: .window(.root))
     }

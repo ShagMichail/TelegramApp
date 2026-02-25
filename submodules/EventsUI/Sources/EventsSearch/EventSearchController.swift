@@ -21,7 +21,7 @@ public class EventsSearchController: ViewController, UINavigationControllerDeleg
     private var contactsNode: EventsSearchControllerNode {
         return self.displayNode as! EventsSearchControllerNode
     }
-    
+
     private var presentationData: PresentationData
     private var presentationDataDisposable: Disposable?
     
@@ -120,10 +120,12 @@ public class EventsSearchController: ViewController, UINavigationControllerDeleg
     }
 
     private func scheduleTimeController() {
-        let controller = ChatScheduleTimeController(
+        let peerId = PeerId(0)
+        let controller = TimeController(
             context: context,
             updatedPresentationData: nil,
-            mode: .reminders,
+            peerId: peerId,
+            mode: .date,
             style: .default,
             currentTime: nil,
             minimalTime: nil,

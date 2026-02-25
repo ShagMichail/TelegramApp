@@ -16,6 +16,7 @@ public final class EventDetailController: TelegramBaseController {
         return self.displayNode as! EventDetailControllerNode
     }
     
+    private let getEventDisposable = MetaDisposable()
     private var customBackSwipeGestureRecognizer: UIScreenEdgePanGestureRecognizer?
     
     private let eventData: EventData
@@ -55,6 +56,10 @@ public final class EventDetailController: TelegramBaseController {
     
     required public init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        self.getEventDisposable.dispose()
     }
     
     private func updateNavigation() {
@@ -116,7 +121,7 @@ public final class EventDetailController: TelegramBaseController {
     }
     
     override public func loadDisplayNode() {
-        self.displayNode = EventDetailControllerNode(context: self.context, eventData: self.eventData, presentationData: self.presentationData)
+        self.displayNode = EventDetailControllerNode(context: self.context, presentationData: self.presentationData)
         self.displayNodeDidLoad()
     }
     
@@ -124,5 +129,36 @@ public final class EventDetailController: TelegramBaseController {
         super.containerLayoutUpdated(layout, transition: transition)
         
         self.controllerNode.containerLayoutUpdated(layout, navigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
+    }
+
+    override public func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        getEvent()
+    }
+    
+    private func getEvent() {
+        let supportPeer = Promise<EventModel?>()
+        supportPeer.set(context.engine.eventsEngine.getEvent(eventId: eventData.id))
+        self.getEventDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { eventModel in
+            
+            if let eventModel = eventModel {
+                let datePartPrefix = eventModel.eventDate.prefix(while: { $0 != "T" })
+                
+                let data = EventData(
+                    id: eventModel.id,
+                    title: eventModel.title,
+                    subtitle: eventModel.description,
+                    imageName: "Components/Model",
+                    profileImageName: "Components/Model",
+                    profileName: "@" + (eventModel.creatorName ?? ""),
+                    timeRemaining: String(datePartPrefix),
+                    type: eventModel.eventType ?? "",
+                    coverPhoto: eventModel.coverPhoto,
+                    profilePhoto: eventModel.creatorPhoto
+                )
+                self.controllerNode.updateEventData(data)
+                print("🔕", eventModel)
+            }
+        }))
     }
 }

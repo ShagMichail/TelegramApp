@@ -12,12 +12,15 @@ import SearchUI
 import ChatListSearchItemHeader
 import AppBundle
 import ItemListUI
+import Postbox
+import ChatScheduleTimeController
 
 final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     
     private let context: AccountContext
     private let supportPeerDisposable = MetaDisposable()
-    private var currentTime: Int32 = 0
+    private var eventDate: Int32 = 0
+    private var eventTime: Int32 = 0
     
     private var presentationData: PresentationData
     private var presentationDataDisposable: Disposable?
@@ -49,7 +52,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     private let nameEventTextField: TextFieldNode
     
     private let aboutEventLabel: ASTextNode
-    private let aboutEventTextField: TextFieldNode
+    private let aboutEventTextField: DivoTextView
     
     private let eventTypeLabel: ASTextNode
     private let eventTypeTextField: TextFieldNode
@@ -69,7 +72,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     private let applyButton: ASControlNode
     private let addPhoto: () -> Void
     var selectCountryCode: (() -> Void)?
-    var scheduleTimeController: (() -> Void)?
+    var scheduleTimeController: ((TimeControllerMode) -> Void)?
     var showAlert: ((String) -> Void)?
     private var countryId: String = ""
     
@@ -143,7 +146,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         self.aboutEventLabel = ASTextNode()
         self.aboutEventLabel.attributedText = NSAttributedString(string: "About event", font: regularFont, textColor: labelColor)
         
-        self.aboutEventTextField = getTextFiel(title: "Description event", isMultiline: true)
+        self.aboutEventTextField = DivoTextView(title: "", initialText: "")
         
         self.eventTypeLabel = ASTextNode()
         self.eventTypeLabel.attributedText = NSAttributedString(string: "Event type", font: regularFont, textColor: labelColor)
@@ -243,8 +246,12 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     }
     
     func textFieldShouldBeginEditing(_ textField: UITextField) -> Bool {
-        if textField == eventDateTextField.textField || textField == eventTimeTextField.textField {
-            scheduleTimeController?()
+        if textField == eventDateTextField.textField {
+            scheduleTimeController?(.date)
+            return false
+        }
+        if textField == eventTimeTextField.textField {
+            scheduleTimeController?(.time)
             return false
         }
         if textField == venueEventTextField.textField {
@@ -259,39 +266,57 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     }
     @objc private func applyButtonTapped() {
         print("applyButton Tapped!")
-
+        
         if let nameEventTextField = nameEventTextField.textField.text,
            nameEventTextField.isEmpty,
-           let aboutEventTextField = aboutEventTextField.textField.text,
-           aboutEventTextField.isEmpty,
-           currentTime != 0 {
+           aboutEventTextField.text.isEmpty,
+           eventTime != 0,
+           eventDate != 0
+        {
             showAlert?("Please fill in all fields")
         }
         
-        let unixTimestamp = TimeInterval(currentTime)
-        let date = Date(timeIntervalSince1970: unixTimestamp)
+        let unixTimestampDate = TimeInterval(eventDate)
+        let unixTimestampTime = TimeInterval(eventTime)
+        let date = Date(timeIntervalSince1970: unixTimestampDate)
+        let time = Date(timeIntervalSince1970: unixTimestampTime)
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let formattedDate = formatter.string(from: date)
 
         formatter.dateFormat = "HH:mm"
-        let formattedTime = formatter.string(from: date)
+        let formattedTime = formatter.string(from: time)
         
         let supportPeer = Promise<String?>()
         let eventModel = EventModel(
             title: nameEventTextField.textField.text ?? "",
-            description: aboutEventTextField.textField.text ?? "",
+            description: aboutEventTextField.text,
             eventDate: formattedDate,
             eventTime: formattedTime,
-            coverPhotoId: 0,
+            coverPhoto: nil,
             enabledParameterKeys: [])
         
-        supportPeer.set(context.engine.eventsEngine.createEvent(eventModel: eventModel))
-        self.supportPeerDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { peerId in
-            print("🔕", peerId ?? "")
-            self.showAlert?("event added")
-        }))
+        if let currentPhoto = currentPhoto {
+            let _ = uploadPhotoToCloud(context: context, image: currentPhoto).start(next: { id in
+                if let id = id {
+                    print("⛳️", id)
+                    supportPeer.set(self.context.engine.eventsEngine.createEvent(eventModel: eventModel, id: id))
+                    self.supportPeerDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { peerId in
+                        print("🔕", peerId ?? "")
+                        self.showAlert?("event added")
+                    }))
+                }
+            })
+        }
+    }
+
+    func uploadPhotoToCloud(context: AccountContext, image: UIImage) -> Signal<Int64?, NoError> {
+        guard let data = image.jpegData(compressionQuality: 0.9) else {
+            return .single(nil)
+        }
+        
+        return context.engine.engineDivo.uploadedPhoto(resource: data)
     }
     
     @objc private func addParametersTapped() {
@@ -303,8 +328,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         self.countryId = countryId
     }
     
-    func updateTime(_ timestamp: Int32) {
-        currentTime = timestamp
+    func updateTime(_ timestamp: Int32, _ mode: TimeControllerMode) {
         let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
         let dateFormatter = DateFormatter()
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
@@ -313,8 +337,14 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         dateFormatter.dateFormat = "HH:mm"
         let timeString = dateFormatter.string(from: date)
         
-        eventDateTextField.textField.text = dateString
-        eventTimeTextField.textField.text = timeString
+        switch mode {
+        case .time:
+            eventTime = timestamp
+            eventTimeTextField.textField.text = timeString
+        case .date:
+            eventDate = timestamp
+            eventDateTextField.textField.text = dateString
+        }
     }
     
     private func updateThemeAndStrings() {
