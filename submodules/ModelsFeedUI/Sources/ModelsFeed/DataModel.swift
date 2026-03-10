@@ -14,8 +14,39 @@ struct CardModel {
     let avatarImageName: String
     let previewImagesName: [String]
     var userReaction: ReactionType?
-    //    let reactionCounts: [ReactionType: Int]
-    //    let status: String
+
+    let userId: Int?
+    let mainImageURL: URL?
+    let avatarImageURL: URL?
+    let previewImageURLs: [URL]
+    let likesCount: Int
+    let isFavorite: Bool
+
+    init(
+        name: String,
+        mainImageName: String = "",
+        avatarImageName: String = "",
+        previewImagesName: [String] = [],
+        userReaction: ReactionType? = nil,
+        userId: Int? = nil,
+        mainImageURL: URL? = nil,
+        avatarImageURL: URL? = nil,
+        previewImageURLs: [URL] = [],
+        likesCount: Int = 0,
+        isFavorite: Bool = false
+    ) {
+        self.name = name
+        self.mainImageName = mainImageName
+        self.avatarImageName = avatarImageName
+        self.previewImagesName = previewImagesName
+        self.userReaction = userReaction
+        self.userId = userId
+        self.mainImageURL = mainImageURL
+        self.avatarImageURL = avatarImageURL
+        self.previewImageURLs = previewImageURLs
+        self.likesCount = likesCount
+        self.isFavorite = isFavorite
+    }
 }
 
 enum ReactionType {
@@ -27,7 +58,7 @@ enum ReactionType {
 
 extension ReactionType: RawRepresentable {
     typealias RawValue = Int
-    
+
     var rawValue: Int {
         switch self {
         case .like: return 1
@@ -36,7 +67,7 @@ extension ReactionType: RawRepresentable {
         case .fire: return 4
         }
     }
-    
+
     init?(rawValue: Int) {
         switch rawValue {
         case 1: self = .like

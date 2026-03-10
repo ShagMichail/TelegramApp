@@ -33,14 +33,14 @@ public final class ProfileScreenController: TelegramBaseController {
     private let uploadPortfolioDisposable = MetaDisposable()
     private let supportBackground = MetaDisposable()
     private let getFullUserDisposable = MetaDisposable()
-    private var presentationData: PresentationData
     private var peerDisposable: MetaDisposable?
     private var galleryController: GalleryController? = nil
     
+    private var presentationData: PresentationData
+    
     private var navigationBarIsTransparent = true
-
     private let peer: Peer?
-
+    
     private let contextSourceNode = ContextReferenceContentNode()
     
     public init(context: AccountContext, model: ProfileModel, peer: Peer? = nil) {
@@ -60,18 +60,14 @@ public final class ProfileScreenController: TelegramBaseController {
             badgeBackgroundColor: .clear,
             badgeStrokeColor: .clear,
             badgeTextColor: .clear)
-        
+
         let navigationBarData = NavigationBarPresentationData(theme: darkNavigationTheme, strings: NavigationBarStrings(presentationStrings: self.presentationData.strings))
-        
+
         super.init(context: context, navigationBarPresentationData: navigationBarData)
         
         updateNavigation()
     }
     
-    required public init(coder aDecoder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
     deinit {
         self.supportPeerDisposable.dispose()
         self.getPortfoliorDisposable.dispose()
@@ -81,20 +77,28 @@ public final class ProfileScreenController: TelegramBaseController {
         self.peerDisposable?.dispose()
     }
     
+    required public init(coder aDecoder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
     private func updateNavigation() {
         self.statusBar.statusBarStyle = .White
+        
         let editButtonImg = generateTintedImage(image: UIImage(bundleImageName: "Contact List/EditActionIcon"), color: .white)
         let editButton = UIBarButtonItem(image: editButtonImg, style: .plain, target: self, action: #selector(self.showMenu))
+        
         self.navigationItem.rightBarButtonItems = [editButton]
     }
-
+    
     @objc func showMenu() {
         let presentationData = self.presentationData
         let barHeight: CGFloat = 44.0
         let screenWidth = self.view.bounds.width
+        
         if self.contextSourceNode.supernode == nil {
             self.view.addSubnode(self.contextSourceNode)
         }
+        
         self.contextSourceNode.frame = CGRect(x: screenWidth - 50, y: 50, width: 40, height: barHeight)
         self.contextSourceNode.isUserInteractionEnabled = false
         
@@ -103,24 +107,26 @@ public final class ProfileScreenController: TelegramBaseController {
             f(.default)
             self?.editProfile()
         })))
-        items.append(.action(ContextMenuActionItem(text: "Edit Appearance", icon: { _ in return nil }, action: { [weak self] _, f in
-            f(.default)
-            self?.editAppearance()
-        })))
+        
         items.append(.action(ContextMenuActionItem(text: "Change Profile Background", icon: { _ in return nil }, action: { [weak self] _, f in
             f(.default)
             self?.changeProfileBackground()
+        })))
+        
+        items.append(.action(ContextMenuActionItem(text: "Edit Appearance", icon: { _ in return nil }, action: { [weak self] _, f in
+            f(.default)
+            self?.editAppearance()
         })))
         items.append(.action(ContextMenuActionItem(text: "Edit Social Links", icon: { _ in return nil }, action: { [weak self] _, f in
             f(.default)
             self?.editSocialLinks()
         })))
-        items.append(.action(ContextMenuActionItem(text: "Manage Work Experience", icon: { _ in return nil }, action: { [weak self] _, f in
+        items.append(.action(ContextMenuActionItem(text: "Manage Work Experience", icon: { _ in return nil }, action: { _, f in
             f(.default)
-            self?.editWorkExperience()
+//            self?.editWorkExperience()
         })))
-
-        let contextController = makeContextController( 
+        
+        let contextController = makeContextController(
             presentationData: presentationData,
             source: .reference(MenuSource(controller: self, sourceNode: self.contextSourceNode)),
             items: .single(ContextController.Items(content: .list(items)))
@@ -128,7 +134,7 @@ public final class ProfileScreenController: TelegramBaseController {
         
         self.present(contextController, in: .window(.root))
     }
-
+    
     @objc func showGalleryMenu() {
         let presentationData = self.presentationData
         let barHeight: CGFloat = 44.0
@@ -155,7 +161,7 @@ public final class ProfileScreenController: TelegramBaseController {
         
         self.present(contextController, in: .window(.root))
     }
-
+    
     func uploadPhotoToCloud(context: AccountContext, image: UIImage) -> Signal<Int64?, NoError> {
         guard let data = image.jpegData(compressionQuality: 0.9) else {
             return .single(nil)
@@ -224,14 +230,13 @@ public final class ProfileScreenController: TelegramBaseController {
             navigationController.pushViewController(controller)
         }
     }
+//    private func editWorkExperience() {
+//        let controller = WorkExperienceController(context: context, model: model, peer: peer)
+//        if let navigationController = context.sharedContext.mainWindow?.viewController as? NavigationController {
+//            navigationController.pushViewController(controller)
+//        }
+//    }
     
-    private func editWorkExperience() {
-        let controller = WorkExperienceController(context: context, model: model, peer: peer)
-        if let navigationController = context.sharedContext.mainWindow?.viewController as? NavigationController {
-            navigationController.pushViewController(controller)
-        }
-    }
-
     override public func loadDisplayNode() {
         self.displayNode = ProfileScreenNode(
             controller: self,
@@ -242,6 +247,7 @@ public final class ProfileScreenController: TelegramBaseController {
                 self?.uploadAvatar()
             },
             uploadPortfolioItem: { [weak self] in
+//                self?.uploadPortfolioItem()
                 self?.openNativeMultiplePhotoPicker()
             },
             openEditLink: {
@@ -251,9 +257,10 @@ public final class ProfileScreenController: TelegramBaseController {
                 self?.openGallery(at: index)
             }
         )
+        
         self.displayNodeDidLoad()
     }
-
+    
     private func uploadAvatar() {
         let currentAvatarMixin = Atomic<NSObject?>(value: nil)
         let theme = self.presentationData.theme
@@ -295,7 +302,7 @@ public final class ProfileScreenController: TelegramBaseController {
         }, videoCompletion: { _, _, _ in
         })
     }
-
+    
     private func openGallery(at index: Int) {
         let photos: [TelegramMediaImage] = self.controllerNode.localPhotos.compactMap { item in
             switch item {
@@ -396,13 +403,13 @@ public final class ProfileScreenController: TelegramBaseController {
         
         self.present(controller, in: .window(.root))
     }
-    
+
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
         super.containerLayoutUpdated(layout, transition: transition)
         
         self.controllerNode.containerLayoutUpdated(layout, navigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
     }
-
+    
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         getUserProfile()
@@ -420,7 +427,7 @@ public final class ProfileScreenController: TelegramBaseController {
             self.controllerNode.reloadSocialMedia(userProfile?.socialLinks)
             self.controllerNode.reloadBackground(userProfile?.backgroundImage)
         }))
-
+        
         peerDisposable = MetaDisposable()
         let signal: Signal<Peer?, NoError> = Signal { subscriber in
             let disposable = MetaDisposable()
@@ -446,45 +453,17 @@ public final class ProfileScreenController: TelegramBaseController {
             }
         }))
     }
-
+    
     private func getPortfolio() {
         
         let supportPeer = Promise<[TelegramMediaImage]?>()
         
-        supportPeer.set(
-            context.engine.profileEngine.getPortfolio(
-                peer: peer, 
-                tab: "photo", 
-                offset: 0, 
-                limit: 0
-            )
-        )
+        supportPeer.set(context.engine.profileEngine.getPortfolio(peer: peer, tab: "photo", offset: 0, limit: 0))
         self.getPortfoliorDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { portfolio in
             self.controllerNode.updateLocalPhotos(portfolio ?? [])
         }))
     }
     
-    // private func uploadPortfolioItem() {
-    //     let currentAvatarMixin = Atomic<NSObject?>(value: nil)
-    //     let theme = self.presentationData.theme
-        
-    //     presentLegacyAvatarPicker(holder: currentAvatarMixin, signup: true, theme: theme, present: { c, a in
-    //         self.view.endEditing(true)
-    //         self.present(c, in: .window(.root), with: a)
-    //     }, openCurrent: nil, completion: { [weak self] image in
-    //         guard let self = self else { return }
-    //         self.controllerNode.addTempUploadingPhoto(image)
-    //         let _ = self.uploadPhotoToCloud(context: self.context, image: image).start(next: { [weak self] id in
-    //             guard let self = self, let id = id else { return }
-    //             let uploadSignal = self.context.engine.profileEngine.uploadPortfolioItem(fileId: id, type: "photo")
-    //             self.uploadPortfolioDisposable.set((uploadSignal |> deliverOnMainQueue).startStrict(next: { [weak self] _ in
-    //                 self?.getPortfolio()
-    //             }))
-    //         })
-    //     }, videoCompletion: { _, _, _ in
-    //     })
-    // }
-
     func openNativeMultiplePhotoPicker() {
         if #available(iOS 14.0, *) {
             var configuration = PHPickerConfiguration()
@@ -496,16 +475,9 @@ public final class ProfileScreenController: TelegramBaseController {
             self.present(picker, animated: true)
         }
     }
-
+    
     private func deletePortfolioItem(id: Int64) {
         self.galleryController?.dismiss(completion: nil)
-//        let supportPeer = Promise<Bool?>()
-//        
-//        supportPeer.set(context.engine.profileEngine.deletePortfolioItem(id: id))
-//        self.getPortfoliorDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { res in
-//            self.galleryController?.dismiss(completion: nil)
-//            print("🌉 res")
-//        }))
     }
 }
 
@@ -530,7 +502,7 @@ extension ProfileScreenController: PHPickerViewControllerDelegate {
         
         let group = DispatchGroup()
         var pickedImages: [UIImage] = []
-
+        
         for result in results {
             if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
                 group.enter()
@@ -542,7 +514,7 @@ extension ProfileScreenController: PHPickerViewControllerDelegate {
                 }
             }
         }
-
+        
         group.notify(queue: .main) { [weak self] in
             guard let self = self, !pickedImages.isEmpty else { return }
             
@@ -556,7 +528,7 @@ extension ProfileScreenController: PHPickerViewControllerDelegate {
                     |> map { _ in Void() }
                 }
             }
-
+            
             self.uploadPortfolioDisposable.set(
                 (combineLatest(uploadSignals)
                 |> deliverOnMainQueue).start(completed: { [weak self] in

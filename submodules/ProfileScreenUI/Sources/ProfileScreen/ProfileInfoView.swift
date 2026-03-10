@@ -16,8 +16,7 @@ final class ProfileInfoView: UIView {
     private var isExpanded: Bool = false
     private var biographyText: String
     private var appearanceData: [AppearanceAttribute]
-    
-    private let headerHeight: CGFloat = 30
+    private let headerHeight: CGFloat = 26
     
     private var selectedIndex: Int = 0 {
         didSet {
@@ -48,7 +47,10 @@ final class ProfileInfoView: UIView {
     private let indicatorView: UIView = {
         let view = UIView()
         view.backgroundColor = .white
+        view.layer.cornerRadius = 2
+        view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         view.translatesAutoresizingMaskIntoConstraints = false
+        view.clipsToBounds = true
         return view
     }()
     
@@ -61,13 +63,13 @@ final class ProfileInfoView: UIView {
     
     private let contentLabel: UILabel = {
         let label = UILabel()
-        label.font = UIFont.systemFont(ofSize: 12)
-        label.textColor = .white
+        label.font = Font.helveticaNeue(12)
+        label.textColor = .white.withAlphaComponent(0.82)
         label.numberOfLines = 0
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
-
+    
     private let appearanceStack: UIStackView = {
         let stack = UIStackView()
         stack.axis = .horizontal
@@ -82,12 +84,13 @@ final class ProfileInfoView: UIView {
     private let seeMoreButton: UIButton = {
         let button = UIButton(type: .system)
         button.titleLabel?.font = Font.helveticaNeue(10)
-        button.setTitleColor(.white, for: .normal)
+        button.setTitleColor(.white.withAlphaComponent(0.82), for: .normal)
         button.setTitle("SEE MORE", for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
     
+    private var headerHeightConstraint: NSLayoutConstraint!
     private var indicatorLeadingConstraint: NSLayoutConstraint!
     private var indicatorWidthConstraint: NSLayoutConstraint!
     
@@ -95,9 +98,7 @@ final class ProfileInfoView: UIView {
         self.biographyText = biography
         self.appearanceData = appearance
         super.init(frame: .zero)
-        
         self.backgroundColor = .black.withAlphaComponent(0.15)
-        
         setupViews()
         configureActions()
         rebuildAppearanceGrid()
@@ -106,20 +107,29 @@ final class ProfileInfoView: UIView {
             self.updateContent(animated: false)
         }
     }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
 
     override func layoutSubviews() {
         super.layoutSubviews()
         updateHeaderAppearance(animated: false)
     }
     
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
     func update(biography: String, appearance: [AppearanceAttribute]) {
         self.biographyText = biography
         self.appearanceData = appearance
         rebuildAppearanceGrid()
+        updateContent(animated: false)
+        setNeedsLayout()
+    }
+    
+    func update(biography: String) {
+        self.biographyText = biography
+        self.biographyButton.isHidden = true
+        self.appearanceButton.isHidden = true
+        headerHeightConstraint.isActive = false
         updateContent(animated: false)
         setNeedsLayout()
     }
@@ -141,26 +151,28 @@ final class ProfileInfoView: UIView {
         mainStack.axis = .vertical
         mainStack.spacing = 5
         mainStack.translatesAutoresizingMaskIntoConstraints = false
-
+        
         appearanceStack.setContentCompressionResistancePriority(.required, for: .vertical)
         appearanceStack.setContentHuggingPriority(.required, for: .vertical)
         
         addSubview(headerView)
         addSubview(mainStack)
         
+        headerHeightConstraint = headerView.heightAnchor.constraint(equalToConstant: headerHeight)
+        
         NSLayoutConstraint.activate([
             headerView.topAnchor.constraint(equalTo: self.topAnchor),
             headerView.leadingAnchor.constraint(equalTo: self.leadingAnchor),
             headerView.trailingAnchor.constraint(equalTo: self.trailingAnchor),
-            headerView.heightAnchor.constraint(equalToConstant: headerHeight),
-
-            headerStack.topAnchor.constraint(equalTo: headerView.topAnchor),
-            headerStack.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: 16),
-            headerStack.trailingAnchor.constraint(equalTo: headerView.trailingAnchor, constant: -16),
-            headerStack.heightAnchor.constraint(equalToConstant: headerHeight - 3),
+            headerHeightConstraint,
             
-            indicatorView.topAnchor.constraint(equalTo: headerStack.bottomAnchor),
-            indicatorView.heightAnchor.constraint(equalToConstant: 3),
+            headerStack.topAnchor.constraint(equalTo: headerView.topAnchor),
+            headerStack.leadingAnchor.constraint(equalTo: headerView.leadingAnchor),
+            headerStack.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
+            headerStack.heightAnchor.constraint(equalToConstant: headerHeight - 2),
+            
+            indicatorView.heightAnchor.constraint(equalToConstant: 2),
+            indicatorView.bottomAnchor.constraint(equalTo: headerView.bottomAnchor),
             
             mainStack.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 10),
             mainStack.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: 16),
@@ -168,7 +180,7 @@ final class ProfileInfoView: UIView {
             mainStack.bottomAnchor.constraint(equalTo: self.bottomAnchor, constant: -10)
         ])
         
-        indicatorLeadingConstraint = indicatorView.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: 16)
+        indicatorLeadingConstraint = indicatorView.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: 60)
         indicatorWidthConstraint = indicatorView.widthAnchor.constraint(equalToConstant: 0)
         
         NSLayoutConstraint.activate([
@@ -249,12 +261,20 @@ final class ProfileInfoView: UIView {
         if isBio {
             contentLabel.text = biographyText
             contentLabel.numberOfLines = isExpanded ? 0 : maxLinesCollapsed
-            let contentWidth = bounds.width - 32
-            let lineCount = biographyText.lineCount(for: contentLabel.font, width: contentWidth)
-            updateSeeMoreButton(visible: lineCount > maxLinesCollapsed)
+            seeMoreButton.isHidden = false
         } else {
-            updateSeeMoreButton(visible: false)
+            let dataToShow: [AppearanceAttribute]
+            if isExpanded {
+                dataToShow = appearanceData
+            } else {
+                dataToShow = Array(appearanceData.prefix(4))
+            }
+            
+            rebuildAppearanceGrid(with: dataToShow)
+            seeMoreButton.isHidden = appearanceData.count <= 4
         }
+        
+        seeMoreButton.setTitle(isExpanded ? "SEE LESS" : "SEE MORE", for: .normal)
         
         let changes = {
             self.contentLabel.alpha = isBio ? 1 : 0
@@ -278,13 +298,28 @@ final class ProfileInfoView: UIView {
         }
     }
     
-    private func updateSeeMoreButton(visible: Bool) {
-        if visible {
-            seeMoreButton.isHidden = false
-            seeMoreButton.setTitle(isExpanded ? "SEE LESS" : "SEE MORE", for: .normal)
-        } else {
-            seeMoreButton.isHidden = true
+    private func rebuildAppearanceGrid(with attributes: [AppearanceAttribute]) {
+        appearanceStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        let leftStack = UIStackView()
+        leftStack.axis = .vertical
+        leftStack.spacing = 10
+        
+        let rightStack = UIStackView()
+        rightStack.axis = .vertical
+        rightStack.spacing = 10
+        
+        for (index, attr) in attributes.enumerated() {
+            let itemView = createAttributeView(title: attr.title, value: attr.value)
+            if index % 2 == 0 {
+                leftStack.addArrangedSubview(itemView)
+            } else {
+                rightStack.addArrangedSubview(itemView)
+            }
         }
+        
+        appearanceStack.addArrangedSubview(leftStack)
+        appearanceStack.addArrangedSubview(rightStack)
     }
     
     private func updateHeaderAppearance(animated: Bool) {
@@ -295,20 +330,34 @@ final class ProfileInfoView: UIView {
         appearanceButton.setTitleColor(selectedIndex == 1 ? selectedColor : unselectedColor, for: .normal)
         
         let selectedButton = selectedIndex == 0 ? biographyButton : appearanceButton
-        guard selectedButton.frame.width > 0 else { return }
         
-        let buttonFrameInHeader = selectedButton.convert(selectedButton.bounds, to: headerView)
+        let label = UILabel()
+        label.font = selectedButton.titleLabel?.font
+        label.text = selectedButton.title(for: .normal)
+        label.sizeToFit()
+        
+        let newIndicatorWidth = label.frame.width
+        
+        let newIndicatorX = selectedButton.center.x - (newIndicatorWidth / 2)
         
         let actions = {
-            self.indicatorLeadingConstraint.constant = buttonFrameInHeader.minX
-            self.indicatorWidthConstraint.constant = buttonFrameInHeader.width
-            self.layoutIfNeeded()
+            self.indicatorLeadingConstraint.constant = newIndicatorX
+            self.indicatorWidthConstraint.constant = newIndicatorWidth
+            self.headerView.layoutIfNeeded()
         }
-
+        
         if animated {
-            UIView.animate(withDuration: 0.25, animations: actions)
+            UIView.animate(
+                withDuration: 0.4,
+                delay: 0,
+                usingSpringWithDamping: 0.8,
+                initialSpringVelocity: 0.5,
+                options: [.curveEaseOut],
+                animations: actions
+            )
         } else {
-            UIView.performWithoutAnimation(actions)
+            indicatorLeadingConstraint.constant = newIndicatorX
+            indicatorWidthConstraint.constant = newIndicatorWidth
         }
     }
     
@@ -337,6 +386,7 @@ final class ProfileInfoView: UIView {
 private extension String {
     func lineCount(for font: UIFont, width: CGFloat) -> Int {
         guard width > 0 else { return 0 }
+        
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.lineBreakMode = .byWordWrapping
         
@@ -354,5 +404,43 @@ private extension String {
         )
         
         return Int(ceil(rect.height / font.lineHeight))
+    }
+}
+
+import UIKit
+
+extension UIView {
+    func startShimmering() {
+        let gradient = CAGradientLayer()
+        gradient.startPoint = CGPoint(x: 0, y: 0.5)
+        gradient.endPoint = CGPoint(x: 1, y: 0.5)
+        
+        // Цвета анимации (светло-серый -> чуть светлее -> светло-серый)
+        let baseColor = UIColor(white: 0.85, alpha: 1.0).cgColor
+        let highlightColor = UIColor(white: 0.95, alpha: 1.0).cgColor
+        
+        gradient.colors = [baseColor, highlightColor, baseColor]
+        gradient.locations = [0.0, 0.5, 1.0]
+        
+        // Размер градиента больше вью, чтобы он "проезжал"
+        gradient.frame = CGRect(x: -self.bounds.width, y: 0, width: self.bounds.width * 3, height: self.bounds.height)
+        
+        let animation = CABasicAnimation(keyPath: "locations")
+        animation.fromValue = [0.0, 0.1, 0.2]
+        animation.toValue = [0.8, 0.9, 1.0]
+        animation.duration = 1.5
+        animation.repeatCount = .infinity
+        animation.isRemovedOnCompletion = false
+        
+        gradient.add(animation, forKey: "shimmer")
+        
+        // Маска, чтобы градиент был только внутри скругленных углов вью
+        self.layer.mask = self.layer.cornerRadius > 0 ? nil : nil
+        self.layer.addSublayer(gradient)
+        self.layer.masksToBounds = true
+    }
+    
+    func stopShimmering() {
+        self.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
     }
 }

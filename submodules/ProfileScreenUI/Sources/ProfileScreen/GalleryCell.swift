@@ -10,14 +10,14 @@ final class GalleryCell: UICollectionViewCell {
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
-    
+
     private let spinner: UIActivityIndicatorView = {
         let indicator = UIActivityIndicatorView(style: .medium)
         indicator.hidesWhenStopped = true
         indicator.translatesAutoresizingMaskIntoConstraints = false
         return indicator
     }()
-
+    
     func configure(with image: UIImage, isUploading: Bool = false) {
         self.imageView.image = image
         if isUploading {
@@ -28,9 +28,15 @@ final class GalleryCell: UICollectionViewCell {
             self.imageView.alpha = 1.0
         }
     }
-
+    
     func configure(with imageName: String) {
         imageView.image = UIImage(named: imageName)
+        spinner.stopAnimating()
+        imageView.alpha = 1.0
+    }
+
+    func configure(with url: URL) {
+        imageView.loadImage(from: url)
         spinner.stopAnimating()
         imageView.alpha = 1.0
     }
@@ -47,6 +53,7 @@ final class GalleryCell: UICollectionViewCell {
     private func setupLayout() {
         contentView.addSubview(imageView)
         contentView.addSubview(spinner)
+        
         NSLayoutConstraint.activate([
             imageView.topAnchor.constraint(equalTo: contentView.topAnchor),
             imageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
@@ -60,6 +67,7 @@ final class GalleryCell: UICollectionViewCell {
     
     override func prepareForReuse() {
         super.prepareForReuse()
+        imageView.cancelImageLoad()
         imageView.image = nil
         spinner.stopAnimating()
         imageView.alpha = 1.0

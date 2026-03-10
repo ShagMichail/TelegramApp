@@ -18,20 +18,19 @@ import Postbox
 
 public class AddWorkExperienceController: ViewController, UINavigationControllerDelegate {
     private let context: AccountContext
-    
+
     private var createEventNode: AddWorkExperience {
         return self.displayNode as! AddWorkExperience
     }
-    
+
     private var presentationData: PresentationData
     private var presentationDataDisposable: Disposable?
-    
+
     public init(context: AccountContext) {
         self.context = context
-        
+
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        
-        
+
         let darkNavigationTheme = NavigationBarTheme(
             overallDarkAppearance: true,
             buttonColor: .black,
@@ -46,51 +45,51 @@ public class AddWorkExperienceController: ViewController, UINavigationController
             badgeTextColor: .clear)
 
         let navigationBarData = NavigationBarPresentationData(theme: darkNavigationTheme, strings: NavigationBarStrings(presentationStrings: self.presentationData.strings))
-        
+
         super.init(navigationBarPresentationData: navigationBarData)
-        
+
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
-        
+
         self.title = "Create event"
-        
+
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
-        
+
         self.presentationDataDisposable = (context.sharedContext.presentationData
                                            |> deliverOnMainQueue).start(next: { [weak self] presentationData in
             if let strongSelf = self {
                 let previousTheme = strongSelf.presentationData.theme
                 let previousStrings = strongSelf.presentationData.strings
-                
+
                 strongSelf.presentationData = presentationData
-                
+
                 if previousTheme !== presentationData.theme || previousStrings !== presentationData.strings {
                     strongSelf.updateThemeAndStrings()
                 }
             }
         }).strict()
     }
-    
+
     required public init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
     deinit {
         self.presentationDataDisposable?.dispose()
     }
-    
+
     private func updateThemeAndStrings() {
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
         self.navigationBar?.updatePresentationData(NavigationBarPresentationData(presentationData: self.presentationData), transition: .immediate)
-        
+
         self.title = "Create event"
-        
+
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
     }
-    
+
     override public func loadDisplayNode() {
         let currentAvatarMixin = Atomic<NSObject?>(value: nil)
         let theme = self.presentationData.theme
-        
+
         self.displayNode = AddWorkExperience(context: self.context, addPhoto: { [weak self] in
             presentLegacyAvatarPicker(holder: currentAvatarMixin, signup: true, theme: theme, present: { c, a in
                 self?.view.endEditing(true)
@@ -105,19 +104,19 @@ public class AddWorkExperienceController: ViewController, UINavigationController
 //                self?.avatarAdjustments = adjustments
             })
         })
-        
+
         self.createEventNode.scheduleTimeController = { [weak self] type in
             self?.scheduleTimeController(type: type)
         }
         self.createEventNode.showAlert = { [weak self] text in
             self?.showAlert(text: text)
         }
-        
+
         self.displayNodeDidLoad()
     }
-    
+
     private func showAlert(text: String) {
-        
+
         let alertController = textAlertController(
             context: context, title: nil,
             text: text, actions: [
@@ -127,7 +126,7 @@ public class AddWorkExperienceController: ViewController, UINavigationController
             ])
         present(alertController, in: .window(.root))
     }
-    
+
     private func scheduleTimeController(type: TimeType) {
         let peerId = PeerId(0)
         let controller = TimeController(
@@ -143,19 +142,19 @@ public class AddWorkExperienceController: ViewController, UINavigationController
             })
         present(controller, in: .window(.root))
     }
-    
+
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
     }
-    
+
     override public func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
     }
-    
+
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
         super.containerLayoutUpdated(layout, transition: transition)
-        
+
         self.createEventNode.containerLayoutUpdated(layout, navigationBarHeight: self.cleanNavigationHeight, actualNavigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
     }
-    
+
 }

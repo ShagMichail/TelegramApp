@@ -52,9 +52,9 @@ public final class PublicProfileScreenController: TelegramBaseController {
             badgeBackgroundColor: .clear,
             badgeStrokeColor: .clear,
             badgeTextColor: .clear)
-        
+
         let navigationBarData = NavigationBarPresentationData(theme: darkNavigationTheme, strings: NavigationBarStrings(presentationStrings: self.presentationData.strings))
-        
+
         super.init(context: context, navigationBarPresentationData: navigationBarData)
         
         updateNavigation()
@@ -71,55 +71,20 @@ public final class PublicProfileScreenController: TelegramBaseController {
     
     private func updateNavigation() {
         self.statusBar.statusBarStyle = .White
+        
+        let moreButtonImg = generateTintedImage(image: UIImage(bundleImageName: "Profile/MoreActionIcon"), color: .white)
+        let moreButton = UIBarButtonItem(image: moreButtonImg, style: .plain, target: self, action: #selector(self.moreMenu))
+        
+        self.navigationItem.rightBarButtonItems = [moreButton]
     }
     
     override public func loadDisplayNode() {
-        let currentAvatarMixin = Atomic<NSObject?>(value: nil)
-        let theme = self.presentationData.theme
-        
         self.displayNode = PublicProfileScreenNode(
             controller: self,
             context: self.context,
             presentationData: self.presentationData,
-            model: model,
-            addPhoto: { [weak self] in
-                presentLegacyAvatarPicker(holder: currentAvatarMixin, signup: true, theme: theme, present: { c, a in
-                    self?.view.endEditing(true)
-                    self?.present(c, in: .window(.root), with: a)
-                }, openCurrent: nil, completion: { image in
-                    self?.controllerNode.currentPhoto = image
-                    self?.controllerNode.toggleSpinner(active: true)
-                    
-                    let tempFile = TempBox.shared.tempFile(fileName: "avatar.jpg")
-                    guard let data = image.jpegData(compressionQuality: 0.9), let context = self?.context else { return }
-                    try? data.write(to: URL(fileURLWithPath: tempFile.path))
-                    
-                    let resource = LocalFileReferenceMediaResource(localFilePath: tempFile.path, randomId: Int64.random(in: Int64.min ... Int64.max))
-                    
-                    let uploadedPeerPhoto = context.engine.peers.uploadedPeerPhoto(resource: resource)
-                    let postbox = context.account.postbox
-                    let signal = context.engine.peers.updatePeerPhoto(
-                        peerId: context.account.peerId,
-                        photo: uploadedPeerPhoto,
-                        video: nil,
-                        videoStartTimestamp: nil,
-                        markup: nil,
-                        mapResourceToAvatarSizes: { resource, representations in
-                            return mapResourceToAvatarSizes(postbox: postbox, resource: resource, representations: representations)
-                        }
-                    )
-                    
-                    let _ = (signal |> deliverOnMainQueue).start(next: { status in
-                        if case .complete = status {
-                            self?.controllerNode.toggleSpinner(active: false)
-                            self?.controllerNode.addPhotoToCollection()
-                        }
-                    }, error: { error in
-                        self?.controllerNode.toggleSpinner(active: false)
-                    })
-                }, videoCompletion: { _, _, _ in
-                })
-            })
+            model: model
+        )
         
         self.displayNodeDidLoad()
     }
@@ -130,18 +95,62 @@ public final class PublicProfileScreenController: TelegramBaseController {
         self.controllerNode.containerLayoutUpdated(layout, navigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
     }
     
+    private var galleryLoaded: Bool = false
+
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         getUserProfile()
+        getUserGalleryProfile()
     }
-    
+
     private func getUserProfile() {
-        let supportPeer = Promise<UserProfileData?>()
-        
-        supportPeer.set(context.engine.profileEngine.getUserProfile(peer: peer))
-        self.supportPeerDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { userProfile in
-            self.userProfileData = userProfile
-        }))
+        guard let userId = model.userId else { return }
+        Task {
+            do {
+                let response: UserDetailResponse = try await DivoAPIClient.shared.request(
+                    path: "/user/\(userId)"
+                )
+                await MainActor.run {
+                    self.controllerNode.updateWithUserDetail(response.data)
+                }
+            } catch {
+                print("[DivoAPI] user/\(userId) error: \(error)")
+            }
+        }
+    }
+
+    private func getUserGalleryProfile() {
+        guard let userId = model.userId else { return }
+        guard !galleryLoaded else { return }
+        galleryLoaded = true
+        controllerNode.resetGalleryPagination()
+        loadGalleryPage(userId: userId, offset: 0)
+    }
+
+    func loadGalleryPage(userId: Int, offset: Int) {
+        print("📡 [GALLERY REQUEST] offset=\(offset), limit=6, userId=\(userId)")
+        // Устанавливаем флаг загрузки перед запросом
+        controllerNode.setGalleryLoading(true)
+        Task {
+            do {
+                let response: UserGalleryResponse = try await DivoAPIClient.shared.request(
+                    path: "/user-gallery/list",
+                    method: "POST",
+                    body: GalleryListRequest(offset: offset, limit: 6, userId: userId)
+                )
+                print("📥 [GALLERY RESPONSE] items=\(response.data.items.count), pagination.offset=\(response.data.pagination.meta.currentOffset), pagination.total=\(response.data.pagination.meta.totalCount)")
+                await MainActor.run {
+                    self.controllerNode.appendGalleryPhotos(response.data)
+                }
+            } catch {
+                print("[DivoAPI] user/\(userId) error: \(error)")
+                // Сбрасываем флаг при ошибке
+                controllerNode.setGalleryLoading(false)
+            }
+        }
     }
     
+    @objc func moreMenu() {
+        
+    }
 }

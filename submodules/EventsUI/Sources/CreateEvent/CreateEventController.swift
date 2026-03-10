@@ -18,20 +18,19 @@ import Postbox
 
 public class CreateEventController: ViewController, UINavigationControllerDelegate {
     private let context: AccountContext
-    
+
     private var createEventNode: CreateEventNode {
         return self.displayNode as! CreateEventNode
     }
-    
+
     private var presentationData: PresentationData
     private var presentationDataDisposable: Disposable?
-    
+
     public init(context: AccountContext) {
         self.context = context
-        
+
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
-        
-        
+
         let darkNavigationTheme = NavigationBarTheme(
             overallDarkAppearance: true,
             buttonColor: .black,
@@ -46,51 +45,51 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
             badgeTextColor: .clear)
 
         let navigationBarData = NavigationBarPresentationData(theme: darkNavigationTheme, strings: NavigationBarStrings(presentationStrings: self.presentationData.strings))
-        
+
         super.init(navigationBarPresentationData: navigationBarData)
-        
+
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
-        
+
         self.title = "Create event"
-        
+
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
-        
+
         self.presentationDataDisposable = (context.sharedContext.presentationData
                                            |> deliverOnMainQueue).start(next: { [weak self] presentationData in
             if let strongSelf = self {
                 let previousTheme = strongSelf.presentationData.theme
                 let previousStrings = strongSelf.presentationData.strings
-                
+
                 strongSelf.presentationData = presentationData
-                
+
                 if previousTheme !== presentationData.theme || previousStrings !== presentationData.strings {
                     strongSelf.updateThemeAndStrings()
                 }
             }
         }).strict()
     }
-    
+
     required public init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
     deinit {
         self.presentationDataDisposable?.dispose()
     }
-    
+
     private func updateThemeAndStrings() {
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
         self.navigationBar?.updatePresentationData(NavigationBarPresentationData(presentationData: self.presentationData), transition: .immediate)
-        
+
         self.title = "Create event"
-        
+
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
     }
-    
+
     override public func loadDisplayNode() {
         let currentAvatarMixin = Atomic<NSObject?>(value: nil)
         let theme = self.presentationData.theme
-        
+
         self.displayNode = CreateEventNode(context: self.context, addPhoto: { [weak self] in
             presentLegacyAvatarPicker(holder: currentAvatarMixin, signup: true, theme: theme, present: { c, a in
                 self?.view.endEditing(true)
@@ -101,12 +100,12 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
                 self?.createEventNode.currentPhoto = image
             })
         })
-        
+
         self.createEventNode.selectCountryCode = { [weak self] in
             if let strongSelf = self {
                 let controller = AuthorizationSequenceCountrySelectionController(strings: strongSelf.presentationData.strings, theme: strongSelf.presentationData.theme, displayCodes: false)
                 controller.completeWithCountryCode = { _, countryId, name in
-                    
+
                     if let strongSelf = self {
                         strongSelf.createEventNode.updateCountry(countryId: countryId, countryName: name)
                     }
@@ -117,7 +116,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
                 strongSelf.push(controller)
             }
         }
-        
+
         self.createEventNode.scheduleTimeController = { [weak self] mode in
             self?.scheduleTimeController(mode: mode)
         }
@@ -128,7 +127,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
     }
 
     private func showAlert(text: String) {
-        
+
         let alertController = textAlertController(
             context: context, title: nil,
             text: text, actions: [
@@ -138,7 +137,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
             ])
         present(alertController, in: .window(.root))
     }
-    
+
     private func scheduleTimeController(mode: TimeControllerMode) {
         let peerId = PeerId(0)
         let controller = TimeController(
@@ -157,15 +156,15 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
     }
-    
+
     override public func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
     }
-    
+
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
         super.containerLayoutUpdated(layout, transition: transition)
-        
+
         self.createEventNode.containerLayoutUpdated(layout, navigationBarHeight: self.cleanNavigationHeight, actualNavigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
     }
-    
+
 }

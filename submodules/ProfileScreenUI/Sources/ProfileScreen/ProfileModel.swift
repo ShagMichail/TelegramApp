@@ -20,10 +20,15 @@ public struct ProfileModel {
     let socialMediaHandles: [String]
     
     let galleryImageNames: [String]
+    let galleryImageURLs: [URL]
     
     let photos: [TelegramPeerPhoto]
     let isMyProfile: Bool
 
+    let userId: Int?
+    let mainImageURL: URL?
+    let avatarImageURL: URL?
+    
     public init(
         name: String,
         lastName: String? = nil,
@@ -38,8 +43,12 @@ public struct ProfileModel {
         biography: String,
         socialMediaHandles: [String],
         galleryImageNames: [String],
+        galleryImageURLs: [URL] = [],
         photos: [TelegramPeerPhoto] = [],
-        isMyProfile: Bool = false
+        isMyProfile: Bool = false,
+        userId: Int? = nil,
+        mainImageURL: URL? = nil,
+        avatarImageURL: URL? = nil
     ) {
         self.name = name
         self.lastName = lastName
@@ -54,7 +63,11 @@ public struct ProfileModel {
         self.biography = biography
         self.socialMediaHandles = socialMediaHandles
         self.galleryImageNames = galleryImageNames
+        self.galleryImageURLs = galleryImageURLs
         self.photos = photos
         self.isMyProfile = isMyProfile
+        self.userId = userId
+        self.mainImageURL = mainImageURL
+        self.avatarImageURL = avatarImageURL
     }
 }

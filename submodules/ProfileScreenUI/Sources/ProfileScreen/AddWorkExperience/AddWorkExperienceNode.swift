@@ -19,17 +19,17 @@ enum TimeType {
 }
 
 final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
-    
+
     private let context: AccountContext
     private let createWorkExperienceDisposable = MetaDisposable()
     private var startTime: Int32 = 0
     private var endTime: Int32 = 0
-    
+
     private var presentationData: PresentationData
     private var presentationDataDisposable: Disposable?
-    
+
     private let presentationDataPromise: Promise<PresentationData>
-    
+
     private let _ready = Promise<Bool>()
     private var readyValue = false {
         didSet {
@@ -41,35 +41,36 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
     var ready: Signal<Bool, NoError> {
         return self._ready.get()
     }
-    
+
     private var disposable: Disposable?
-    
+
     private let scrollNode: ASScrollNode
-    
+
     private let currentPhotoNode: ASImageNode
     private let addPhotoButton: HighlightableButtonNode
-    
+
     private let eventInfoLabel: ASTextNode
-    
+
     private let nameEventLabel: ASTextNode
     private let nameEventTextField: TextFieldNode
-    
+
     private let startDateLabel: ASTextNode
     private let startDateTextField: TextFieldNode
-    
+
     private let endTimeLabel: ASTextNode
     private let endTimeTextField: TextFieldNode
-    
+
     private let currentlyWorkingContainer: ASDisplayNode
     private let currentlyWorkingCheckbox: CheckboxNode
     private let currentlyWorkingLabel: ASTextNode
-    
+
     private let applyButton: ASControlNode
     private let addPhoto: () -> Void
+
     var scheduleTimeController: ((TimeType) -> Void)?
     var showAlert: ((String) -> Void)?
     private var countryId: String = ""
-    
+
     var currentPhoto: UIImage? = nil {
         didSet {
             if let currentPhoto = self.currentPhoto {
@@ -85,29 +86,29 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
             }
         }
     }
-    
+
     init(context: AccountContext, addPhoto: @escaping () -> Void) {
         self.context = context
         self.addPhoto = addPhoto
-        
+
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
         self.presentationData = presentationData
-        
+
         self.presentationDataPromise = Promise(self.presentationData)
-        
+
         self.scrollNode = ASScrollNode()
-        
+
         let iconColor = UIColor(red: 0.75, green: 0.48, blue: 0.33, alpha: 1.00)
-        
+
         self.addPhotoButton = HighlightableButtonNode()
         self.addPhotoButton.setImage(
             generateTintedImage(
                 image: UIImage(bundleImageName: "Avatar/AddAvatarIconLarge"),
                 color: iconColor),
             for: .normal)
-        
+
         let buttonDiameter: CGFloat = 110.0
-        
+
         self.addPhotoButton.setBackgroundImage(
             generateFilledCircleImage(diameter: buttonDiameter,
                                       color: .white,
@@ -116,31 +117,31 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
                                       backgroundColor: nil),
             for: .normal
         )
-        
+
         self.addPhotoButton.allowsGroupOpacity = true
-        
+
         self.currentPhotoNode = ASImageNode()
         self.currentPhotoNode.isUserInteractionEnabled = false
         self.currentPhotoNode.displaysAsynchronously = false
         self.currentPhotoNode.displayWithoutProcessing = true
-        
+
         let headerColor = UIColor(red: 0.09, green: 0.09, blue: 0.11, alpha: 1.00)
         let labelColor = UIColor(red: 0.24, green: 0.24, blue: 0.26, alpha: 1.00)
         let regularFont = Font.regular(16)
         let semiboldFont = Font.semibold(16)
-        
+
         self.eventInfoLabel = ASTextNode()
         self.eventInfoLabel.attributedText = NSAttributedString(string: "Work experience info", font: semiboldFont, textColor: headerColor)
-        
+
         self.nameEventLabel = ASTextNode()
         self.nameEventLabel.attributedText = NSAttributedString(string: "Agency name", font: regularFont, textColor: labelColor)
-        
+
         self.nameEventTextField = getTextFiel(title: "Enter agency name")
 
         self.startDateLabel = ASTextNode()
         self.startDateLabel.attributedText = NSAttributedString(string: "Start date", font: regularFont, textColor: labelColor)
         self.startDateTextField = getTextFiel(title: "27 Jun 2025")
-        
+
         self.endTimeLabel = ASTextNode()
         self.endTimeLabel.attributedText = NSAttributedString(string: "End date", font: regularFont, textColor: labelColor)
         self.endTimeTextField = getTextFiel(title: "27 Jun 2025")
@@ -160,63 +161,63 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
 
         self.currentlyWorkingContainer.addSubnode(self.currentlyWorkingCheckbox)
         self.currentlyWorkingContainer.addSubnode(self.currentlyWorkingLabel)
-        
+
         self.applyButton = ButtonWithIconNode(title: "Create New Work Experience", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
         self.applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
-        
+
         super.init()
         self.startDateTextField.textField.delegate = self
         self.endTimeTextField.textField.delegate = self
-        
+
         self.backgroundColor = .white
         self.addSubnode(self.scrollNode)
         self.addPhotoButton.addSubnode(self.currentPhotoNode)
         self.scrollNode.addSubnode(self.addPhotoButton)
         self.scrollNode.addSubnode(self.eventInfoLabel)
-        
+
         self.scrollNode.addSubnode(self.nameEventLabel)
         self.scrollNode.addSubnode(self.nameEventTextField)
-        
+
         self.scrollNode.addSubnode(self.startDateLabel)
         self.scrollNode.addSubnode(self.startDateTextField)
-        
+
         self.scrollNode.addSubnode(self.endTimeLabel)
         self.scrollNode.addSubnode(self.endTimeTextField)
-        
+
         self.scrollNode.addSubnode(self.currentlyWorkingContainer)
-        
+
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(self.dismissKeyboard))
         tapGesture.cancelsTouchesInView = false
         self.scrollNode.view.addGestureRecognizer(tapGesture)
-        
+
         self.scrollNode.addSubnode(self.applyButton)
-        
+
         self.presentationDataDisposable = (context.sharedContext.presentationData
                                            |> deliverOnMainQueue).start(next: { [weak self] presentationData in
             if let strongSelf = self {
                 let previousTheme = strongSelf.presentationData.theme
                 let previousStrings = strongSelf.presentationData.strings
-                
+
                 strongSelf.presentationData = presentationData
                 strongSelf.presentationDataPromise.set(.single(presentationData))
-                
+
                 if previousTheme !== presentationData.theme || previousStrings !== presentationData.strings {
                     strongSelf.updateThemeAndStrings()
                 }
             }
         }).strict()
     }
-    
+
     deinit {
         self.disposable?.dispose()
         self.presentationDataDisposable?.dispose()
         self.createWorkExperienceDisposable.dispose()
         NotificationCenter.default.removeObserver(self)
     }
-    
+
     override func didLoad() {
         super.didLoad()
-        
+
         self.applyButton.addTarget(self, action: #selector(self.applyButtonTapped), forControlEvents: .touchUpInside)
         self.addPhotoButton.addTarget(self, action: #selector(self.addPhotoPressed), forControlEvents: .touchUpInside)
         let checkboxTapGesture = UITapGestureRecognizer(target: self, action: #selector(currentlyWorkingTapped))
@@ -225,7 +226,7 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow), name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide), name: UIResponder.keyboardWillHideNotification, object: nil)
     }
-    
+
     func textFieldShouldBeginEditing(_ textField: UITextField) -> Bool {
         if textField == startDateTextField.textField  {
             scheduleTimeController?(.start)
@@ -236,22 +237,21 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
         }
         return true
     }
-    
+
     @objc private func addPhotoPressed() {
         self.addPhoto()
     }
 
     @objc private func applyButtonTapped() {
         print("applyButton Tapped!")
-        
+
         let agencyName = nameEventTextField.textField.text ?? ""
 
         guard startTime > 0 else {
             self.showAlert?("Please fill in the start date")
             return
         }
-        
-        
+
         if let currentPhoto = currentPhoto {
             let _ = uploadPhotoToCloud(context: context, image: currentPhoto).start(next: { [weak self] id in
                 if let id = id {
@@ -275,7 +275,7 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
             photoId: photoId
         ))
         self.createWorkExperienceDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { peerId in
-            print("🔕 createWorkExperienceDisposable", peerId ?? "")
+            print("createWorkExperienceDisposable", peerId ?? "")
             self.showAlert?("WorkExperience Added")
         }))
     }
@@ -284,7 +284,6 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
         guard let data = image.jpegData(compressionQuality: 0.9) else {
             return .single(nil)
         }
-        
         return context.engine.engineDivo.uploadedPhoto(resource: data)
     }
 
@@ -312,15 +311,15 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
             endTimeTextField.textField.text = timeString
         }
     }
-    
+
     private func updateThemeAndStrings() {
         self.backgroundColor = self.presentationData.theme.chatList.backgroundColor
     }
-    
+
     @objc private func dismissKeyboard() {
         self.view.endEditing(true)
     }
-    
+
     @objc func keyboardWillShow(notification: NSNotification) {
         guard let userInfo = notification.userInfo,
               let keyboardFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue,
@@ -332,15 +331,15 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
         let keyboardHeight = keyboardFrame.cgRectValue.height
 
         var currentInsets = self.scrollNode.view.contentInset
-        
+
         currentInsets.bottom = keyboardHeight
-        
+
         UIView.animate(withDuration: duration.doubleValue, delay: 0.0, options: UIView.AnimationOptions(rawValue: curve.uintValue << 16), animations: {
             self.scrollNode.view.contentInset = currentInsets
             self.scrollNode.view.scrollIndicatorInsets = currentInsets
         }, completion: nil)
     }
-    
+
     @objc func keyboardWillHide(notification: NSNotification) {
         guard let userInfo = notification.userInfo,
               let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber,
@@ -350,52 +349,52 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
 
         var currentInsets = self.scrollNode.view.contentInset
         currentInsets.bottom = 0
-        
+
         UIView.animate(withDuration: duration.doubleValue, delay: 0.0, options: UIView.AnimationOptions(rawValue: curve.uintValue << 16), animations: {
             self.scrollNode.view.contentInset = currentInsets
             self.scrollNode.view.scrollIndicatorInsets = currentInsets
         }, completion: nil)
     }
-    
+
     func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, actualNavigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
-        
+
         let avatarSize: CGSize = CGSize(width: 100.0, height: 100.0)
-        
+
         let avatarX: CGFloat = floor((layout.size.width - avatarSize.width) / 2.0)
         self.addPhotoButton.frame = CGRect(origin: CGPoint(x: avatarX, y: 20), size: avatarSize)
         self.currentPhotoNode.frame = CGRect(origin: CGPoint(), size: avatarSize)
-        
+
         let topInset: CGFloat = navigationBarHeight
-        
+
         let sidePadding: CGFloat = 16.0
         let sectionSpacing: CGFloat = 24.0
         let itemHeight: CGFloat = 48.0
         let halfItemSpacing: CGFloat = 6.0
-        
+
         self.scrollNode.frame = CGRect(origin: CGPoint(x: 0.0, y: topInset), size: CGSize(width: layout.size.width, height: layout.size.height - topInset))
-        
+
         var currentY: CGFloat = 140.0
-        
+
         let eventInfoBySize = self.eventInfoLabel.measure(CGSize(width: layout.size.width - sidePadding * 2, height: .greatestFiniteMagnitude))
         self.eventInfoLabel.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: eventInfoBySize)
         currentY += eventInfoBySize.height + sectionSpacing
-        
+
         let nameEventLabelSize = self.nameEventLabel.measure(CGSize(width: layout.size.width - sidePadding * 2, height: .greatestFiniteMagnitude))
         self.nameEventLabel.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: nameEventLabelSize)
         currentY += nameEventLabelSize.height + halfItemSpacing
-        
+
         self.nameEventTextField.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: layout.size.width - sidePadding * 2, height: itemHeight))
         currentY += itemHeight + sectionSpacing
-        
+
         let dateWidth: CGFloat = floor((layout.size.width - sidePadding * 3) / 2.0)
-        
+
         let startDateLabelSize = self.startDateLabel.measure(CGSize(width: dateWidth, height: .greatestFiniteMagnitude))
         self.startDateLabel.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: startDateLabelSize)
 
         let endTimeLabelSize = self.endTimeLabel.measure(CGSize(width: dateWidth, height: .greatestFiniteMagnitude))
         self.endTimeLabel.frame = CGRect(origin: CGPoint(x: sidePadding * 2 + dateWidth, y: currentY), size: endTimeLabelSize)
         currentY += startDateLabelSize.height + halfItemSpacing
-        
+
         self.startDateTextField.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: dateWidth, height: itemHeight))
         self.endTimeTextField.frame = CGRect(origin: CGPoint(x: sidePadding * 2 + dateWidth, y: currentY), size: CGSize(width: dateWidth, height: itemHeight))
         currentY += itemHeight + sectionSpacing
@@ -421,23 +420,23 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
         )
 
         currentY += rowHeight + sectionSpacing
-        
+
         let buttonWidth = layout.size.width - sidePadding * 2
         let buttonHeight: CGFloat = 50.0
-        
+
         self.applyButton.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: buttonWidth, height: buttonHeight))
-        
+
         currentY += buttonHeight + sectionSpacing
-        
+
         self.scrollNode.view.contentSize = CGSize(width: layout.size.width, height: currentY + 20.0)
-        
+
         self.readyValue = true
     }
 }
 
 private func getTextFiel(title: String, isMultiline: Bool = false) -> TextFieldNode {
     let field = TextFieldNode()
-    
+
     field.textField.font = Font.regular(16.0)
     field.textField.textColor = UIColor(red: 0.24, green: 0.24, blue: 0.26, alpha: 1.0)
     field.textField.textAlignment = .natural
@@ -450,13 +449,13 @@ private func getTextFiel(title: String, isMultiline: Bool = false) -> TextFieldN
     field.cornerRadius = 11.0
     field.clipsToBounds = true
     field.backgroundColor = UIColor(red: 0.94, green: 0.94, blue: 0.94, alpha: 1.00)
-    
+
     if isMultiline {
         field.padding = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
     } else {
         field.padding = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
     }
-    
+
     return field
 }
 

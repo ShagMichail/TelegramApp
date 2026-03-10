@@ -1,7 +1,7 @@
 import UIKit
 
 final class HighlightableReactionButton: UIButton {
-    
+
     private let backgroundContainer: UIView = {
         let view = UIView()
         view.layer.cornerRadius = 20
@@ -9,15 +9,15 @@ final class HighlightableReactionButton: UIButton {
         view.isUserInteractionEnabled = false
         return view
     }()
-    
+
     var reactionType: ReactionType?
-    
+
     var isCurrentlySelected: Bool = false {
         didSet {
             updateAppearance()
         }
     }
-    
+
     func updateAppearance(forPress: Bool = false) {
         if forPress {
             self.backgroundContainer.backgroundColor = UIColor.white.withAlphaComponent(0.6)
@@ -27,7 +27,7 @@ final class HighlightableReactionButton: UIButton {
             self.backgroundContainer.backgroundColor = UIColor.white.withAlphaComponent(0.3)
         }
     }
-    
+
     override var isHighlighted: Bool {
         didSet {
             UIView.animate(withDuration: 0.15) {
@@ -39,16 +39,16 @@ final class HighlightableReactionButton: UIButton {
             }
         }
     }
-    
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         insertSubview(backgroundContainer, at: 0)
     }
-    
+
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
     override func layoutSubviews() {
         super.layoutSubviews()
         backgroundContainer.frame = self.bounds
@@ -56,12 +56,12 @@ final class HighlightableReactionButton: UIButton {
 }
 
 class GradientView: UIView {//TODO:
-    
+
     enum GradientDirection {
         case vertical
         case horizontal
     }
-    
+
     private var gradientLayer: CAGradientLayer {
         return self.layer as! CAGradientLayer
     }
@@ -69,7 +69,7 @@ class GradientView: UIView {//TODO:
     override static var layerClass: AnyClass {
         return CAGradientLayer.self
     }
-    
+
     func configure(colors: [UIColor], direction: GradientDirection) {
         gradientLayer.colors = colors.map { $0.cgColor }
         switch direction {
