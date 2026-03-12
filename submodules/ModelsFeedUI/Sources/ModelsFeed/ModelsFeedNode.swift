@@ -129,6 +129,18 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
     }()
 
     private var loadingPlaceholderView: UIView?
+    private var errorView: UIView?
+
+    var showNetworkError: Bool = false {
+        didSet {
+            if showNetworkError && cards.isEmpty {
+                showErrorView()
+            } else {
+                hideErrorView()
+            }
+        }
+    }
+
     var isPaginating: Bool = false {
         didSet {
             guard oldValue != isPaginating else { return }
@@ -483,6 +495,64 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
             placeholder.removeFromSuperview()
         })
         loadingPlaceholderView = nil
+    }
+
+    private func showErrorView() {
+        guard errorView == nil else { return }
+
+        let container = UIView()
+        container.backgroundColor = .white
+
+        let iconLabel = UILabel()
+        iconLabel.text = "⚠️"
+        iconLabel.font = .systemFont(ofSize: 40)
+        iconLabel.textAlignment = .center
+
+        let titleLabel = UILabel()
+        titleLabel.text = "Server Unavailable"
+        titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        titleLabel.textColor = UIColor(white: 0.1, alpha: 1)
+        titleLabel.textAlignment = .center
+
+        let subtitleLabel = UILabel()
+        subtitleLabel.text = "Unable to connect to the server.\nTry toggling your VPN on or off."
+        subtitleLabel.font = .systemFont(ofSize: 14)
+        subtitleLabel.textColor = UIColor(white: 0.5, alpha: 1)
+        subtitleLabel.textAlignment = .center
+        subtitleLabel.numberOfLines = 0
+
+        [iconLabel, titleLabel, subtitleLabel].forEach {
+            container.addSubview($0)
+            $0.translatesAutoresizingMaskIntoConstraints = false
+        }
+
+        NSLayoutConstraint.activate([
+            iconLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            iconLabel.centerYAnchor.constraint(equalTo: container.centerYAnchor, constant: -40),
+
+            titleLabel.topAnchor.constraint(equalTo: iconLabel.bottomAnchor, constant: 12),
+            titleLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            titleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 32),
+            titleLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -32),
+
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            subtitleLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            subtitleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 32),
+            subtitleLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -32),
+        ])
+
+        self.view.addSubview(container)
+        errorView = container
+
+        if let (layout, navigationBarHeight) = containerLayout {
+            let topOffset = navigationBarHeight + 90 + 36
+            container.frame = CGRect(x: 0, y: topOffset, width: layout.size.width, height: layout.size.height - topOffset)
+        }
+    }
+
+    private func hideErrorView() {
+        errorView?.removeFromSuperview()
+        errorView = nil
     }
 
     private func layoutLoadingPlaceholder() {

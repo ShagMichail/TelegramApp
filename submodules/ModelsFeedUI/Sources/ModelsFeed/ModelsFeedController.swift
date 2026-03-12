@@ -193,6 +193,7 @@ public final class ModelsFeedController: TelegramBaseController {
                     self.isLoadingFeedline = false
                     self.controllerNode.isLoading = false
                     self.controllerNode.isPaginating = false
+                    self.controllerNode.showNetworkError = false
                 }
             } catch {
                 print("[DivoAPI] feedline/list error: \(error)")
@@ -200,6 +201,9 @@ public final class ModelsFeedController: TelegramBaseController {
                     self.isLoadingFeedline = false
                     self.controllerNode.isLoading = false
                     self.controllerNode.isPaginating = false
+                    if reset {
+                        self.controllerNode.showNetworkError = true
+                    }
                 }
             }
         }
