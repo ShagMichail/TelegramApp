@@ -1319,20 +1319,8 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                     if !self.otherAccountPhoneNumbers.1.isEmpty {
                         controllers.append(self.splashController())
                     }
-                    var previousSplashController: AuthorizationSequenceSplashController?
-                    for c in self.viewControllers {
-                        if let c = c as? AuthorizationSequenceSplashController {
-                            previousSplashController = c
-                            break
-                        }
-                    }
-                
-                    if let validLayout = self.validLayout, case .tablet = validLayout.deviceMetrics.type {
-                        previousSplashController = nil
-                    }
-                
-                    controllers.append(self.phoneEntryController(countryCode: countryCode, number: number, splashController: previousSplashController))
-                    self.setViewControllers(controllers, animated: !self.viewControllers.isEmpty && (previousSplashController == nil || self.viewControllers.count > 2))
+                    controllers.append(self.phoneEntryController(countryCode: countryCode, number: number, splashController: nil))
+                    self.setViewControllers(controllers, animated: !self.viewControllers.isEmpty)
                 case let .confirmationCodeEntry(number, type, phoneCodeHash, timeout, nextType, _, previousCodeEntry, usePrevious):
                     var controllers: [ViewController] = []
                     if !self.otherAccountPhoneNumbers.1.isEmpty {
