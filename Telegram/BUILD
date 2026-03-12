@@ -283,12 +283,12 @@ filegroup(
 #     ], exclude = ["Telegram-iOS/AppIcons.xcassets/**/.*"]),
 # )
 
-# filegroup(
-#     name = "DefaultAppIcon",
-#     srcs = glob([
-#         "Telegram-iOS/DefaultAppIcon.xcassets/**/*",
-#     ], exclude = ["Telegram-iOS/DefaultAppIcon.xcassets/**/.*"]),
-# )
+filegroup(
+    name = "DefaultAppIcon",
+    srcs = glob([
+        "Telegram-iOS/DefaultAppIcon.xcassets/**/*",
+    ], exclude = ["Telegram-iOS/DefaultAppIcon.xcassets/**/.*"]),
+)
 
 # filegroup(
 #     name = "DefaultIcon",
@@ -1751,14 +1751,11 @@ ios_application(
         ":RequiredDeviceCapabilitiesPlist",
         ":UrlTypesInfoPlist",
     ],
-    app_icons = [ ":{}_icon".format(name) for name in composer_icon_folders ],
-    alternate_icons = [
-        ":{}".format(name) for name in alternate_icon_folders
-    ],
+    alternate_icons = [],
     resources = [
         ":LaunchScreen",
         ":HelveticaNeue",
-        #":DefaultAppIcon",
+        ":DefaultAppIcon",
         #":AdditionalIcons",
     ],
     frameworks = [
