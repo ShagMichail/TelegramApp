@@ -24,6 +24,7 @@ import AlertUI
 import InAppPurchaseManager
 import ObjectiveC
 import AVFoundation
+import OnboardingUI
 
 private var ObjCKey_Delegate: Int?
 
@@ -34,7 +35,7 @@ private enum InnerState: Equatable {
 
 public final class AuthorizationSequenceController: NavigationController, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     static func navigationBarTheme(_ theme: PresentationTheme) -> NavigationBarTheme {
-        return NavigationBarTheme(overallDarkAppearance: theme.overallDarkAppearance, buttonColor: theme.chat.inputPanel.panelControlColor, disabledButtonColor: theme.intro.disabledTextColor, primaryTextColor: theme.intro.primaryTextColor, backgroundColor: .clear, opaqueBackgroundColor: .clear, enableBackgroundBlur: false, separatorColor: .clear, badgeBackgroundColor: theme.rootController.navigationBar.badgeBackgroundColor, badgeStrokeColor: theme.rootController.navigationBar.badgeStrokeColor, badgeTextColor: theme.rootController.navigationBar.badgeTextColor, edgeEffectColor: .clear, style: .glass)
+        return NavigationBarTheme(overallDarkAppearance: theme.overallDarkAppearance, buttonColor: .white, disabledButtonColor: theme.intro.disabledTextColor, primaryTextColor: theme.intro.primaryTextColor, backgroundColor: .clear, opaqueBackgroundColor: .clear, enableBackgroundBlur: false, separatorColor: .clear, badgeBackgroundColor: theme.rootController.navigationBar.badgeBackgroundColor, badgeStrokeColor: theme.rootController.navigationBar.badgeStrokeColor, badgeTextColor: theme.rootController.navigationBar.badgeTextColor, edgeEffectColor: .clear)
     }
     
     private let sharedContext: SharedAccountContext
@@ -147,12 +148,37 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                     if let strings = strings {
                         strongSelf.presentationData = strongSelf.presentationData.withStrings(strings)
                     }
-                    let masterDatacenterId = strongSelf.account.masterDatacenterId
-                    let isTestingEnvironment = strongSelf.account.testingEnvironment
-                    
-                    let countryCode = AuthorizationSequenceCountrySelectionController.defaultCountryCode()
-                    
-                    let _ = strongSelf.engine.auth.setState(state: UnauthorizedAccountState(isTestingEnvironment: isTestingEnvironment, masterDatacenterId: masterDatacenterId, contents: .phoneEntry(countryCode: countryCode, number: ""))).startStandalone()
+
+                    let proceedToPhoneEntry = {
+                        guard let strongSelf = self else { return }
+                        let masterDatacenterId = strongSelf.account.masterDatacenterId
+                        let isTestingEnvironment = strongSelf.account.testingEnvironment
+                        let countryCode = AuthorizationSequenceCountrySelectionController.defaultCountryCode()
+                        let _ = strongSelf.engine.auth.setState(state: UnauthorizedAccountState(isTestingEnvironment: isTestingEnvironment, masterDatacenterId: masterDatacenterId, contents: .phoneEntry(countryCode: countryCode, number: ""))).startStandalone()
+                    }
+
+                    if !UserDefaults.standard.bool(forKey: "hasSeenOnboarding") {
+                        let onboarding = OnboardingScreenController()
+                        strongSelf.addChild(onboarding)
+                        onboarding.view.frame = strongSelf.view.bounds
+                        onboarding.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                        strongSelf.view.addSubview(onboarding.view)
+                        onboarding.didMove(toParent: strongSelf)
+                        onboarding.onFinish = { [weak onboarding, weak self] in
+                            // Clear nav stack so proceedToPhoneEntry animates without showing splash
+                            self?.setViewControllers([], animated: false)
+                            proceedToPhoneEntry()
+                            UIView.animate(withDuration: 0.3, delay: 0.05, options: [], animations: {
+                                onboarding?.view.alpha = 0
+                            }, completion: { _ in
+                                onboarding?.willMove(toParent: nil)
+                                onboarding?.view.removeFromSuperview()
+                                onboarding?.removeFromParent()
+                            })
+                        }
+                    } else {
+                        proceedToPhoneEntry()
+                    }
                 }
             }
         }

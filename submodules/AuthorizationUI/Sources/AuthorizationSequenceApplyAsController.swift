@@ -255,11 +255,7 @@ final class AuthorizationSequenceApplyAsController: ViewController {
             }
         }
         
-        if isFirstAppearance {
-            self.controllerNode.containerLayoutUpdated(layout, navigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
-            
-            isFirstAppearance = false
-        }
+        self.controllerNode.containerLayoutUpdated(layout, navigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
     }
     
     // @objc func nextPressed() {

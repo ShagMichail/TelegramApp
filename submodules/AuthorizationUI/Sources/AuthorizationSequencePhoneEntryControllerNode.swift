@@ -641,7 +641,7 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         self.noticeActivateAreaNode.accessibilityTraits = .staticText
         
         self.noticeNode.attributedText = NSAttributedString(
-            string: account == nil ? strings.ChangePhoneNumberNumber_Help : strings.Login_PhoneAndCountryHelp,
+            string: "Please confirm your country code and enter your phone number.",
             font: Font.regular(16.0), textColor: UIColor(red: 1.00, green: 1.00, blue: 1.00, alpha: 0.6),
             paragraphAlignment: .center
         )
@@ -662,7 +662,7 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
             disabledForegroundColor: .white
         )
         
-        self.proceedNode = SolidRoundedButtonNode(title: self.strings.Login_Continue, theme: customButtonTheme, glass: false, height: 50.0, cornerRadius: 11.0)
+        self.proceedNode = SolidRoundedButtonNode(title: self.strings.Login_Continue, theme: customButtonTheme, glass: false, font: .bold, fontSize: 20.0, height: 50.0, cornerRadius: 11.0)
         
         self.proceedNode.progressType = .embedded
         self.proceedNode.isEnabled = false
@@ -1044,7 +1044,7 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         // MARK: MASTER
         //         self.titleNode.attributedText = NSAttributedString(string: self.account == nil ? self.strings.Login_NewNumber : self.strings.Login_PhoneTitle, font: Font.bold(28.0), textColor: self.theme.list.itemPrimaryTextColor)
         // MARK: LEGACY
-        self.titleNode.attributedText = NSAttributedString(string: (self.account == nil ? strings.Login_NewNumber : strings.Login_PhoneTitle).uppercased(), font: Font.bold(34.0), textColor: .white)
+        self.titleNode.attributedText = Font.helveticaNeue((self.account == nil ? strings.Login_NewNumber : strings.Login_PhoneTitle).uppercased(), 34)
         
         self.titleActivateAreaNode.accessibilityLabel = self.titleNode.attributedText?.string ?? ""
         
@@ -1059,12 +1059,7 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         )
         transition.updateFrame(node: self.titleNode, frame: titleFrame)
         
-        // MARK: MASTER
-        // let noticeInset: CGFloat = self.account == nil ? 32.0 : 0.0
-        
-        // let noticeSize = self.noticeNode.updateLayout(CGSize(width: min(274.0 + noticeInset, maximumWidth - 28.0), height: CGFloat.greatestFiniteMagnitude))
-        // MARK: LEGACY
-        let noticeSize = self.noticeNode.measure(CGSize(width: maximumWidth, height: CGFloat.greatestFiniteMagnitude))
+        let noticeSize = self.noticeNode.updateLayout(CGSize(width: maximumWidth - 48.0, height: CGFloat.greatestFiniteMagnitude))
         let noticeSpacing: CGFloat = 8.0
         let noticeOriginY = titleFrame.maxY + noticeSpacing
         let noticeFrame = CGRect(
@@ -1073,6 +1068,13 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         )
         transition.updateFrame(node: self.noticeNode, frame: noticeFrame)
         
+        if let divoFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 20.0) {
+            self.proceedNode.titleNode.attributedText = NSAttributedString(string: self.strings.Login_Continue, attributes: [
+                .font: divoFont,
+                .foregroundColor: UIColor.white,
+                .kern: 20.0 * 0.005
+            ])
+        }
         let proceedHeight = self.proceedNode.updateLayout(width: maximumWidth - inset * 2.0, transition: transition)
         let proceedSize = CGSize(width: maximumWidth - inset * 2.0, height: proceedHeight)
         
