@@ -1449,7 +1449,7 @@ func debugRestoreState(basePath: String, name: String) {
 public func openPostbox(basePath: String, seedConfiguration: SeedConfiguration, encryptionParameters: ValueBoxEncryptionParameters, timestampForAbsoluteTimeBasedOperations: Int32, isMainProcess: Bool, isTemporary: Bool, isReadOnly: Bool, useCopy: Bool, useCaches: Bool, removeDatabaseOnError: Bool) -> Signal<PostboxResult, NoError> {
     let queue = Postbox.sharedQueue
     return Signal { subscriber in
-        queue.async {
+        queue.justDispatch {
             postboxLog("openPostbox, basePath: \(basePath), useCopy: \(useCopy)")
 
             let _ = try? FileManager.default.createDirectory(atPath: basePath, withIntermediateDirectories: true, attributes: nil)
