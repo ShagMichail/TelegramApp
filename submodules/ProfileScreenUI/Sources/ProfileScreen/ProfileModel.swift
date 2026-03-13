@@ -16,7 +16,7 @@ public struct ProfileModel {
     
     var biography: String
     
-    let socialMediaIcons: [String] = ["Models/instaIcon", "Models/TikTokIcon", "Models/youtubeIcon", "Models/webIcon"]
+    let socialMediaIcons: [String] = ["instaIcon", "TikTokIcon", "youtubeIcon", "webIcon"]
     let socialMediaHandles: [String]
     
     let galleryImageNames: [String]

@@ -25,7 +25,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     private var headerHeightConstraint: NSLayoutConstraint!
     private var socialHeightConstraint: NSLayoutConstraint!
-    private let iconPlaceholder = "HeartActionIcon"
+    private let iconPlaceholder = "Contact List/HeartActionIcon"
     private let fixedHeaderHeight: CGFloat = 540.0
     private let fixedProfileHeaderHeight: CGFloat = 240.0
     
@@ -521,7 +521,8 @@ final class PublicProfileScreenNode: ASDisplayNode {
             
             infoStack.leadingAnchor.constraint(equalTo: headerContainer.leadingAnchor, constant: 16),
             infoStack.trailingAnchor.constraint(equalTo: headerContainer.trailingAnchor, constant: -16),
-            infoStack.heightAnchor.constraint(equalToConstant: 85),
+            infoStack.centerYAnchor.constraint(equalTo: headerContainer.centerYAnchor),
+            infoStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 120),
         ])
     }
     
@@ -823,7 +824,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         
         let iconImageView: UIImageView = {
             let imageView = UIImageView()
-            imageView.image = UIImage(bundleImageName: iconImageName)
+            imageView.image = UIImage(bundleImageName: iconImageName)?.withRenderingMode(.alwaysTemplate)
             imageView.tintColor = .white
             imageView.contentMode = .scaleAspectFit
             imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -865,7 +866,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         
         let icon: UIImageView = {
             let imageView = UIImageView()
-            imageView.image = UIImage(bundleImageName: iconName)
+            imageView.image = UIImage(bundleImageName: iconName)?.withRenderingMode(.alwaysTemplate)
             imageView.tintColor = .white
             imageView.contentMode = .scaleAspectFit
             imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -925,7 +926,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         button.layer.cornerRadius = 6
         
         let icon = UIImageView()
-        icon.image = UIImage(bundleImageName: iconName)
+        icon.image = UIImage(bundleImageName: iconName)?.withRenderingMode(.alwaysTemplate)
         icon.tintColor = .white
         icon.contentMode = .scaleAspectFit
         icon.translatesAutoresizingMaskIntoConstraints = false
@@ -960,7 +961,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         button.layer.cornerRadius = 6
         
         let icon = UIImageView()
-        icon.image = UIImage(bundleImageName: iconName)
+        icon.image = UIImage(bundleImageName: iconName)?.withRenderingMode(.alwaysTemplate)
         icon.tintColor = .white
         icon.contentMode = .scaleAspectFit
         icon.translatesAutoresizingMaskIntoConstraints = false
@@ -1295,8 +1296,8 @@ final class PublicProfileScreenNode: ASDisplayNode {
         }
         
         let stats = detail.statistic
-        setupCounterView(likesView, count: "\(stats?.followersCount ?? 0)", name: "Like", iconName: "Instant View/Favorite")
-        setupCounterView(viewsView, count: "\(stats?.viewsCount ?? 0)", name: "Viewed", iconName: "Instant View/Visibility")
+        setupCounterView(likesView, count: "\(stats?.followersCount ?? 0)", name: "Like", iconName: "Chat/Input/Text/AccessoryIconReaction")
+        setupCounterView(viewsView, count: "\(stats?.viewsCount ?? 0)", name: "Viewed", iconName: "Stories/EmbeddedViewIcon")
         setupCounterView(savesView, count: "\(stats?.followingCount ?? 0)", name: "Save", iconName: "Instant View/Bookmark")
         // что такое Save в модели?
         //        let socialIcons = ["Models/instaIcon", "Models/TikTokIcon", "Models/youtubeIcon", "Models/webIcon"]
@@ -1307,13 +1308,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
         //    }
         //        let handles = handlesFromApi.isEmpty ? ["instagram", "tiktok", "youtube", "website"] : handlesFromApi
         
-        let socialIcons = ["Models/instaIcon", "Models/TikTokIcon", "Models/youtubeIcon", "Models/webIcon"]
+        let socialIcons = ["instaIcon", "TikTokIcon", "youtubeIcon", "webIcon"]
         let networks = detail.userSocialNetworks ?? []
         let handlesFromApi = networks.compactMap { network -> String? in
             let handle = network.username ?? network.url ?? ""
             return handle.isEmpty ? nil : handle
         }
-        let handles = handlesFromApi
+        let handles = handlesFromApi.isEmpty ? ["instagram", "tiktok", "youtube", "website"] : handlesFromApi
         
         populateSocialMedia(handles: handles, icons: socialIcons)
         

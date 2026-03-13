@@ -20,7 +20,7 @@ final class ProfileScreenNode: ASDisplayNode {
 
     private var containerLayout: (ContainerViewLayout, CGFloat)?
     
-    private let iconPlaceholder = "HeartActionIcon"
+    private let iconPlaceholder = "Contact List/HeartActionIcon"
     
     private let uploadAvatar: () -> Void
     private let uploadPortfolioItem: () -> Void
@@ -578,7 +578,7 @@ final class ProfileScreenNode: ASDisplayNode {
     }
     
     private func createStatusBadge(text: String, iconName: String) -> UIView {
-        let icon = UIImageView(image: UIImage(named: iconPlaceholder))
+        let icon = UIImageView(image: UIImage(bundleImageName: iconPlaceholder))
         icon.tintColor = .black
         icon.translatesAutoresizingMaskIntoConstraints = false
         icon.widthAnchor.constraint(equalToConstant: 12).isActive = true
@@ -787,34 +787,34 @@ final class ProfileScreenNode: ASDisplayNode {
         if let socialMedia = socialMedia {
             if let instagram = socialMedia.instagram,
                let name = URL(string: instagram)?.pathComponents.last(where: { $0 != "/" }) {
-                let buttonView = createSocialMediaButton(handle: "@" + name, iconName: "Models/instaIcon") {
+                let buttonView = createSocialMediaButton(handle: "@" + name, iconName: "instaIcon") {
                     self.openURL(instagram)
                 }
                 socialMediaStack.addArrangedSubview(buttonView)
             }
             if let tiktok = socialMedia.tiktok,
                let name = URL(string: tiktok)?.pathComponents.last(where: { $0 != "/" }) {
-                let buttonView = createSocialMediaButton(handle: "@" + name, iconName: "Models/TikTokIcon") {
+                let buttonView = createSocialMediaButton(handle: "@" + name, iconName: "TikTokIcon") {
                     self.openURL(tiktok)
                 }
                 socialMediaStack.addArrangedSubview(buttonView)
             }
             if let youtube = socialMedia.youtube,
                let name = URL(string: youtube)?.pathComponents.last(where: { $0 != "/" }) {
-                let buttonView = createSocialMediaButton(handle: name, iconName: "Models/youtubeIcon") {
+                let buttonView = createSocialMediaButton(handle: name, iconName: "youtubeIcon") {
                     self.openURL(youtube)
                 }
                 socialMediaStack.addArrangedSubview(buttonView)
             }
             if let website = socialMedia.website, !website.isEmpty {
-                let buttonView = createSocialMediaButton(handle: "website", iconName: "Models/webIcon") {
+                let buttonView = createSocialMediaButton(handle: "website", iconName: "webIcon") {
                     self.openURL(website)
                 }
                 socialMediaStack.addArrangedSubview(buttonView)
             }
         }
         if socialMediaStack.arrangedSubviews.count == 0 {
-            let buttonView = createSocialMediaButton(handle: "Add Links", iconName: "Models/Link") {
+            let buttonView = createSocialMediaButton(handle: "Add Links", iconName: "webIcon") {
                 self.openEditLink()
             }
             socialMediaStack.addArrangedSubview(buttonView)

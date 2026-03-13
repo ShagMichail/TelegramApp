@@ -23,6 +23,9 @@ final class ProfileNavigationBarTitleView: UIView {
         let label = UILabel()
         label.font = Font.helveticaNeue(12)
         label.textColor = .white
+        label.numberOfLines = 1
+        label.adjustsFontSizeToFitWidth = true
+        label.minimumScaleFactor = 0.7
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
@@ -31,6 +34,9 @@ final class ProfileNavigationBarTitleView: UIView {
         let label = UILabel()
         label.font = Font.helveticaNeue(10)
         label.textColor = .white
+        label.numberOfLines = 1
+        label.adjustsFontSizeToFitWidth = true
+        label.minimumScaleFactor = 0.7
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
