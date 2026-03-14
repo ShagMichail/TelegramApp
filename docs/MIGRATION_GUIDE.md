@@ -57,6 +57,18 @@ git log --oneline <last-migrated-commit>..HEAD
 #### ShimmerView
 `ShimmerView` и расширения `addShimmerOverlay()`/`removeShimmerOverlay()` живут в **TelegramCore** (не ModelsFeedUI), потому что `ImageLoader` (тоже в TelegramCore) их использует. В dummy ShimmerView лежит в `App/UI/ModelsFeed/`.
 
+#### Assets (Images.xcassets)
+- В dummy все DIVO-иконки лежат в `App/App/Images.xcassets`, в TelegramApp — в `submodules/TelegramUI/Images.xcassets`.
+- При каждом переносе, если в `divo-ios-dummy` добавлялись новые иконки (например, начиная с коммита `496a827` для профиля моделей), нужно:
+  - скопировать из dummy папки:
+    - `App/App/Images.xcassets/Profile` → `submodules/TelegramUI/Images.xcassets/Profile`
+    - `App/App/Images.xcassets/Models/*.imageset` → `submodules/TelegramUI/Images.xcassets/Models/`
+    - `App/App/Images.xcassets/Instant View/*.imageset` → `submodules/TelegramUI/Images.xcassets/Instant View/`
+  - убедиться, что в `Contents.json` каждого `.imageset` все `filename` реально существуют в папке (нет ссылок на `*.jpeg`, если лежит только `*.pdf`, и нет «пустых» записей с одними `scale` без `filename`).
+- Типичная ошибка Bazel при пропущенных/битых ассетах:
+  - `CoreGraphics PDF has logged an error... The image set "X" has an unassigned child` или `The file "Y" for the image set "X" does not exist`.
+  - **Решение:** поправить `Contents.json` под реальные файлы или удалить лишние файлы, затем пересобрать.
+
 #### Access control
 Все типы в `Divo/Models/` и `Divo/Services/` должны быть `public` — иначе ProfileScreenUI, EventsUI, ModelsFeedUI не смогут их использовать.
 

@@ -43,7 +43,7 @@ module(
 EOF
 ```
 
-### 3. Сборка
+### 3. Сборка (симулятор)
 
 ```bash
 bazel build //Telegram:Telegram \
@@ -70,6 +70,28 @@ xcrun simctl install booted bazel-bin/Telegram/Telegram.ipa
 
 # Запустить приложение
 xcrun simctl launch booted ph.telegra.Telegraph
+```
+
+### 5. Сборка для физического девайса
+
+```bash
+bazel build //Telegram:Telegram \
+  --compilation_mode=opt \
+  --cpu=ios_arm64 \
+  --define=buildNumber=100001 \
+  --define=telegramVersion=12.2.2 \
+  --//Telegram:disableExtensions=true
+```
+
+### 6. Установка на физический девайс
+
+Пример ниже использует **конкретный UDID девайса** (`51CB07C4-5E7A-5044-A4D3-8FABEDA1B647`).  
+У себя подставьте **UDID своего устройства**, который можно посмотреть в Xcode → `Devices and Simulators` или через `xcrun devicectl list devices`.
+
+```bash
+xcrun devicectl device install app \
+  bazel-bin/Telegram/Telegram.ipa \
+  --device 51CB07C4-5E7A-5044-A4D3-8FABEDA1B647
 ```
 
 ## Часто используемые команды
