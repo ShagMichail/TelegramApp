@@ -135,3 +135,11 @@ git log --oneline <last-migrated-commit>..HEAD
 - **Что перенесено**: всё (22 новых файла + 33 обновлённых)
 - **Модули затронуты**: ProfileScreenUI, EventsUI, ModelsFeedUI, TelegramCore, OnboardingUI (новый)
 - **Ключевые фичи**: публичный профиль с галереей, похожие модели, шиммеры, пагинация ленты, онбординг, REST API клиент
+
+### 2026-03-14: Профиль — видео, табы и интеракции
+- **Коммиты в dummy**: `3dccc18`..`9356d9c` (исключая `b5c5311`)
+- **Что перенесено**:
+  - новые модели и сервисы в TelegramCore (`ProfileRawData`, обновления `UserDetailModels`/`UserGalleryModels`, `CDNURLHelper`, настройки `DivoConfig`);
+  - новые компоненты ProfileScreenUI (`DropdownNode`, `VideoGalleryCell`, ячейки каналов/моделей/ивентов, `InteractionListViewController` и `InteractionUserCell`);
+  - расширенная логика публичного профиля: сегмент‑бар с табами фото/видео/списки, видео‑галерея с автоплеем, пагинация фотогалереи, шторка лайков/просмотров/сохранёнок.
+- **Модули затронуты**: ProfileScreenUI (ProfileScreen/PublicProfile/Components), TelegramCore (Divo/Models, Divo/Services), TelegramUI (Images.xcassets: Profile/Models/Instant View).

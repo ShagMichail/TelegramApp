@@ -36,6 +36,43 @@ public struct UserPhoto: Decodable {
     public let preview: UserFile?
 }
 
+// MARK: - Video Gallery Models (New API)
+
+public struct UserVideoGalleryResponse: Decodable {
+    public let message: String?
+    public let data: UserVideoItems
+    public let errors: [String]?
+}
+
+public struct UserVideoItems: Decodable {
+    public let items: [UserVideoItem]
+    public let pagination: Pagination
+}
+
+public struct UserVideoItem: Decodable {
+    public let id: Int
+    public let title: String?
+    public let description: String?
+    public let type: String?
+    public let likesCount: Int
+    public let isLikedByUser: Bool
+    public let files: [UserVideoFile]
+}
+
+public struct UserVideoFile: Decodable {
+    public let order: Int?
+    public let fileName: String?
+    public let fullUrl: String?
+    public let fileUuid: String?
+    public let fileExtension: String?
+    public let description: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case order, fileName, fullUrl, fileUuid, description
+        case fileExtension = "extension"
+    }
+}
+
 public struct Pagination: Decodable {
     public let meta: Meta
 }

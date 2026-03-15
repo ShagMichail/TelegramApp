@@ -147,6 +147,11 @@ final class PublicProfileScreenNode: ASDisplayNode {
         return view
     }()
     
+    // Callbacks for interactions sheet
+    var onLikesTapped: (() -> Void)?
+    var onViewsTapped: (() -> Void)?
+    var onSavesTapped: (() -> Void)?
+    
     
 // MARK: - Profile Info Section
     
@@ -271,7 +276,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private let segmentedBarHeight: CGFloat = 40.0
     
     
-// MARK: - Gallery Section
+    // MARK: - Gallery Section
     
     private var galleryPhotos: [UserPhoto] = []
     private var galleryCurrentOffset: Int = 0
@@ -280,6 +285,22 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private var galleryInitialized: Bool = false
     private var galleryImageNames: [String] = []
     
+    // Простое состояние для видео-галереи без пагинации как в dummy
+    private var videoItems: [UserVideoItem] = []
+    
+    private func playVisibleVideos() {
+        guard currentTabIndex == 1 else { return }
+        for cell in galleryCollectionView.visibleCells {
+            (cell as? VideoGalleryCell)?.play()
+        }
+    }
+    
+    private func stopVisibleVideos() {
+        for cell in galleryCollectionView.visibleCells {
+            (cell as? VideoGalleryCell)?.stop()
+        }
+    }
+    
     private lazy var galleryCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.minimumInteritemSpacing = 1
@@ -287,6 +308,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.backgroundColor = .clear
         collectionView.register(GalleryCell.self, forCellWithReuseIdentifier: "GalleryCell")
+        collectionView.register(VideoGalleryCell.self, forCellWithReuseIdentifier: VideoGalleryCell.reuseIdentifier)
         collectionView.delegate = self
         collectionView.dataSource = self
         collectionView.isScrollEnabled = false
@@ -305,6 +327,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
+    
+    // MARK: - Tabs & Video/Collections state (simplified)
+    
+    private var currentTabIndex: Int = 0
     
     
 // MARK: - Similar Profiles Section
@@ -863,6 +889,8 @@ final class PublicProfileScreenNode: ASDisplayNode {
     // Создание кнопок счетчиков (лайки, просмотры, сохраненки)
     private func setupCounterView(_ container: UIView, count: String, name: String, iconName: String) {
         container.subviews.forEach { $0.removeFromSuperview() }
+        container.gestureRecognizers?.forEach { container.removeGestureRecognizer($0) }
+        container.isUserInteractionEnabled = true
         
         let icon: UIImageView = {
             let imageView = UIImageView()
@@ -917,6 +945,20 @@ final class PublicProfileScreenNode: ASDisplayNode {
             mainStack.leadingAnchor.constraint(greaterThanOrEqualTo: container.leadingAnchor, constant: 0),
             mainStack.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: 0),
         ])
+        
+        // Tap handling for interactions
+        let selector: Selector
+        if container === likesView {
+            selector = #selector(likesTapped)
+        } else if container === viewsView {
+            selector = #selector(viewsTapped)
+        } else if container === savesView {
+            selector = #selector(savesTapped)
+        } else {
+            return
+        }
+        let tap = UITapGestureRecognizer(target: self, action: selector)
+        container.addGestureRecognizer(tap)
     }
     
     // Создание кнопок социальных сетей
@@ -1387,6 +1429,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     // Сброс пагинации галереи
     func resetGalleryPagination() {
         galleryPhotos = []
+        videoItems = []
         galleryCurrentOffset = 0
         galleryIsLoading = false
         galleryHasMore = true
@@ -1399,6 +1442,15 @@ final class PublicProfileScreenNode: ASDisplayNode {
         galleryIsLoading = loading
         if loading {
             print("⏳ [PAGINATION] Set galleryIsLoading = true")
+        }
+    }
+    
+    // Простое управление состоянием видео-галереи (без пагинации)
+    func appendVideoGalleryItems(_ items: [UserVideoItem]) {
+        self.videoItems = items
+        if currentTabIndex == 1 {
+            galleryCollectionView.reloadData()
+            playVisibleVideos()
         }
     }
     
@@ -1431,6 +1483,18 @@ final class PublicProfileScreenNode: ASDisplayNode {
     @objc private func dmButtonTapped() {
         
     }
+    
+    @objc private func likesTapped() {
+        onLikesTapped?()
+    }
+    
+    @objc private func viewsTapped() {
+        onViewsTapped?()
+    }
+    
+    @objc private func savesTapped() {
+        onSavesTapped?()
+    }
 }
 
 
@@ -1439,7 +1503,12 @@ final class PublicProfileScreenNode: ASDisplayNode {
 extension PublicProfileScreenNode: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         if collectionView == galleryCollectionView {
-            return galleryPhotos.count
+            // 0 — фото, 1 — видео, остальные сегменты пока не используют коллекцию
+            if currentTabIndex == 1 {
+                return videoItems.count
+            } else {
+                return galleryPhotos.count
+            }
         } else if collectionView == similarProfilesCollectionView {
             return similarProfiles.count
         }
@@ -1455,20 +1524,32 @@ extension PublicProfileScreenNode: UICollectionViewDataSource {
             cell.configure(with: profile)
             return cell
         } else if collectionView == galleryCollectionView {
-            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "GalleryCell", for: indexPath) as? GalleryCell else {
-                return UICollectionViewCell()
-            }
-            let photoItem = galleryPhotos[indexPath.item]
-            
-            if let previewUrlString = photoItem.preview?.fullUrl, let url = URL(string: previewUrlString) {
-                cell.configure(with: url)
+            if currentTabIndex == 1 {
+                // Видео-галерея
+                guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: VideoGalleryCell.reuseIdentifier, for: indexPath) as? VideoGalleryCell else {
+                    return UICollectionViewCell()
+                }
+                let item = videoItems[indexPath.item]
+                let primaryFile = item.files.first
+                let videoUrl = primaryFile?.fullUrl ?? ""
+                let previewUrl = primaryFile?.fullUrl
+                cell.configure(with: videoUrl, previewUrl: previewUrl, title: item.title)
+                return cell
             } else {
-                if let fullUrlString = photoItem.photo.fullUrl, let url = URL(string: fullUrlString) {
+                // Фото-галерея
+                guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "GalleryCell", for: indexPath) as? GalleryCell else {
+                    return UICollectionViewCell()
+                }
+                let photoItem = galleryPhotos[indexPath.item]
+                
+                if let previewUrlString = photoItem.preview?.fullUrl, let url = URL(string: previewUrlString) {
+                    cell.configure(with: url)
+                } else if let fullUrlString = photoItem.photo.fullUrl, let url = URL(string: fullUrlString) {
                     cell.configure(with: url)
                 }
+                
+                return cell
             }
-            
-            return cell
         }
         return UICollectionViewCell()
     }
@@ -1549,6 +1630,9 @@ extension PublicProfileScreenNode: UIScrollViewDelegate {
             print("📜 [SCROLL] Triggering load more at offset=\(offsetY), threshold=\(threshold)")
             loadNextGalleryPage()
         }
+        if currentTabIndex == 1 {
+            playVisibleVideos()
+        }
         updateSegmentedBarPosition()
         updateNavigationBarTitleVisibility()
         
@@ -1579,11 +1663,19 @@ extension PublicProfileScreenNode: ProfileInfoViewDelegate {
 
 extension PublicProfileScreenNode: ProfileSegmentedBarDelegate {
     func segmentedBar(_ segmentedBar: ProfileSegmentedBar, didSelectIndex index: Int) {
-        print("Selected segment index: \(index)")
-        
+        guard index != currentTabIndex else { return }
+        if currentTabIndex == 1 {
+            stopVisibleVideos()
+        }
+        currentTabIndex = index
+        // Простое переключение между фото (0) и видео (1).
         DispatchQueue.main.async {
             self.setNeedsLayout()
             self.layoutIfNeeded()
+            self.galleryCollectionView.reloadData()
+            if self.currentTabIndex == 1 {
+                self.playVisibleVideos()
+            }
         }
     }
 }
