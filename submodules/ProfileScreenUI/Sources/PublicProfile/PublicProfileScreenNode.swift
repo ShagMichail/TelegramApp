@@ -29,6 +29,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private let fixedHeaderHeight: CGFloat = 540.0
     private let fixedProfileHeaderHeight: CGFloat = 240.0
     
+    // Управление моментом, когда начинаем анимировать title в навбаре
+    private var titleVisibilityActivated = false
+    
     private let scrollView: UIScrollView = {
         let scrollView = UIScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -751,46 +754,18 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private func stopShimmers() {
         guard profileHeaderView.isHidden else { return }
         
-        navigationBarTitleView?.alpha = 0
-        // если сделать тут, то из-за стека будет пролагивание вниз
-        //        profileHeaderView.isHidden = false
-        profileHeaderView.alpha = 0
-        
+        // просто показываем контент и скрываем шиммеры без анимаций
+        profileHeaderView.isHidden = false
         counterActionsStack.isHidden = false
-        counterActionsStack.alpha = 0
-        
         profileInfoView.isHidden = false
-        profileInfoView.alpha = 0
-        
         socialMediaStack.isHidden = false
-        socialMediaStack.alpha = 0
-        
         currentAgencyView.isHidden = false
-        currentAgencyView.alpha = 0
         
-        UIView.animate(withDuration: 0.3, delay: 0.1, options: .curveEaseInOut, animations: {
-            self.profileHeaderShimmerView.alpha = 0
-            self.actionsShimmerView.alpha = 0
-            self.profileInfoShimmerView.alpha = 0
-            self.socialShimmerView.alpha = 0
-            self.currentAgencyShimmerView.alpha = 0
-            
-            self.profileHeaderView.alpha = 1
-            self.profileHeaderView.isHidden = false
-            self.counterActionsStack.alpha = 1
-            self.profileInfoView.alpha = 1
-            self.socialMediaStack.alpha = 1
-            self.currentAgencyView.alpha = 1
-            
-        }) { (completed) in
-            if completed {
-                self.profileHeaderShimmerView.isHidden = true
-                self.actionsShimmerView.isHidden = true
-                self.profileInfoShimmerView.isHidden = true
-                self.socialShimmerView.isHidden = true
-                self.currentAgencyShimmerView.isHidden = true
-            }
-        }
+        profileHeaderShimmerView.isHidden = true
+        actionsShimmerView.isHidden = true
+        profileInfoShimmerView.isHidden = true
+        socialShimmerView.isHidden = true
+        currentAgencyShimmerView.isHidden = true
     }
     
     private func applyGradientBlurMask() {
@@ -1108,44 +1083,32 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     // Создаем все кнопки социальный сетей
     private func populateSocialMedia(handles: [String], icons: [String]) {
-        UIView.animate(withDuration: 0.3, animations: {
+        if handles.isEmpty {
+            socialMediaContainer.alpha = 0
+            socialHeightConstraint?.isActive = false
+            socialHeightConstraint = socialMediaContainer.heightAnchor.constraint(equalToConstant: 0)
+            socialHeightConstraint.isActive = true
+            socialMediaContainer.isHidden = true
+        } else {
+            socialMediaContainer.alpha = 1
+            socialMediaStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
             
-            if handles.isEmpty {
-                self.socialMediaContainer.alpha = 0
-                
-                self.socialHeightConstraint?.isActive = false
-                self.socialHeightConstraint = self.socialMediaContainer.heightAnchor.constraint(equalToConstant: 0)
-                self.socialHeightConstraint.isActive = true
-                
-            } else {
-                self.socialMediaContainer.alpha = 1
-                
-                self.socialMediaStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-                
-                for (index, handle) in handles.enumerated() {
-                    let iconName = icons[safe: index] ?? self.iconPlaceholder
-                    if handles.count == 1 {
-                        self.socialMediaStack.addArrangedSubview(self.createSocialOneMediaButton(handle: handle, iconName: iconName))
-                    } else {
-                        self.socialMediaStack.addArrangedSubview(self.createSocialMediaButton(handle: handle, iconName: iconName))
-                    }
+            for (index, handle) in handles.enumerated() {
+                let iconName = icons[safe: index] ?? iconPlaceholder
+                if handles.count == 1 {
+                    socialMediaStack.addArrangedSubview(createSocialOneMediaButton(handle: handle, iconName: iconName))
+                } else {
+                    socialMediaStack.addArrangedSubview(createSocialMediaButton(handle: handle, iconName: iconName))
                 }
-                
-                self.socialHeightConstraint?.isActive = false
-                let newHeight: CGFloat = (handles.count == 1) ? 44 : 68
-                self.socialHeightConstraint = self.socialMediaContainer.heightAnchor.constraint(equalToConstant: newHeight)
-                self.socialHeightConstraint.isActive = true
             }
             
-            self.view.layoutIfNeeded()
-            
-        }) { completed in
-            if completed && handles.isEmpty {
-                self.socialMediaContainer.isHidden = true
-            } else {
-                self.socialMediaContainer.isHidden = false
-            }
+            socialHeightConstraint?.isActive = false
+            let newHeight: CGFloat = (handles.count == 1) ? 44 : 68
+            socialHeightConstraint = socialMediaContainer.heightAnchor.constraint(equalToConstant: newHeight)
+            socialHeightConstraint.isActive = true
+            socialMediaContainer.isHidden = false
         }
+        view.layoutIfNeeded()
     }
     
     // Получаем картинку флага в зависимости от кода страны
@@ -1161,6 +1124,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         let titleView = ProfileNavigationBarTitleView()
         
         titleView.configure(name: name, info: info)
+        titleView.alpha = 0.0
         
         self.navigationBarTitleView = titleView
         
@@ -1169,9 +1133,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
         }
     }
     
-    // Обновление титула NavigationBar
+    // Обновление титула NavigationBar в зависимости от скролла
     private func updateNavigationBarTitleVisibility() {
-        guard let titleView = navigationBarTitleView,
+        guard titleVisibilityActivated,
+              let titleView = navigationBarTitleView,
               let (_, navigationBarHeight) = self.containerLayout else { return }
         
         let offsetY = scrollView.contentOffset.y
@@ -1620,6 +1585,10 @@ extension PublicProfileScreenNode: UIScrollViewDelegate {
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
         galleryCollectionView.layoutIfNeeded()
         
+        if !titleVisibilityActivated {
+            titleVisibilityActivated = true
+        }
+        
         let offsetY = scrollView.contentOffset.y
         let contentHeight = galleryCollectionView.contentSize.height
         let frameHeight = galleryCollectionView.frame.size.height
@@ -1651,10 +1620,8 @@ extension PublicProfileScreenNode: UIScrollViewDelegate {
 
 extension PublicProfileScreenNode: ProfileInfoViewDelegate {
     func profileInfoViewDidUpdateContentHeight() {
-        DispatchQueue.main.async {
-            self.setNeedsLayout()
-            self.layoutIfNeeded()
-        }
+        setNeedsLayout()
+        layoutIfNeeded()
     }
 }
 
