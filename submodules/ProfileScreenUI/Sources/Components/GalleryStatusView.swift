@@ -25,6 +25,15 @@ final class GalleryStatusView: UIView {
         return spinner
     }()
     
+    private let statusImageView: UIImageView = {
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFit
+        imageView.tintColor = .white
+        imageView.image = UIImage(bundleImageName: "Profile/AddPhotoIcon")
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+    
     private let statusLabel: UILabel = {
         let label = UILabel()
         label.textColor = .white
@@ -35,7 +44,7 @@ final class GalleryStatusView: UIView {
     }()
     
     private lazy var contentStack: UIStackView = {
-        let stack = UIStackView(arrangedSubviews: [spinner, statusLabel])
+        let stack = UIStackView(arrangedSubviews: [spinner, statusImageView, statusLabel])
         stack.axis = .vertical
         stack.spacing = 8
         stack.alignment = .center
@@ -53,6 +62,7 @@ final class GalleryStatusView: UIView {
     }
     
     private func setupViews() {
+        statusImageView.isHidden = true
         addSubview(containerView)
         containerView.addSubview(contentStack)
         
@@ -67,7 +77,10 @@ final class GalleryStatusView: UIView {
         ])
     }
     
-    func configure(isLoading: Bool, text: String) {
+    func configure(isLoading: Bool, text: String, isMyProfile: Bool) {
+        if isMyProfile {
+            statusImageView.isHidden = false
+        }
         statusLabel.text = text
         if isLoading {
             spinner.isHidden = false
