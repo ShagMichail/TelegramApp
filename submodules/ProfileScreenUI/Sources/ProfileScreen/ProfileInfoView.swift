@@ -21,7 +21,8 @@ final class ProfileInfoView: UIView {
     private var selectedIndex: Int = 0 {
         didSet {
             isExpanded = false
-            updateContent(animated: true)
+//            updateContent(animated: true)
+            updateContent(animated: false)
             updateHeaderAppearance(animated: true)
         }
     }
@@ -64,7 +65,7 @@ final class ProfileInfoView: UIView {
     private let contentLabel: UILabel = {
         let label = UILabel()
         label.font = Font.helveticaNeue(12)
-        label.textColor = .white.withAlphaComponent(0.82)
+        label.textColor = .white
         label.numberOfLines = 0
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -84,10 +85,25 @@ final class ProfileInfoView: UIView {
     private let seeMoreButton: UIButton = {
         let button = UIButton(type: .system)
         button.titleLabel?.font = Font.helveticaNeue(10)
-        button.setTitleColor(.white.withAlphaComponent(0.82), for: .normal)
+        button.setTitleColor(.white, for: .normal)
         button.setTitle("SEE MORE", for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
+    }()
+    
+    private let mainStack: UIStackView = {
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.spacing = 5
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        return stack
+    }()
+    
+    private let seeMoreStack: UIStackView = {
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        return stack
     }()
     
     private var headerHeightConstraint: NSLayoutConstraint!
@@ -143,14 +159,12 @@ final class ProfileInfoView: UIView {
         headerView.addSubview(headerStack)
         headerView.addSubview(indicatorView)
         
-        let seeMoreStack = UIStackView(arrangedSubviews: [UIView(), seeMoreButton])
-        seeMoreStack.axis = .horizontal
-        seeMoreStack.translatesAutoresizingMaskIntoConstraints = false
+        seeMoreStack.addArrangedSubview(UIView())
+        seeMoreStack.addArrangedSubview(seeMoreButton)
         
-        let mainStack = UIStackView(arrangedSubviews: [contentLabel, appearanceStack, seeMoreStack])
-        mainStack.axis = .vertical
-        mainStack.spacing = 5
-        mainStack.translatesAutoresizingMaskIntoConstraints = false
+        mainStack.addArrangedSubview(contentLabel)
+        mainStack.addArrangedSubview(appearanceStack)
+        mainStack.addArrangedSubview(seeMoreStack)
         
         appearanceStack.setContentCompressionResistancePriority(.required, for: .vertical)
         appearanceStack.setContentHuggingPriority(.required, for: .vertical)
@@ -257,21 +271,29 @@ final class ProfileInfoView: UIView {
     
     private func updateContent(animated: Bool) {
         let isBio = selectedIndex == 0
+        var shouldShowSeeMore = false
         
         if isBio {
+            self.seeMoreStack.isHidden = true
             contentLabel.text = biographyText
             contentLabel.numberOfLines = isExpanded ? 0 : maxLinesCollapsed
-            seeMoreButton.isHidden = false
+            
+            let viewWidth = self.bounds.width > 0 ? self.bounds.width : UIScreen.main.bounds.width
+            let labelWidth = viewWidth - 32
+            let actualLines = biographyText.lineCount(for: contentLabel.font, width: labelWidth)
+            shouldShowSeeMore = actualLines > maxLinesCollapsed
+            
         } else {
+            self.seeMoreStack.isHidden = true
             let dataToShow: [AppearanceAttribute]
             if isExpanded {
                 dataToShow = appearanceData
             } else {
                 dataToShow = Array(appearanceData.prefix(4))
             }
-            
             rebuildAppearanceGrid(with: dataToShow)
-            seeMoreButton.isHidden = appearanceData.count <= 4
+            
+            shouldShowSeeMore = appearanceData.count > 4
         }
         
         seeMoreButton.setTitle(isExpanded ? "SEE LESS" : "SEE MORE", for: .normal)
@@ -279,23 +301,18 @@ final class ProfileInfoView: UIView {
         let changes = {
             self.contentLabel.alpha = isBio ? 1 : 0
             self.appearanceStack.alpha = isBio ? 0 : 1
+            self.seeMoreStack.isHidden = !shouldShowSeeMore
         }
         
         let completion: (Bool) -> Void = { _ in
             self.contentLabel.isHidden = !isBio
             self.appearanceStack.isHidden = isBio
-            
             self.delegate?.profileInfoViewDidUpdateContentHeight()
         }
         
-        if animated {
-            UIView.animate(withDuration: 0.05, animations: changes, completion: completion)
-        } else {
-            changes()
-            contentLabel.isHidden = !isBio
-            appearanceStack.isHidden = isBio
-            delegate?.profileInfoViewDidUpdateContentHeight()
-        }
+        changes()
+        seeMoreStack.isHidden = !shouldShowSeeMore
+        completion(true)
     }
     
     private func rebuildAppearanceGrid(with attributes: [AppearanceAttribute]) {
@@ -379,7 +396,8 @@ final class ProfileInfoView: UIView {
     
     @objc private func seeMoreTapped() {
         isExpanded.toggle()
-        updateContent(animated: true)
+//        updateContent(animated: true)
+        updateContent(animated: false)
     }
 }
 
@@ -415,14 +433,12 @@ extension UIView {
         gradient.startPoint = CGPoint(x: 0, y: 0.5)
         gradient.endPoint = CGPoint(x: 1, y: 0.5)
         
-        // Цвета анимации (светло-серый -> чуть светлее -> светло-серый)
         let baseColor = UIColor(white: 0.85, alpha: 1.0).cgColor
         let highlightColor = UIColor(white: 0.95, alpha: 1.0).cgColor
         
         gradient.colors = [baseColor, highlightColor, baseColor]
         gradient.locations = [0.0, 0.5, 1.0]
         
-        // Размер градиента больше вью, чтобы он "проезжал"
         gradient.frame = CGRect(x: -self.bounds.width, y: 0, width: self.bounds.width * 3, height: self.bounds.height)
         
         let animation = CABasicAnimation(keyPath: "locations")
@@ -434,7 +450,6 @@ extension UIView {
         
         gradient.add(animation, forKey: "shimmer")
         
-        // Маска, чтобы градиент был только внутри скругленных углов вью
         self.layer.mask = self.layer.cornerRadius > 0 ? nil : nil
         self.layer.addSublayer(gradient)
         self.layer.masksToBounds = true

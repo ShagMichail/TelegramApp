@@ -56,28 +56,28 @@ extension PeerInfoScreenNode {
                         
             let _ = (context.engine.peers.requestPeerPhotos(peerId: peerId)
             |> deliverOnMainQueue).start(next: { photos in
-                let peer = self.data?.peer
+                // let peer = self.data?.peer
                 
-                let cachedData = self.data?.cachedData as? CachedUserData
-                let dummyModel = ProfileModel(
-                    name: (peer as? TelegramUser)?.firstName ?? "",
-                    lastName: (peer as? TelegramUser)?.lastName,
-                    age: 22,
-                    location: "New York",
-                    mainImageName: "Models/image1",
-                    avatarImageName: "Models/image7",
-                    isVerified: true,
-                    likesCount: "1K",
-                    viewsCount: "285",
-                    savesCount: "765",
-                    biography: cachedData?.about ?? "",
-                    socialMediaHandles: ["_britney_ny", "_britney_ny", "britney_ny", "Website"],
-                    galleryImageNames: ["Models/image4", "Models/image2", "Models/image3"],
-                    photos: photos,
-                    isMyProfile: true
-                )
-                let detailController = ProfileScreenController(context: self.context, model: dummyModel, peer: peer)
-                self.controller?.push(detailController)
+                // let cachedData = self.data?.cachedData as? CachedUserData
+                // let dummyModel = ProfileModel(
+                //     name: (peer as? TelegramUser)?.firstName ?? "",
+                //     lastName: (peer as? TelegramUser)?.lastName,
+                //     age: 22,
+                //     location: "New York",
+                //     mainImageName: "Models/image1",
+                //     avatarImageName: "Models/image7",
+                //     isVerified: true,
+                //     likesCount: "1K",
+                //     viewsCount: "285",
+                //     savesCount: "765",
+                //     biography: cachedData?.about ?? "",
+                //     socialMediaHandles: ["_britney_ny", "_britney_ny", "britney_ny", "Website"],
+                //     galleryImageNames: ["Models/image4", "Models/image2", "Models/image3"],
+                //     photos: photos,
+                //     isMyProfile: true
+                // )
+                // let detailController = ProfileScreenController(context: self.context, model: dummyModel, peer: peer)
+                // self.controller?.push(detailController)
             })
             
             

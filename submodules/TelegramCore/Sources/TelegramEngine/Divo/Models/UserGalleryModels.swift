@@ -34,6 +34,14 @@ public struct UserPhoto: Decodable {
     public let likesCount: Int
     public let isLikedByUser: Bool
     public let preview: UserFile?
+
+    public init(id: Int, photo: UserFile, likesCount: Int, isLikedByUser: Bool, preview: UserFile?) {
+        self.id = id
+        self.photo = photo
+        self.likesCount = likesCount
+        self.isLikedByUser = isLikedByUser
+        self.preview = preview
+    }
 }
 
 // MARK: - Video Gallery Models (New API)

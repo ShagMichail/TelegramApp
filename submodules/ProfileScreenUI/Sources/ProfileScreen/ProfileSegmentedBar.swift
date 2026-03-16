@@ -30,6 +30,11 @@ final class ProfileSegmentedBar: UIView {
     private var indicatorCenterXConstraint: NSLayoutConstraint?
     private var indicatorWidthConstraint: NSLayoutConstraint!
     
+    private let myProfileIconNames: [String] = [
+        "Models/GridIcon",
+        "Models/FilmstripIcon"
+    ]
+    
     private let modelIconNames: [String] = [
         "Models/GridIcon",
         "Models/FilmstripIcon",
@@ -62,7 +67,7 @@ final class ProfileSegmentedBar: UIView {
         setupView()
         self.backgroundColor = .clear
         
-        configure(isAgency: false)
+        configure(isAgency: false, isMyProfile: false)
     }
     
     required init?(coder: NSCoder) {
@@ -87,8 +92,8 @@ final class ProfileSegmentedBar: UIView {
         indicatorWidthConstraint.isActive = true
     }
     
-    func configure(isAgency: Bool, animated: Bool = true) {
-        let icons = isAgency ? agencyIconNames : modelIconNames
+    func configure(isAgency: Bool, isMyProfile: Bool, animated: Bool = true) {
+        let icons = isAgency ? agencyIconNames : (isMyProfile ? myProfileIconNames : modelIconNames)
         
         guard imageViews.count != icons.count else { return }
         

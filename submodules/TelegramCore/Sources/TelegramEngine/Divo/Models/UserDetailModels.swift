@@ -57,6 +57,13 @@ public struct UserFile: Decodable {
         case fileExtension = "extension"
         case fileUuid
     }
+
+    public init(fileName: String?, fullUrl: String?, fileExtension: String?, fileUuid: String?) {
+        self.fileName = fileName
+        self.fullUrl = fullUrl
+        self.fileExtension = fileExtension
+        self.fileUuid = fileUuid
+    }
 }
 
 public struct UserModelInfo: Decodable {

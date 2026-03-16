@@ -12,8 +12,9 @@ import AppBundle
 
 final class PublicProfileScreenNode: ASDisplayNode {
     private static let mockBiographyText = "No biograpy"
-    
+    private static let mockBiographyMyProfileText = "Fill in the information about you"
     private let model: ProfileModel
+    private var modelRole: String = "model"
     private weak var controller: ViewController?
     private let context: AccountContext
     private var presentationData: PresentationData
@@ -25,12 +26,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     private var headerHeightConstraint: NSLayoutConstraint!
     private var socialHeightConstraint: NSLayoutConstraint!
-    private let iconPlaceholder = "Contact List/HeartActionIcon"
+    private let iconPlaceholder = "HeartActionIcon"
     private let fixedHeaderHeight: CGFloat = 540.0
     private let fixedProfileHeaderHeight: CGFloat = 240.0
-    
-    // Управление моментом, когда начинаем анимировать title в навбаре
-    private var titleVisibilityActivated = false
     
     private let scrollView: UIScrollView = {
         let scrollView = UIScrollView()
@@ -83,7 +81,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         }
     }
     
-// MARK: - Profile Header Section
+    // MARK: - Profile Header Section
     
     private lazy var infoStack: UIStackView = {
         let infoStack = UIStackView()
@@ -99,7 +97,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private lazy var profileHeaderShimmerView = ProfileHeaderShimmerView()
     
     
-// MARK: - Actions Section
+    // MARK: - Actions Section
     
     private lazy var counterActionsStack: UIStackView = {
         let stack = UIStackView()
@@ -129,34 +127,30 @@ final class PublicProfileScreenNode: ASDisplayNode {
         button.layer.borderWidth = 0.0
         button.layer.borderColor = UIColor.clear.cgColor
         button.translatesAutoresizingMaskIntoConstraints = false
+        button.isHidden = true
         return button
     }()
     
-    private let likesView: UIView = {
-        let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
+    private let likesView: UIControl = {
+        let control = UIControl()
+        control.translatesAutoresizingMaskIntoConstraints = false
+        return control
     }()
     
-    private let viewsView: UIView = {
-        let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
+    private let viewsView: UIControl = {
+        let control = UIControl()
+        control.translatesAutoresizingMaskIntoConstraints = false
+        return control
     }()
     
-    private let savesView: UIView = {
-        let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
+    private let savesView: UIControl = {
+        let control = UIControl()
+        control.translatesAutoresizingMaskIntoConstraints = false
+        return control
     }()
     
-    // Callbacks for interactions sheet
-    var onLikesTapped: (() -> Void)?
-    var onViewsTapped: (() -> Void)?
-    var onSavesTapped: (() -> Void)?
     
-    
-// MARK: - Profile Info Section
+    // MARK: - Profile Info Section
     
     private let profileInfoContainer: UIView = {
         let view = UIView()
@@ -185,7 +179,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }()
     
     
-// MARK: - Current Agency Section
+    // MARK: - Current Agency Section
     
     private let currentAgencyContainer: UIView = {
         let view = UIView()
@@ -210,7 +204,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }()
     
     
-// MARK: - Work History Section
+    // MARK: - Work History Section
     
     private let addWorkHistoryContainer: UIView = {
         let view = UIView()
@@ -232,12 +226,45 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }()
     
     
-// MARK: - Social Media Section
+    // MARK: - Social Media Section
     
     private let socialMediaContainer: UIView = {
         let view = UIView()
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
+    }()
+    
+    private let titleEditContainer: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
+        return view
+    }()
+    
+    private let titleEditStack: UIStackView = {
+        let stack = UIStackView()
+        stack.axis = .horizontal
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        return stack
+    }()
+    
+    private let editLinksButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.titleLabel?.font = Font.helveticaNeue(10)
+        button.setTitleColor(.white, for: .normal)
+        button.setTitle("EDIT LINKS", for: .normal)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+    
+    private let editLinksLabel: UILabel = {
+        let label = UILabel()
+        label.font = Font.helveticaNeue(14)
+        label.textColor = .white
+        label.numberOfLines = 0
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.text = "My Links"
+        return label
     }()
     
     private let socialMediaStack: UIStackView = {
@@ -258,7 +285,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }()
     
     
-// MARK: - Segmented Bar Section
+    // MARK: - Segmented Bar Section
     
     private lazy var segmentedBar: ProfileSegmentedBar = {
         let view = ProfileSegmentedBar()
@@ -279,6 +306,63 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private let segmentedBarHeight: CGFloat = 40.0
     
     
+    // MARK: - Gallery Collections Section
+    
+    private let collectionsContainer: UIView = {
+        let view = UIView()
+        view.backgroundColor = .clear
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.clipsToBounds = true
+        return view
+    }()
+    
+    
+    // MARK: - Tabs & Swipe Logic Variables
+    
+    private var galleryHeightConstraint: NSLayoutConstraint!
+    private var videoHeightConstraint: NSLayoutConstraint!
+    private var channelHeightConstraint: NSLayoutConstraint!
+    private var modelHeightConstraint: NSLayoutConstraint!
+    private var eventHeightConstraint: NSLayoutConstraint!
+    
+    private var currentTabIndex: Int = 0
+    private var collectionsContainerHeightConstraint: NSLayoutConstraint!
+    
+    private let photoTabContainer: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let videoTabContainer: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
+        return view
+    }()
+    
+    private let channelTabContainer: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
+        return view
+    }()
+    
+    private let modelTabContainer: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
+        return view
+    }()
+    
+    private let eventTabContainer: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
+        return view
+    }()
+    
+    
     // MARK: - Gallery Section
     
     private var galleryPhotos: [UserPhoto] = []
@@ -288,22 +372,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private var galleryInitialized: Bool = false
     private var galleryImageNames: [String] = []
     
-    // Простое состояние для видео-галереи без пагинации как в dummy
-    private var videoItems: [UserVideoItem] = []
-    
-    private func playVisibleVideos() {
-        guard currentTabIndex == 1 else { return }
-        for cell in galleryCollectionView.visibleCells {
-            (cell as? VideoGalleryCell)?.play()
-        }
-    }
-    
-    private func stopVisibleVideos() {
-        for cell in galleryCollectionView.visibleCells {
-            (cell as? VideoGalleryCell)?.stop()
-        }
-    }
-    
     private lazy var galleryCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.minimumInteritemSpacing = 1
@@ -311,18 +379,11 @@ final class PublicProfileScreenNode: ASDisplayNode {
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.backgroundColor = .clear
         collectionView.register(GalleryCell.self, forCellWithReuseIdentifier: "GalleryCell")
-        collectionView.register(VideoGalleryCell.self, forCellWithReuseIdentifier: VideoGalleryCell.reuseIdentifier)
         collectionView.delegate = self
         collectionView.dataSource = self
         collectionView.isScrollEnabled = false
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         return collectionView
-    }()
-    
-    private let galleryStatusContainer: UIView = {
-        let view = UIView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        return view
     }()
     
     private let galleryStatusView: GalleryStatusView = {
@@ -331,12 +392,120 @@ final class PublicProfileScreenNode: ASDisplayNode {
         return view
     }()
     
-    // MARK: - Tabs & Video/Collections state (simplified)
     
-    private var currentTabIndex: Int = 0
+    // MARK: - Video Gallery Pagination
+    
+    private var videoGalleryInitialized: Bool = false
+    private var videoGalleryImageNames: [String] = []
+    private var videoGalleryItems: [UserPhoto] = []
+    private var videoGalleryTotalCount: Int = 0
+    private var videoGalleryCurrentOffset: Int = 0
+    private var videoGalleryIsLoading: Bool = false
+    private var videoGalleryHasMore: Bool = true
+    
+    private lazy var videoGalleryCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.minimumInteritemSpacing = 1
+        layout.minimumLineSpacing = 1
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.backgroundColor = .clear
+        collectionView.register(VideoGalleryCell.self, forCellWithReuseIdentifier: VideoGalleryCell.reuseIdentifier)
+        collectionView.delegate = self
+        collectionView.dataSource = self
+        collectionView.isScrollEnabled = false
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        return collectionView
+    }()
+    
+    private let videoGalleryStatusView: GalleryStatusView = {
+        let view = GalleryStatusView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
     
     
-// MARK: - Similar Profiles Section
+    // MARK: - Channels Gallery Section
+    
+    private var channelGalleryItems: [ProfileChannelItem] = []
+    private var channelGalleryInitialized: Bool = false
+    
+    private lazy var channelGalleryCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .vertical
+        layout.minimumInteritemSpacing = 0
+        layout.minimumLineSpacing = 0
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.backgroundColor = .white
+        collectionView.register(ChannelListCell.self, forCellWithReuseIdentifier: ChannelListCell.reuseIdentifier)
+        collectionView.delegate = self
+        collectionView.dataSource = self
+        collectionView.isScrollEnabled = false
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        return collectionView
+    }()
+    
+    private let channelGalleryStatusView: GalleryStatusView = {
+        let view = GalleryStatusView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    
+    // MARK: - Models Gallery Section
+    
+    private var modelGalleryItems: [ModelItem] = []
+    private var modelGalleryInitialized: Bool = false
+    
+    private lazy var modelGalleryCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .vertical
+        layout.minimumInteritemSpacing = 0
+        layout.minimumLineSpacing = 0
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.backgroundColor = .white
+        collectionView.register(ModelListCell.self, forCellWithReuseIdentifier: ModelListCell.reuseIdentifier)
+        collectionView.delegate = self
+        collectionView.dataSource = self
+        collectionView.isScrollEnabled = false
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        return collectionView
+    }()
+    
+    private let modelGalleryStatusView: GalleryStatusView = {
+        let view = GalleryStatusView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    
+    // MARK: - Models Gallery Section
+    
+    private var eventGalleryItems: [EventItem] = []
+    private var eventGalleryInitialized: Bool = false
+    
+    private lazy var eventGalleryCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .vertical
+        layout.minimumInteritemSpacing = 0
+        layout.minimumLineSpacing = 0
+        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collectionView.backgroundColor = .white
+        collectionView.register(EventListCell.self, forCellWithReuseIdentifier: EventListCell.reuseIdentifier)
+        collectionView.delegate = self
+        collectionView.dataSource = self
+        collectionView.isScrollEnabled = false
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        return collectionView
+    }()
+    
+    private let eventGalleryStatusView: GalleryStatusView = {
+        let view = GalleryStatusView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    
+    // MARK: - Similar Profiles Section
     
     private var similarProfiles: [SimilarProfileItem] = []
     private var similarProfilesTotalCount: Int = 0
@@ -348,6 +517,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         let view = UIView()
         view.backgroundColor = .white
         view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
         return view
     }()
     
@@ -377,7 +547,14 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }()
     
     
-// MARK: - Init
+    // MARK: - Sheet View
+    
+    var onLikesTapped: (() -> Void)?
+    var onViewsTapped: (() -> Void)?
+    var onSavesTapped: (() -> Void)?
+    
+    
+    // MARK: - Init
     
     init(controller: ViewController, context: AccountContext, presentationData: PresentationData, model: ProfileModel) {
         self.controller = controller
@@ -399,7 +576,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     
-// MARK: - Override
+    // MARK: - Override
     
     override func layout() {
         super.layout()
@@ -451,7 +628,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     
-// MARK: - Private
+    // MARK: - Private
     
     private func setupContent() {
         setupHeaderImageView()
@@ -460,7 +637,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         setupContentViewStack()
         setupSegmentedBar()
         setupContentLayout()
-        setupGallery()
+        setupAllCollectionsLayers()
         setupSimilarProfiles()
     }
     
@@ -550,8 +727,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             
             infoStack.leadingAnchor.constraint(equalTo: headerContainer.leadingAnchor, constant: 16),
             infoStack.trailingAnchor.constraint(equalTo: headerContainer.trailingAnchor, constant: -16),
-            infoStack.centerYAnchor.constraint(equalTo: headerContainer.centerYAnchor),
-            infoStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 120),
+            infoStack.heightAnchor.constraint(equalToConstant: 85),
         ])
     }
     
@@ -564,7 +740,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
         counterActionsStack.addArrangedSubview(likesView)
         counterActionsStack.addArrangedSubview(viewsView)
         counterActionsStack.addArrangedSubview(savesView)
-        
         
         NSLayoutConstraint.activate([
             counterActionsContainer.topAnchor.constraint(equalTo: infoStack.bottomAnchor, constant: 20),
@@ -649,11 +824,25 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     private func setupSocialMediaContainer() {
+        contentViewStack.addArrangedSubview(titleEditContainer)
+        titleEditContainer.addSubview(titleEditStack)
+        titleEditStack.addArrangedSubview(editLinksLabel)
+        titleEditStack.addArrangedSubview(UIView())
+        titleEditStack.addArrangedSubview(editLinksButton)
+        
         contentViewStack.addArrangedSubview(socialMediaContainer)
         socialMediaContainer.addSubview(socialMediaStack)
         socialMediaContainer.addSubview(socialShimmerView)
         
         NSLayoutConstraint.activate([
+            titleEditContainer.leadingAnchor.constraint(equalTo: contentViewStack.leadingAnchor),
+            titleEditContainer.trailingAnchor.constraint(equalTo: contentViewStack.trailingAnchor),
+            
+            titleEditStack.leadingAnchor.constraint(equalTo: titleEditContainer.leadingAnchor, constant: 16),
+            titleEditStack.trailingAnchor.constraint(equalTo: titleEditContainer.trailingAnchor, constant: -16),
+            titleEditStack.topAnchor.constraint(equalTo: titleEditContainer.topAnchor),
+            titleEditStack.bottomAnchor.constraint(equalTo: titleEditContainer.bottomAnchor),
+            
             socialMediaContainer.leadingAnchor.constraint(equalTo: contentViewStack.leadingAnchor),
             socialMediaContainer.trailingAnchor.constraint(equalTo: contentViewStack.trailingAnchor),
             socialMediaStack.leadingAnchor.constraint(equalTo: socialMediaContainer.leadingAnchor, constant: 16),
@@ -671,6 +860,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         
         contentViewStack.setCustomSpacing(8, after: socialMediaStack)
         contentViewStack.setCustomSpacing(8, after: socialShimmerView)
+        contentViewStack.setCustomSpacing(4, after: titleEditContainer)
         
         socialHeightConstraint = socialMediaStack.heightAnchor.constraint(equalToConstant: 68)
         socialHeightConstraint.isActive = true
@@ -688,24 +878,127 @@ final class PublicProfileScreenNode: ASDisplayNode {
         contentViewStack.setCustomSpacing(0, after: segmentedBarPlaceholder)
     }
     
-    private func setupGallery() {
-        contentViewStack.addArrangedSubview(galleryStatusContainer)
-        galleryStatusContainer.addSubview(galleryStatusView)
+    private func setupAllCollectionsLayers() {
+        contentViewStack.addArrangedSubview(collectionsContainer)
         
+        collectionsContainerHeightConstraint = collectionsContainer.heightAnchor.constraint(equalToConstant: 160)
+        collectionsContainerHeightConstraint.isActive = true
+        
+        let containers = [photoTabContainer, videoTabContainer, channelTabContainer, modelTabContainer, eventTabContainer]
+        for container in containers {
+            collectionsContainer.addSubview(container)
+            NSLayoutConstraint.activate([
+                container.topAnchor.constraint(equalTo: collectionsContainer.topAnchor),
+                container.leadingAnchor.constraint(equalTo: collectionsContainer.leadingAnchor),
+                container.trailingAnchor.constraint(equalTo: collectionsContainer.trailingAnchor),
+                container.bottomAnchor.constraint(equalTo: collectionsContainer.bottomAnchor)
+            ])
+        }
+        
+        // --- PHOTO ---
+        // ЗАМЕНА: Сохраняем констрейнт высоты
+        galleryHeightConstraint = galleryCollectionView.heightAnchor.constraint(equalToConstant: 1)
+        galleryHeightConstraint.isActive = true
+        
+        photoTabContainer.addSubview(galleryStatusView)
+        photoTabContainer.addSubview(galleryCollectionView)
         NSLayoutConstraint.activate([
-            galleryStatusContainer.heightAnchor.constraint(equalToConstant: 160),
+            galleryStatusView.heightAnchor.constraint(equalToConstant: 160),
+            galleryStatusView.topAnchor.constraint(equalTo: photoTabContainer.topAnchor),
+            galleryStatusView.leadingAnchor.constraint(equalTo: photoTabContainer.leadingAnchor, constant: 16),
+            galleryStatusView.trailingAnchor.constraint(equalTo: photoTabContainer.trailingAnchor, constant: -16),
             
-            galleryStatusView.topAnchor.constraint(equalTo: galleryStatusContainer.topAnchor),
-            galleryStatusView.bottomAnchor.constraint(equalTo: galleryStatusContainer.bottomAnchor),
-            galleryStatusView.leadingAnchor.constraint(equalTo: galleryStatusContainer.leadingAnchor, constant: 16),
-            galleryStatusView.trailingAnchor.constraint(equalTo: galleryStatusContainer.trailingAnchor, constant: -16)
+            galleryCollectionView.topAnchor.constraint(equalTo: photoTabContainer.topAnchor),
+            galleryCollectionView.leadingAnchor.constraint(equalTo: photoTabContainer.leadingAnchor),
+            galleryCollectionView.trailingAnchor.constraint(equalTo: photoTabContainer.trailingAnchor)
         ])
-        
-        contentViewStack.addArrangedSubview(galleryCollectionView)
-        
         galleryCollectionView.isHidden = true
-        galleryStatusContainer.isHidden = false
-        galleryStatusView.configure(isLoading: true, text: "Uploading Photos...")
+        galleryStatusView.isHidden = false
+        galleryStatusView.configure(isLoading: true, text: "Uploading Photos...", isMyProfile: false)
+        
+        // --- VIDEO ---
+        // ЗАМЕНА: Сохраняем констрейнт высоты
+        videoHeightConstraint = videoGalleryCollectionView.heightAnchor.constraint(equalToConstant: 1)
+        videoHeightConstraint.isActive = true
+        
+        videoTabContainer.addSubview(videoGalleryStatusView)
+        videoTabContainer.addSubview(videoGalleryCollectionView)
+        NSLayoutConstraint.activate([
+            videoGalleryStatusView.heightAnchor.constraint(equalToConstant: 160),
+            videoGalleryStatusView.topAnchor.constraint(equalTo: videoTabContainer.topAnchor),
+            videoGalleryStatusView.leadingAnchor.constraint(equalTo: videoTabContainer.leadingAnchor, constant: 16),
+            videoGalleryStatusView.trailingAnchor.constraint(equalTo: videoTabContainer.trailingAnchor, constant: -16),
+            
+            videoGalleryCollectionView.topAnchor.constraint(equalTo: videoTabContainer.topAnchor),
+            videoGalleryCollectionView.leadingAnchor.constraint(equalTo: videoTabContainer.leadingAnchor),
+            videoGalleryCollectionView.trailingAnchor.constraint(equalTo: videoTabContainer.trailingAnchor)
+        ])
+        videoGalleryCollectionView.isHidden = true
+        videoGalleryStatusView.isHidden = false
+        videoGalleryStatusView.configure(isLoading: true, text: "Uploading Videos...", isMyProfile: false)
+        
+        // --- CHANNELS ---
+        // ЗАМЕНА: Сохраняем констрейнт высоты
+        channelHeightConstraint = channelGalleryCollectionView.heightAnchor.constraint(equalToConstant: 1)
+        channelHeightConstraint.isActive = true
+        
+        channelTabContainer.addSubview(channelGalleryStatusView)
+        channelTabContainer.addSubview(channelGalleryCollectionView)
+        NSLayoutConstraint.activate([
+            channelGalleryStatusView.heightAnchor.constraint(equalToConstant: 160),
+            channelGalleryStatusView.topAnchor.constraint(equalTo: channelTabContainer.topAnchor),
+            channelGalleryStatusView.leadingAnchor.constraint(equalTo: channelTabContainer.leadingAnchor, constant: 16),
+            channelGalleryStatusView.trailingAnchor.constraint(equalTo: channelTabContainer.trailingAnchor, constant: -16),
+            
+            channelGalleryCollectionView.topAnchor.constraint(equalTo: channelTabContainer.topAnchor),
+            channelGalleryCollectionView.leadingAnchor.constraint(equalTo: channelTabContainer.leadingAnchor),
+            channelGalleryCollectionView.trailingAnchor.constraint(equalTo: channelTabContainer.trailingAnchor)
+        ])
+        channelGalleryCollectionView.isHidden = true
+        channelGalleryStatusView.isHidden = false
+        channelGalleryStatusView.configure(isLoading: true, text: "Loading channels...", isMyProfile: false)
+        
+        // --- MODELS ---
+        // ЗАМЕНА: Сохраняем констрейнт высоты
+        modelHeightConstraint = modelGalleryCollectionView.heightAnchor.constraint(equalToConstant: 1)
+        modelHeightConstraint.isActive = true
+        
+        modelTabContainer.addSubview(modelGalleryStatusView)
+        modelTabContainer.addSubview(modelGalleryCollectionView)
+        NSLayoutConstraint.activate([
+            modelGalleryStatusView.heightAnchor.constraint(equalToConstant: 160),
+            modelGalleryStatusView.topAnchor.constraint(equalTo: modelTabContainer.topAnchor),
+            modelGalleryStatusView.leadingAnchor.constraint(equalTo: modelTabContainer.leadingAnchor, constant: 16),
+            modelGalleryStatusView.trailingAnchor.constraint(equalTo: modelTabContainer.trailingAnchor, constant: -16),
+            
+            modelGalleryCollectionView.topAnchor.constraint(equalTo: modelTabContainer.topAnchor),
+            modelGalleryCollectionView.leadingAnchor.constraint(equalTo: modelTabContainer.leadingAnchor),
+            modelGalleryCollectionView.trailingAnchor.constraint(equalTo: modelTabContainer.trailingAnchor)
+        ])
+        modelGalleryCollectionView.isHidden = true
+        modelGalleryStatusView.isHidden = false
+        modelGalleryStatusView.configure(isLoading: true, text: "Loading models...", isMyProfile: false)
+        
+        // --- EVENTS ---
+        // ЗАМЕНА: Сохраняем констрейнт высоты
+        eventHeightConstraint = eventGalleryCollectionView.heightAnchor.constraint(equalToConstant: 1)
+        eventHeightConstraint.isActive = true
+        
+        eventTabContainer.addSubview(eventGalleryStatusView)
+        eventTabContainer.addSubview(eventGalleryCollectionView)
+        NSLayoutConstraint.activate([
+            eventGalleryStatusView.heightAnchor.constraint(equalToConstant: 160),
+            eventGalleryStatusView.topAnchor.constraint(equalTo: eventTabContainer.topAnchor),
+            eventGalleryStatusView.leadingAnchor.constraint(equalTo: eventTabContainer.leadingAnchor, constant: 16),
+            eventGalleryStatusView.trailingAnchor.constraint(equalTo: eventTabContainer.trailingAnchor, constant: -16),
+            
+            eventGalleryCollectionView.topAnchor.constraint(equalTo: eventTabContainer.topAnchor),
+            eventGalleryCollectionView.leadingAnchor.constraint(equalTo: eventTabContainer.leadingAnchor),
+            eventGalleryCollectionView.trailingAnchor.constraint(equalTo: eventTabContainer.trailingAnchor)
+        ])
+        eventGalleryCollectionView.isHidden = true
+        eventGalleryStatusView.isHidden = false
+        eventGalleryStatusView.configure(isLoading: true, text: "Loading events...", isMyProfile: false)
     }
     
     private func setupSimilarProfiles() {
@@ -725,7 +1018,19 @@ final class PublicProfileScreenNode: ASDisplayNode {
             similarProfilesCollectionView.heightAnchor.constraint(equalToConstant: 232)
         ])
         
-        contentViewStack.setCustomSpacing(-12, after: galleryCollectionView)
+        contentViewStack.setCustomSpacing(0, after: collectionsContainer)
+        
+        contentViewStack.setCustomSpacing(0, after: videoGalleryCollectionView)
+        contentViewStack.setCustomSpacing(0, after: videoGalleryStatusView)
+        
+        contentViewStack.setCustomSpacing(0, after: channelGalleryCollectionView)
+        contentViewStack.setCustomSpacing(0, after: channelGalleryStatusView)
+        
+        contentViewStack.setCustomSpacing(0, after: modelGalleryCollectionView)
+        contentViewStack.setCustomSpacing(0, after: modelGalleryStatusView)
+        
+        contentViewStack.setCustomSpacing(0, after: eventGalleryCollectionView)
+        contentViewStack.setCustomSpacing(0, after: eventGalleryStatusView)
     }
     
     // Настройка шиммеров
@@ -754,18 +1059,46 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private func stopShimmers() {
         guard profileHeaderView.isHidden else { return }
         
-        // просто показываем контент и скрываем шиммеры без анимаций
+        navigationBarTitleView?.alpha = 0
+        // если сделать тут, то из-за стека будет пролагивание вниз
         profileHeaderView.isHidden = false
-        counterActionsStack.isHidden = false
-        profileInfoView.isHidden = false
-        socialMediaStack.isHidden = false
-        currentAgencyView.isHidden = false
+        profileHeaderView.alpha = 0
         
-        profileHeaderShimmerView.isHidden = true
-        actionsShimmerView.isHidden = true
-        profileInfoShimmerView.isHidden = true
-        socialShimmerView.isHidden = true
-        currentAgencyShimmerView.isHidden = true
+        counterActionsStack.isHidden = false
+        counterActionsStack.alpha = 0
+        
+        profileInfoView.isHidden = false
+        profileInfoView.alpha = 0
+        
+        socialMediaStack.isHidden = false
+        socialMediaStack.alpha = 0
+        
+        currentAgencyView.isHidden = false
+        currentAgencyView.alpha = 0
+        
+        UIView.animate(withDuration: 0.3, delay: 0.1, options: .curveEaseInOut, animations: {
+            self.profileHeaderShimmerView.alpha = 0
+            self.actionsShimmerView.alpha = 0
+            self.profileInfoShimmerView.alpha = 0
+            self.socialShimmerView.alpha = 0
+            self.currentAgencyShimmerView.alpha = 0
+            
+            self.profileHeaderView.alpha = 1
+            self.profileHeaderView.isHidden = false
+            self.counterActionsStack.alpha = 1
+            self.profileInfoView.alpha = 1
+            self.socialMediaStack.alpha = 1
+            self.currentAgencyView.alpha = 1
+            
+        }) { (completed) in
+            if completed {
+                self.profileHeaderShimmerView.isHidden = true
+                self.actionsShimmerView.isHidden = true
+                self.profileInfoShimmerView.isHidden = true
+                self.socialShimmerView.isHidden = true
+                self.currentAgencyShimmerView.isHidden = true
+            }
+        }
     }
     
     private func applyGradientBlurMask() {
@@ -825,7 +1158,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         
         let iconImageView: UIImageView = {
             let imageView = UIImageView()
-            imageView.image = UIImage(bundleImageName: iconImageName)?.withRenderingMode(.alwaysTemplate)
+            imageView.image = UIImage(bundleImageName: iconImageName)
             imageView.tintColor = .white
             imageView.contentMode = .scaleAspectFit
             imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -862,14 +1195,12 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     // Создание кнопок счетчиков (лайки, просмотры, сохраненки)
-    private func setupCounterView(_ container: UIView, count: String, name: String, iconName: String) {
+    private func setupCounterView(_ container: UIControl, count: String, name: String, iconName: String) {
         container.subviews.forEach { $0.removeFromSuperview() }
-        container.gestureRecognizers?.forEach { container.removeGestureRecognizer($0) }
-        container.isUserInteractionEnabled = true
         
         let icon: UIImageView = {
             let imageView = UIImageView()
-            imageView.image = UIImage(bundleImageName: iconName)?.withRenderingMode(.alwaysTemplate)
+            imageView.image = UIImage(bundleImageName: iconName)
             imageView.tintColor = .white
             imageView.contentMode = .scaleAspectFit
             imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -909,6 +1240,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             stack.spacing = 4
             stack.alignment = .center
             stack.translatesAutoresizingMaskIntoConstraints = false
+            stack.isUserInteractionEnabled = false
             return stack
         }()
         
@@ -921,19 +1253,17 @@ final class PublicProfileScreenNode: ASDisplayNode {
             mainStack.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: 0),
         ])
         
-        // Tap handling for interactions
-        let selector: Selector
+        container.removeTarget(nil, action: nil, for: .allEvents)
+        container.addTarget(self, action: #selector(handleTouchDown(_:)), for: [.touchDown, .touchDragEnter])
+        container.addTarget(self, action: #selector(handleTouchUp(_:)), for:[.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit])
+        
         if container === likesView {
-            selector = #selector(likesTapped)
+            container.addTarget(self, action: #selector(likesViewDidTap), for: .touchUpInside)
         } else if container === viewsView {
-            selector = #selector(viewsTapped)
+            container.addTarget(self, action: #selector(viewsViewDidTap), for: .touchUpInside)
         } else if container === savesView {
-            selector = #selector(savesTapped)
-        } else {
-            return
+            container.addTarget(self, action: #selector(savesViewDidTap), for: .touchUpInside)
         }
-        let tap = UITapGestureRecognizer(target: self, action: selector)
-        container.addGestureRecognizer(tap)
     }
     
     // Создание кнопок социальных сетей
@@ -943,7 +1273,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         button.layer.cornerRadius = 6
         
         let icon = UIImageView()
-        icon.image = UIImage(bundleImageName: iconName)?.withRenderingMode(.alwaysTemplate)
+        icon.image = UIImage(bundleImageName: iconName)
         icon.tintColor = .white
         icon.contentMode = .scaleAspectFit
         icon.translatesAutoresizingMaskIntoConstraints = false
@@ -978,7 +1308,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         button.layer.cornerRadius = 6
         
         let icon = UIImageView()
-        icon.image = UIImage(bundleImageName: iconName)?.withRenderingMode(.alwaysTemplate)
+        icon.image = UIImage(bundleImageName: iconName)
         icon.tintColor = .white
         icon.contentMode = .scaleAspectFit
         icon.translatesAutoresizingMaskIntoConstraints = false
@@ -1040,42 +1370,44 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     // Создаем список критериев внешнего вида модели
     private func buildAppearanceList(from appearance: UserAppearance?, gender: UserGender?) -> [AppearanceAttribute] {
-        guard let appearance = appearance else { return [] }
         
         var items: [AppearanceAttribute] = []
         
         if let gender = gender {
             items.append(.init(title: "Gender", value: "\(gender.title)"))
         }
-        if let height = appearance.height {
-            items.append(.init(title: "Height", value: "\(height.clean) cm"))
-        }
-        if let weight = appearance.weight {
-            items.append(.init(title: "Weight", value: "\(weight.clean) kg"))
-        }
-        if let bust = appearance.breastSize {
-            items.append(.init(title: "Bust", value: bust))
-        }
-        if let waist = appearance.waist {
-            items.append(.init(title: "Waist", value: "\(waist.clean) cm"))
-        }
-        if let hips = appearance.hips {
-            items.append(.init(title: "Hips", value: "\(hips.clean) cm"))
-        }
-        if let shoesSize = appearance.shoesSize {
-            items.append(.init(title: "Shoes", value: "\(shoesSize.clean) EU"))
-        }
-        if let hairColor = appearance.hairColor?.title {
-            items.append(.init(title: "Hair Color", value: hairColor))
-        }
-        if let hairLength = appearance.hairLength?.title {
-            items.append(.init(title: "Hair Length", value: hairLength))
-        }
-        if let eyeColor = appearance.eyeColor?.title {
-            items.append(.init(title: "Eye Color", value: eyeColor))
-        }
-        if let skinColor = appearance.skinColor?.title {
-            items.append(.init(title: "Skin Color", value: skinColor))
+        
+        if let appearance = appearance {
+            if let height = appearance.height {
+                items.append(.init(title: "Height", value: "\(height.clean) cm"))
+            }
+            if let weight = appearance.weight {
+                items.append(.init(title: "Weight", value: "\(weight.clean) kg"))
+            }
+            if let bust = appearance.breastSize {
+                items.append(.init(title: "Bust", value: bust))
+            }
+            if let waist = appearance.waist {
+                items.append(.init(title: "Waist", value: "\(waist.clean) cm"))
+            }
+            if let hips = appearance.hips {
+                items.append(.init(title: "Hips", value: "\(hips.clean) cm"))
+            }
+            if let shoesSize = appearance.shoesSize {
+                items.append(.init(title: "Shoes", value: "\(shoesSize.clean) EU"))
+            }
+            if let hairColor = appearance.hairColor?.title {
+                items.append(.init(title: "Hair Color", value: hairColor))
+            }
+            if let hairLength = appearance.hairLength?.title {
+                items.append(.init(title: "Hair Length", value: hairLength))
+            }
+            if let eyeColor = appearance.eyeColor?.title {
+                items.append(.init(title: "Eye Color", value: eyeColor))
+            }
+            if let skinColor = appearance.skinColor?.title {
+                items.append(.init(title: "Skin Color", value: skinColor))
+            }
         }
         
         return items
@@ -1083,32 +1415,45 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     // Создаем все кнопки социальный сетей
     private func populateSocialMedia(handles: [String], icons: [String]) {
-        if handles.isEmpty {
-            socialMediaContainer.alpha = 0
-            socialHeightConstraint?.isActive = false
-            socialHeightConstraint = socialMediaContainer.heightAnchor.constraint(equalToConstant: 0)
-            socialHeightConstraint.isActive = true
-            socialMediaContainer.isHidden = true
-        } else {
-            socialMediaContainer.alpha = 1
-            socialMediaStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        UIView.animate(withDuration: 0.3, animations: {
             
-            for (index, handle) in handles.enumerated() {
-                let iconName = icons[safe: index] ?? iconPlaceholder
-                if handles.count == 1 {
-                    socialMediaStack.addArrangedSubview(createSocialOneMediaButton(handle: handle, iconName: iconName))
-                } else {
-                    socialMediaStack.addArrangedSubview(createSocialMediaButton(handle: handle, iconName: iconName))
+            if handles.isEmpty {
+                self.socialMediaContainer.alpha = 0
+                
+                self.socialHeightConstraint?.isActive = false
+                self.socialHeightConstraint = self.socialMediaContainer.heightAnchor.constraint(equalToConstant: 0)
+                self.socialHeightConstraint.isActive = true
+                self.titleEditContainer.removeFromSuperview()
+                
+            } else {
+                self.socialMediaContainer.alpha = 1
+                
+                self.socialMediaStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+                
+                for (index, handle) in handles.enumerated() {
+                    let iconName = icons[safe: index] ?? self.iconPlaceholder
+                    if handles.count == 1 {
+                        self.socialMediaStack.addArrangedSubview(self.createSocialOneMediaButton(handle: handle, iconName: iconName))
+                    } else {
+                        self.socialMediaStack.addArrangedSubview(self.createSocialMediaButton(handle: handle, iconName: iconName))
+                    }
                 }
+                
+                self.socialHeightConstraint?.isActive = false
+                let newHeight: CGFloat = (handles.count == 1) ? 44 : 68
+                self.socialHeightConstraint = self.socialMediaContainer.heightAnchor.constraint(equalToConstant: newHeight)
+                self.socialHeightConstraint.isActive = true
             }
             
-            socialHeightConstraint?.isActive = false
-            let newHeight: CGFloat = (handles.count == 1) ? 44 : 68
-            socialHeightConstraint = socialMediaContainer.heightAnchor.constraint(equalToConstant: newHeight)
-            socialHeightConstraint.isActive = true
-            socialMediaContainer.isHidden = false
+            self.view.layoutIfNeeded()
+            
+        }) { completed in
+            if completed && handles.isEmpty {
+                self.socialMediaContainer.isHidden = true
+            } else {
+                self.socialMediaContainer.isHidden = false
+            }
         }
-        view.layoutIfNeeded()
     }
     
     // Получаем картинку флага в зависимости от кода страны
@@ -1124,7 +1469,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
         let titleView = ProfileNavigationBarTitleView()
         
         titleView.configure(name: name, info: info)
-        titleView.alpha = 0.0
         
         self.navigationBarTitleView = titleView
         
@@ -1133,10 +1477,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
         }
     }
     
-    // Обновление титула NavigationBar в зависимости от скролла
+    // Обновление титула NavigationBar
     private func updateNavigationBarTitleVisibility() {
-        guard titleVisibilityActivated,
-              let titleView = navigationBarTitleView,
+        guard let titleView = navigationBarTitleView,
               let (_, navigationBarHeight) = self.containerLayout else { return }
         
         let offsetY = scrollView.contentOffset.y
@@ -1162,7 +1505,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     
-// MARK: - Internal
+    // MARK: - Internal
     
     func loadSimilarProfiles() {
         // TODO: Заменить на API запрос
@@ -1188,53 +1531,36 @@ final class PublicProfileScreenNode: ASDisplayNode {
         
         applyGradientBlurMask()
         
-        if let flowLayout = galleryCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
-            let itemsPerRow: CGFloat = 3
-            let spacing: CGFloat = 1
-            let totalWidth = layout.size.width
-            let itemWidth = (totalWidth - 2 * spacing) / itemsPerRow
-            
-            let totalItems = galleryPhotos.count
-            let rows = ceil(CGFloat(totalItems) / itemsPerRow)
-            let galleryHeight = rows * itemWidth + (rows - 1) * spacing
-            
-            galleryCollectionView.constraints.filter({ $0.firstAttribute == .height }).forEach({ $0.isActive = false })
-            galleryCollectionView.heightAnchor.constraint(equalToConstant: galleryHeight).isActive = true
-            
-            flowLayout.itemSize = CGSize(width: itemWidth, height: itemWidth)
-            galleryCollectionView.collectionViewLayout.invalidateLayout()
-        }
+        updateAllCollectionViewHeights(layout: layout)
+        updateCollectionsContainerHeight(animated: false)
+        
+        galleryCollectionView.collectionViewLayout.invalidateLayout()
+        videoGalleryCollectionView.collectionViewLayout.invalidateLayout()
+        channelGalleryCollectionView.collectionViewLayout.invalidateLayout()
+        modelGalleryCollectionView.collectionViewLayout.invalidateLayout()
+        eventGalleryCollectionView.collectionViewLayout.invalidateLayout()
         
         updateNavigationBarTitleVisibility()
         
         self.layoutIfNeeded()
     }
     
-    // Настройка показа галереи после загруки фотографий
-    func updateGalleryState() {
-        let hasPhotos = !galleryPhotos.isEmpty
-        
-        UIView.animate(withDuration: 0.3) {
-            if hasPhotos {
-                self.galleryStatusContainer.isHidden = true
-                self.galleryCollectionView.isHidden = false
-            } else {
-                self.galleryStatusContainer.isHidden = true
-                self.galleryCollectionView.isHidden = true
-                self.segmentedBar.isHidden = true
-                self.segmentedBarPlaceholder.isHidden = true
-            }
-            self.view.layoutIfNeeded()
-        }
-    }
-    
     // Обновление профиля, после загрузки baseURL/user/userId
-    func updateWithUserDetail(_ detail: UserDetail) {
-        setupDmButtonContent()
+    func updateWithUserDetail(_ detail: UserDetail, _ isMyProfile: Bool) {
         var bio: String
         var appearance: [AppearanceAttribute]
         
+        if !isMyProfile {
+            similarProfilesCollectionContainer.isHidden = false
+            dmButton.isHidden = false
+            setupDmButtonContent()
+            titleEditContainer.removeFromSuperview()
+        } else {
+            titleEditContainer.isHidden = false
+        }
+        
         if detail.role == "agency_employee" {
+            self.modelRole = "agency_employee"
             setupNavigationBarTitle(name: detail.agency?.title ?? "No name")
             
             profileHeaderView.configure(with: UserProfileViewModel(
@@ -1242,13 +1568,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 age: nil,
                 location: detail.agency?.address?.city?.name ?? "",
                 countryFlag: Self.flag(for: detail.agency?.address?.city?.countryCode),
-                jobTitle: detail.roleLabel?.lowercased() ?? detail.role?.lowercased() ?? "model",
+                jobTitle: detail.role?.lowercased() ?? "model",
                 avatarImage: nil,
                 isPremium: true,
                 isOnline: true
             ))
             
-            if let photoURLString = detail.agency?.photo?.fullUrl, let photoURL = URL(string: photoURLString) {
+            if let photoURLString = detail.agency?.photo?.fullUrl, let photoURL = CDNURLHelper.convertToCDNURL(photoURLString) {
                 headerImageView.loadImage(from: photoURL)
             }
             
@@ -1258,8 +1584,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
             
             profileInfoView.update(biography: bio)
             currentAgencyContainer.removeFromSuperview()
-            segmentedBar.configure(isAgency: true)
+            segmentedBar.configure(isAgency: true, isMyProfile: isMyProfile)
         } else {
+            self.modelRole = "model"
             let age = detail.birthday.flatMap { calculateAge(from: $0) } ?? 0
             setupNavigationBarTitle(name: detail.fullName ?? "No name", info: "\(age) y.o • \(detail.city?.name ?? "")")
             profileHeaderView.configure(with: UserProfileViewModel(
@@ -1267,19 +1594,19 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 age: age,
                 location: detail.city?.name ?? "",
                 countryFlag: Self.flag(for: detail.city?.countryCode),
-                jobTitle: detail.roleLabel ?? detail.role ?? "model",
+                jobTitle: detail.role ?? "model",
                 avatarImage: nil,
                 isPremium: true,
                 isOnline: true
             ))
             
-            if let photoURLString = detail.photo?.fullUrl, let photoURL = URL(string: photoURLString) {
+            if let photoURLString = detail.photo?.fullUrl, let photoURL = CDNURLHelper.convertToCDNURL(photoURLString) {
                 headerImageView.loadImage(from: photoURL)
             }
             
             bio = (detail.model?.additionalInformation?.isEmpty == false)
             ? (detail.model?.additionalInformation ?? "")
-            : Self.mockBiographyText
+            :  (isMyProfile ? Self.mockBiographyMyProfileText : Self.mockBiographyText)
             
             appearance = buildAppearanceList(from: detail.model?.appearance, gender: detail.gender)
             
@@ -1291,37 +1618,40 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 let logoURL = logoURLString != nil ? URL(string: logoURLString!) : nil
                 currentAgencyView.configure(name: detail.model?.agency?.title, logoURL: logoURL)
             }
-            segmentedBar.configure(isAgency: false)
+            segmentedBar.configure(isAgency: false, isMyProfile: isMyProfile)
         }
         
-        if let avatarURLString = detail.avatar?.fullUrl, let avatarURL = URL(string: avatarURLString) {
-            ImageLoader.shared.load(url: avatarURL) { [weak self] image in
-                if let image = image {
-                    self?.profileHeaderView.changeAvatar(with: image)
+        if let avatarURLString = detail.avatar?.fullUrl {
+            if let avatarURL = CDNURLHelper.convertToCDNURL(avatarURLString) {
+                ImageLoader.shared.load(url: avatarURL) { [weak self] image in
+                    if let image = image {
+                        self?.profileHeaderView.changeAvatar(with: image)
+                    }
                 }
             }
         }
         
         let stats = detail.statistic
-        setupCounterView(likesView, count: "\(stats?.followersCount ?? 0)", name: "Like", iconName: "Chat/Input/Text/AccessoryIconReaction")
-        setupCounterView(viewsView, count: "\(stats?.viewsCount ?? 0)", name: "Viewed", iconName: "Stories/EmbeddedViewIcon")
+        setupCounterView(likesView, count: "\(stats?.followersCount ?? 0)", name: "Like", iconName: "Instant View/Favorite")
+        setupCounterView(viewsView, count: "\(stats?.viewsCount ?? 0)", name: "Viewed", iconName: "Instant View/Visibility")
         setupCounterView(savesView, count: "\(stats?.followingCount ?? 0)", name: "Save", iconName: "Instant View/Bookmark")
         // что такое Save в модели?
-        //        let socialIcons = ["Models/instaIcon", "Models/TikTokIcon", "Models/youtubeIcon", "Models/webIcon"]
-        //        let networks = detail.userSocialNetworks ?? []
-        //        let handlesFromApi = networks.compactMap { network -> String? in
-        //            let handle = network.username ?? network.url ?? ""
-        //            return handle.isEmpty ? nil : handle
-        //    }
-        //        let handles = handlesFromApi.isEmpty ? ["instagram", "tiktok", "youtube", "website"] : handlesFromApi
         
-        let socialIcons = ["instaIcon", "TikTokIcon", "youtubeIcon", "webIcon"]
+//        let socialIcons = ["Models/instaIcon", "Models/TikTokIcon", "Models/youtubeIcon", "Models/webIcon"]
+//        let networks = detail.userSocialNetworks ?? []
+//        let handlesFromApi = networks.compactMap { network -> String? in
+//            let handle = network.username ?? network.url ?? ""
+//            return handle.isEmpty ? nil : handle
+//        }
+//        let handles = handlesFromApi.isEmpty ? ["instagram", "tiktok", "youtube", "website"] : handlesFromApi
+        
+        let socialIcons = ["Models/instaIcon", "Models/TikTokIcon", "Models/youtubeIcon", "Models/webIcon"]
         let networks = detail.userSocialNetworks ?? []
         let handlesFromApi = networks.compactMap { network -> String? in
             let handle = network.username ?? network.url ?? ""
             return handle.isEmpty ? nil : handle
         }
-        let handles = handlesFromApi.isEmpty ? ["instagram", "tiktok", "youtube", "website"] : handlesFromApi
+        let handles = handlesFromApi
         
         populateSocialMedia(handles: handles, icons: socialIcons)
         
@@ -1329,7 +1659,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     // Добавление фотографий в галерею пагинацией
-    func appendGalleryPhotos(_ photos: UserPhotos) {
+    func appendGalleryPhotos(_ photos: UserPhotos, isMyProfile: Bool) {
         let newPhotos = photos.items
         let totalCount = photos.pagination.meta.totalCount
         let serverOffset = photos.pagination.meta.currentOffset
@@ -1354,18 +1684,31 @@ final class PublicProfileScreenNode: ASDisplayNode {
         print("  - HasMore: \(self.galleryHasMore)")
         
         if previousCount == 0 {
-            updateGalleryState()
-            galleryCollectionView.reloadData()
-            updateGalleryCollectionViewHeight()
+            let hasPhotos = !self.galleryPhotos.isEmpty
+            self.galleryStatusView.isHidden = hasPhotos
+            if isMyProfile {
+                self.galleryStatusView.configure(isLoading: false, text: "Upload your photos", isMyProfile: true)
+            } else {
+                self.galleryStatusView.configure(isLoading: false, text: "No videos yet", isMyProfile: false)
+            }
+            self.galleryCollectionView.isHidden = !hasPhotos
+            self.galleryCollectionView.reloadData()
+            
+            if let layout = self.containerLayout?.0 {
+                self.updateAllCollectionViewHeights(layout: layout)
+                if self.currentTabIndex == 0 { self.updateCollectionsContainerHeight(animated: true) }
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.checkAndLoadMoreGalleryPhotos()
             }
         } else {
             let newIndices = (previousCount..<(previousCount + newPhotos.count)).map { IndexPath(item: $0, section: 0) }
-            
-            galleryCollectionView.performBatchUpdates({
+            self.galleryCollectionView.performBatchUpdates({
                 self.galleryCollectionView.insertItems(at: newIndices)
-                self.updateGalleryCollectionViewHeight()
+                if let layout = self.containerLayout?.0 {
+                    self.updateAllCollectionViewHeights(layout: layout)
+                    if self.currentTabIndex == 0 { self.updateCollectionsContainerHeight(animated: true) }
+                }
             }, completion: { [weak self] _ in
                 self?.checkAndLoadMoreGalleryPhotos()
             })
@@ -1394,7 +1737,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
     // Сброс пагинации галереи
     func resetGalleryPagination() {
         galleryPhotos = []
-        videoItems = []
         galleryCurrentOffset = 0
         galleryIsLoading = false
         galleryHasMore = true
@@ -1407,15 +1749,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
         galleryIsLoading = loading
         if loading {
             print("⏳ [PAGINATION] Set galleryIsLoading = true")
-        }
-    }
-    
-    // Простое управление состоянием видео-галереи (без пагинации)
-    func appendVideoGalleryItems(_ items: [UserVideoItem]) {
-        self.videoItems = items
-        if currentTabIndex == 1 {
-            galleryCollectionView.reloadData()
-            playVisibleVideos()
         }
     }
     
@@ -1442,22 +1775,373 @@ final class PublicProfileScreenNode: ASDisplayNode {
         }
     }
     
+    // MARK: - Video Gallery Methods
     
-// MARK: - @objc
+    // Загрузка видео галереи
+    func loadVideoGallery() {
+        guard let userId = model.userId else { return }
+        
+        if let controller = self.controller as? PublicProfileScreenController {
+            controller.loadVideoGalleryPage(userId: userId, offset: 0)
+        }
+    }
+    
+    // Добавление элементов видео галереи из API
+    func appendVideoGalleryItems(_ items: [UserVideoItem], totalCount: Int, isMyProfile: Bool) {
+        let previousCount = videoGalleryItems.count
+        
+        let validVideoExtensions: Set<String> = ["mp4", "mov", "avi", "mkv", "webm"]
+        
+        let photoItems: [UserPhoto] = items.compactMap { item in
+            guard let videoFile = item.files.first,
+                  let ext = videoFile.fileExtension?.lowercased(),
+                  validVideoExtensions.contains(ext) else {
+                return nil
+            }
+
+            return UserPhoto(
+                id: item.id,
+                photo: UserFile(
+                    fileName: videoFile.fileName,
+                    fullUrl: videoFile.fullUrl,
+                    fileExtension: videoFile.fileExtension,
+                    fileUuid: videoFile.fileUuid
+                ),
+                likesCount: item.likesCount,
+                isLikedByUser: item.isLikedByUser,
+                preview: nil
+            )
+        }
+        
+        videoGalleryItems.append(contentsOf: photoItems)
+        
+        videoGalleryTotalCount = totalCount
+        videoGalleryCurrentOffset += items.count
+        
+        videoGalleryHasMore = videoGalleryCurrentOffset < totalCount
+        videoGalleryIsLoading = false
+        
+        print("🎬 [VIDEO] Пришло с сервера: \(items.count), Из них видео: \(photoItems.count). Всего в UI: \(videoGalleryItems.count) из \(totalCount)")
+                
+        if previousCount == 0 {
+            let hasVideos = !self.videoGalleryItems.isEmpty
+            self.videoGalleryStatusView.isHidden = hasVideos
+            if isMyProfile {
+                self.videoGalleryStatusView.configure(isLoading: false, text: "Upload your videos", isMyProfile: true)
+            } else {
+                self.videoGalleryStatusView.configure(isLoading: false, text: "No videos yet", isMyProfile: false)
+            }
+            self.videoGalleryCollectionView.isHidden = !hasVideos
+            self.videoGalleryCollectionView.reloadData()
+            
+            if let layout = self.containerLayout?.0 {
+                self.updateAllCollectionViewHeights(layout: layout)
+                if self.currentTabIndex == 1 { self.updateCollectionsContainerHeight(animated: true) }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.checkAndLoadMoreVideoGallery()
+            }
+        } else if !photoItems.isEmpty {
+            let newIndices = (previousCount..<(previousCount + photoItems.count)).map { IndexPath(item: $0, section: 0) }
+            self.videoGalleryCollectionView.performBatchUpdates({
+                self.videoGalleryCollectionView.insertItems(at: newIndices)
+                if let layout = self.containerLayout?.0 {
+                    self.updateAllCollectionViewHeights(layout: layout)
+                    if self.currentTabIndex == 1 { self.updateCollectionsContainerHeight(animated: true) }
+                }
+            }, completion: { [weak self] _ in
+                self?.checkAndLoadMoreVideoGallery()
+            })
+        } else {
+            self.checkAndLoadMoreVideoGallery()
+        }
+    }
+    
+    // Обновление высоты видео галереи
+    func updateVideoGalleryCollectionViewHeight() {
+        guard let (layout, _) = self.containerLayout else { return }
+        
+        let itemsPerRow: CGFloat = 3
+        let spacing: CGFloat = 1
+        let totalWidth = layout.size.width
+        let itemWidth = (totalWidth - 2 * spacing) / itemsPerRow
+        
+        let totalItems = videoGalleryItems.count
+        let rows = ceil(CGFloat(totalItems) / itemsPerRow)
+        let galleryHeight = rows * itemWidth + (rows - 1) * spacing
+        
+        videoGalleryCollectionView.constraints.filter({ $0.firstAttribute == .height }).forEach({ $0.isActive = false })
+        videoGalleryCollectionView.heightAnchor.constraint(equalToConstant: galleryHeight).isActive = true
+        
+        videoGalleryCollectionView.layoutIfNeeded()
+    }
+    
+    // Проверка загрузки следующих видео
+    func checkAndLoadMoreVideoGallery() {
+        guard videoGalleryHasMore && !videoGalleryIsLoading else { return }
+        
+        videoGalleryCollectionView.layoutIfNeeded()
+        
+        let contentHeight = videoGalleryCollectionView.contentSize.height
+        let frameHeight = videoGalleryCollectionView.frame.size.height
+        
+        if contentHeight <= frameHeight {
+            loadNextVideoGalleryPage()
+        }
+    }
+    
+    // Загрузка следующей страницы видео
+    func loadNextVideoGalleryPage() {
+        guard !videoGalleryIsLoading && videoGalleryHasMore, let userId = model.userId else { return }
+        
+        videoGalleryIsLoading = true
+        
+        if let controller = self.controller as? PublicProfileScreenController {
+            controller.loadVideoGalleryPage(userId: userId, offset: videoGalleryCurrentOffset)
+        }
+    }
+    
+    // Сброс пагинации видео галереи
+    func resetVideoGalleryPagination() {
+        videoGalleryItems = []
+        videoGalleryTotalCount = 0
+        videoGalleryCurrentOffset = 0
+        videoGalleryIsLoading = false
+        videoGalleryHasMore = true
+        print("🔄 [VIDEO] Reset video gallery pagination state")
+    }
+    
+    // Флаг загрузки галереи видео
+    func setVideoGalleryLoading(_ loading: Bool) {
+        videoGalleryIsLoading = loading
+        if loading {
+            print("⏳ [PAGINATION] Set videoGalleryIsLoading = true")
+        }
+    }
+    
+    
+    // MARK: - Channels Gallery Methods
+    
+    // Загрузка галереи каналов
+    func loadChannelGallery() {
+        // guard let userId = model.userId else { return }
+        
+        if let controller = self.controller as? PublicProfileScreenController {
+            controller.loadTelegramChannels()
+        }
+    }
+    
+    // Обновление галереи каналов
+    func updateChannelsList(_ items: [ProfileChannelItem]) {
+        self.channelGalleryItems = items
+        let hasItems = !items.isEmpty
+        self.channelGalleryStatusView.isHidden = hasItems
+        self.channelGalleryCollectionView.isHidden = !hasItems
+        self.channelGalleryCollectionView.reloadData()
+        
+        if let layout = self.containerLayout?.0 {
+            self.updateAllCollectionViewHeights(layout: layout)
+            // Индекс каналов зависит от роли
+            let channelIndex = (modelRole == "model") ? 2 : 3
+            if self.currentTabIndex == channelIndex { self.updateCollectionsContainerHeight(animated: true) }
+        }
+    }
+    
+    // Загрузка высоты галереи каналов
+    private func updateChannelsCollectionViewHeight() {
+        let channelCellHeight: CGFloat = 76.0
+        let channelsHeight = CGFloat(channelGalleryItems.count) * channelCellHeight
+        
+        channelGalleryCollectionView.constraints.filter({ $0.firstAttribute == .height }).forEach({ $0.isActive = false })
+        channelGalleryCollectionView.heightAnchor.constraint(equalToConstant: max(channelsHeight, 1.0)).isActive = true
+        channelGalleryCollectionView.layoutIfNeeded()
+        
+        print("📏 [CHANNELS] Updated height to \(channelsHeight) for \(channelGalleryItems.count) items")
+    }
+    
+    
+    // MARK: - Models Gallery Methods
+    
+    // Загрузка галереи моделей
+    func loadModelGallery() {
+        // guard let userId = model.userId else { return }
+        
+        if let controller = self.controller as? PublicProfileScreenController {
+            controller.loadModels()
+        }
+    }
+    
+    // Обновление галереи моделей
+    func updateModelsList(_ items:[ModelItem]) {
+        self.modelGalleryItems = items
+        let hasItems = !items.isEmpty
+        self.modelGalleryStatusView.isHidden = hasItems
+        self.modelGalleryCollectionView.isHidden = !hasItems
+        self.modelGalleryCollectionView.reloadData()
+        
+        if let layout = self.containerLayout?.0 {
+            self.updateAllCollectionViewHeights(layout: layout)
+            if self.currentTabIndex == 2 { self.updateCollectionsContainerHeight(animated: true) }
+        }
+    }
+    
+    // Загрузка высоты галереи моделей
+    private func updateModelsCollectionViewHeight() {
+        let modelCellHeight: CGFloat = 76.0
+        let modelsHeight = CGFloat(modelGalleryItems.count) * modelCellHeight
+        
+        modelGalleryCollectionView.constraints.filter({ $0.firstAttribute == .height }).forEach({ $0.isActive = false })
+        modelGalleryCollectionView.heightAnchor.constraint(equalToConstant: max(modelsHeight, 1.0)).isActive = true
+        modelGalleryCollectionView.layoutIfNeeded()
+        
+        print("📏 [MODELS] Updated height to \(modelsHeight) for \(modelGalleryItems.count) items")
+    }
+    
+    
+    // MARK: - Events Gallery Methods
+    
+    // Загрузка галереи событий
+    func loadEventGallery() {
+        // guard let userId = model.userId else { return }
+        
+        if let controller = self.controller as? PublicProfileScreenController {
+            controller.loadEvents()
+        }
+    }
+    
+    // Обновление галереи событий
+    func updateEventsList(_ items: [EventItem]) {
+        self.eventGalleryItems = items
+        let hasItems = !items.isEmpty
+        self.eventGalleryStatusView.isHidden = hasItems
+        self.eventGalleryCollectionView.isHidden = !hasItems
+        self.eventGalleryCollectionView.reloadData()
+        
+        if let layout = self.containerLayout?.0 {
+            self.updateAllCollectionViewHeights(layout: layout)
+            if self.currentTabIndex == 4 { self.updateCollectionsContainerHeight(animated: true) }
+        }
+    }
+    
+    // Загрузка высоты галереи событий
+    private func updateEventsCollectionViewHeight() {
+        let eventCellHeight: CGFloat = 76.0
+        let eventsHeight = CGFloat(modelGalleryItems.count) * eventCellHeight
+        
+        eventGalleryCollectionView.constraints.filter({ $0.firstAttribute == .height }).forEach({ $0.isActive = false })
+        eventGalleryCollectionView.heightAnchor.constraint(equalToConstant: max(eventsHeight, 1.0)).isActive = true
+        eventGalleryCollectionView.layoutIfNeeded()
+        
+        print("📏 [EVENTS] Updated height to \(eventsHeight) for \(eventGalleryItems.count) items")
+    }
+    
+    
+    // MARK: - Dynamic Height Calculation
+    
+    private func updateAllCollectionViewHeights(layout: ContainerViewLayout) {
+        let itemsPerRow: CGFloat = 3
+        let spacing: CGFloat = 1
+        let totalWidth = layout.size.width
+        let itemWidth = (totalWidth - 2 * spacing) / itemsPerRow
+        
+        // Photo
+        let pRows = ceil(CGFloat(galleryPhotos.count) / itemsPerRow)
+        let pHeight = pRows * itemWidth + max(0, pRows - 1) * spacing
+        galleryHeightConstraint.constant = max(pHeight, 1.0)
+        
+        // Video
+        let vRows = ceil(CGFloat(videoGalleryItems.count) / itemsPerRow)
+        let vHeight = vRows * itemWidth + max(0, vRows - 1) * spacing
+        videoHeightConstraint.constant = max(vHeight, 1.0)
+        
+        // Channels
+        let cHeight = CGFloat(channelGalleryItems.count) * 76.0
+        channelHeightConstraint.constant = max(cHeight, 1.0)
+        
+        // Models
+        let mHeight = CGFloat(modelGalleryItems.count) * 76.0
+        modelHeightConstraint.constant = max(mHeight, 1.0)
+        
+        // Events
+        let eHeight = CGFloat(eventGalleryItems.count) * 76.0
+        eventHeightConstraint.constant = max(eHeight, 1.0)
+    }
+    
+    private func updateCollectionsContainerHeight(animated: Bool = true) {
+        func heightFor(isEmpty: Bool, constraint: NSLayoutConstraint) -> CGFloat {
+            if isEmpty { return 160 }
+            return constraint.constant
+        }
+        
+        let newHeight: CGFloat
+        
+        if model.isMyProfile {
+            switch currentTabIndex {
+            case 0: newHeight = heightFor(isEmpty: galleryPhotos.isEmpty, constraint: galleryHeightConstraint)
+            case 1: newHeight = heightFor(isEmpty: videoGalleryItems.isEmpty, constraint: videoHeightConstraint)
+            default: newHeight = 160
+            }
+        } else if (modelRole == "model" || modelRole == "new_face") && !model.isMyProfile {
+            switch currentTabIndex {
+            case 0: newHeight = heightFor(isEmpty: galleryPhotos.isEmpty, constraint: galleryHeightConstraint)
+            case 1: newHeight = heightFor(isEmpty: videoGalleryItems.isEmpty, constraint: videoHeightConstraint)
+            case 2: newHeight = heightFor(isEmpty: channelGalleryItems.isEmpty, constraint: channelHeightConstraint)
+            default: newHeight = 160
+            }
+        } else {
+            switch currentTabIndex {
+            case 0: newHeight = heightFor(isEmpty: galleryPhotos.isEmpty, constraint: galleryHeightConstraint)
+            case 1: newHeight = heightFor(isEmpty: videoGalleryItems.isEmpty, constraint: videoHeightConstraint)
+            case 2: newHeight = heightFor(isEmpty: modelGalleryItems.isEmpty, constraint: modelHeightConstraint)
+            case 3: newHeight = heightFor(isEmpty: channelGalleryItems.isEmpty, constraint: channelHeightConstraint)
+            case 4: newHeight = heightFor(isEmpty: eventGalleryItems.isEmpty, constraint: eventHeightConstraint)
+            default: newHeight = 160
+            }
+        }
+        
+        collectionsContainerHeightConstraint.constant = newHeight
+        
+        // Мы отключили анимацию, если пользователь активно скроллит (чтобы не было рывков)
+        if animated && !scrollView.isDragging && !scrollView.isDecelerating {
+            UIView.animate(withDuration: 0.3) {
+                self.contentViewStack.layoutIfNeeded()
+                self.view.layoutIfNeeded()
+            }
+        } else {
+            self.view.layoutIfNeeded()
+        }
+    }
+    
+    
+    // MARK: - @objc
     
     @objc private func dmButtonTapped() {
         
     }
     
-    @objc private func likesTapped() {
+    @objc private func handleTouchDown(_ sender: UIControl) {
+        UIView.animate(withDuration: 0.1, delay: 0, options: .curveEaseOut, animations: {
+            sender.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+            sender.alpha = 0.6
+        })
+    }
+    
+    @objc private func handleTouchUp(_ sender: UIControl) {
+        UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: .curveEaseOut, animations: {
+            sender.transform = .identity
+            sender.alpha = 1.0
+        })
+    }
+    
+    @objc private func likesViewDidTap() {
         onLikesTapped?()
     }
     
-    @objc private func viewsTapped() {
+    @objc private func viewsViewDidTap() {
         onViewsTapped?()
     }
     
-    @objc private func savesTapped() {
+    @objc private func savesViewDidTap() {
         onSavesTapped?()
     }
 }
@@ -1468,14 +2152,17 @@ final class PublicProfileScreenNode: ASDisplayNode {
 extension PublicProfileScreenNode: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         if collectionView == galleryCollectionView {
-            // 0 — фото, 1 — видео, остальные сегменты пока не используют коллекцию
-            if currentTabIndex == 1 {
-                return videoItems.count
-            } else {
-                return galleryPhotos.count
-            }
+            return galleryPhotos.count
+        } else if collectionView == videoGalleryCollectionView {
+            return videoGalleryItems.count
         } else if collectionView == similarProfilesCollectionView {
             return similarProfiles.count
+        } else if collectionView == channelGalleryCollectionView {
+            return channelGalleryItems.count
+        } else if collectionView == modelGalleryCollectionView {
+            return modelGalleryItems.count
+        } else if collectionView == eventGalleryCollectionView {
+            return eventGalleryItems.count
         }
         return 0
     }
@@ -1489,32 +2176,54 @@ extension PublicProfileScreenNode: UICollectionViewDataSource {
             cell.configure(with: profile)
             return cell
         } else if collectionView == galleryCollectionView {
-            if currentTabIndex == 1 {
-                // Видео-галерея
-                guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: VideoGalleryCell.reuseIdentifier, for: indexPath) as? VideoGalleryCell else {
-                    return UICollectionViewCell()
-                }
-                let item = videoItems[indexPath.item]
-                let primaryFile = item.files.first
-                let videoUrl = primaryFile?.fullUrl ?? ""
-                let previewUrl = primaryFile?.fullUrl
-                cell.configure(with: videoUrl, previewUrl: previewUrl, title: item.title)
-                return cell
-            } else {
-                // Фото-галерея
-                guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "GalleryCell", for: indexPath) as? GalleryCell else {
-                    return UICollectionViewCell()
-                }
-                let photoItem = galleryPhotos[indexPath.item]
-                
-                if let previewUrlString = photoItem.preview?.fullUrl, let url = URL(string: previewUrlString) {
-                    cell.configure(with: url)
-                } else if let fullUrlString = photoItem.photo.fullUrl, let url = URL(string: fullUrlString) {
-                    cell.configure(with: url)
-                }
-                
-                return cell
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "GalleryCell", for: indexPath) as? GalleryCell else {
+                return UICollectionViewCell()
             }
+            let photoItem = galleryPhotos[indexPath.item]
+            
+            if let previewUrlString = photoItem.preview?.fullUrl, let url = CDNURLHelper.convertToCDNURL(previewUrlString) {
+                cell.configure(with: url)
+            } else {
+                if let fullUrlString = photoItem.photo.fullUrl, let url = CDNURLHelper.convertToCDNURL(fullUrlString) {
+                    cell.configure(with: url)
+                }
+            }
+            
+            return cell
+        } else if collectionView == videoGalleryCollectionView {
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: VideoGalleryCell.reuseIdentifier, for: indexPath) as? VideoGalleryCell else {
+                return UICollectionViewCell()
+            }
+            let videoItem = videoGalleryItems[indexPath.item]
+            
+            if let videoUrlString = videoItem.photo.fullUrl {
+                let cdnVideoUrl = CDNURLHelper.convertToCDN(videoUrlString) ?? ""
+                let previewUrl = videoItem.preview?.fullUrl.flatMap { CDNURLHelper.convertToCDN($0) }
+                cell.configure(with: cdnVideoUrl, previewUrl: previewUrl, title: nil)
+            }
+            
+            return cell
+        } else if collectionView == channelGalleryCollectionView {
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ChannelListCell.reuseIdentifier, for: indexPath) as? ChannelListCell else {
+                return UICollectionViewCell()
+            }
+            let item = channelGalleryItems[indexPath.item]
+            cell.configure(with: item, context: self.context)
+            return cell
+        } else if collectionView == modelGalleryCollectionView {
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ModelListCell.reuseIdentifier, for: indexPath) as? ModelListCell else {
+                return UICollectionViewCell()
+            }
+            let item = modelGalleryItems[indexPath.item]
+            cell.configure(with: item, context: self.context)
+            return cell
+        } else if collectionView == eventGalleryCollectionView {
+            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: EventListCell.reuseIdentifier, for: indexPath) as? EventListCell else {
+                return UICollectionViewCell()
+            }
+            let item = eventGalleryItems[indexPath.item]
+            cell.configure(with: item, context: self.context)
+            return cell
         }
         return UICollectionViewCell()
     }
@@ -1532,6 +2241,20 @@ extension PublicProfileScreenNode: UICollectionViewDelegate {
             // handleSimilarProfileTap(profile)
         }
     }
+    
+    func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        if collectionView == videoGalleryCollectionView,
+           let videoCell = cell as? VideoGalleryCell {
+            videoCell.play()
+        }
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        if collectionView == videoGalleryCollectionView,
+           let videoCell = cell as? VideoGalleryCell {
+            videoCell.stop()
+        }
+    }
 }
 
 
@@ -1541,11 +2264,16 @@ extension PublicProfileScreenNode: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         if collectionView == similarProfilesCollectionView {
             return CGSize(width: 166, height: 200)
-        } else if collectionView == galleryCollectionView {
+        } else if collectionView == galleryCollectionView || collectionView == videoGalleryCollectionView {
             guard let (layout, _) = self.containerLayout else { return .zero }
             let totalSpacing: CGFloat = 2
             let width = (layout.size.width - totalSpacing) / 3.0
             return CGSize(width: width, height: width)
+        } else if collectionView == channelGalleryCollectionView
+                    || collectionView == modelGalleryCollectionView
+                    || collectionView == eventGalleryCollectionView {
+            guard let (layout, _) = self.containerLayout else { return .zero }
+            return CGSize(width: layout.size.width, height: 74)
         }
         return CGSize()
     }
@@ -1553,7 +2281,11 @@ extension PublicProfileScreenNode: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
         if collectionView == similarProfilesCollectionView {
             return 6
-        } else if collectionView == galleryCollectionView {
+        } else if collectionView == galleryCollectionView
+                    || collectionView == videoGalleryCollectionView
+                    || collectionView == channelGalleryCollectionView
+                    || collectionView == modelGalleryCollectionView
+                    || collectionView == eventGalleryCollectionView {
             return 1.0
         }
         return 0
@@ -1562,7 +2294,11 @@ extension PublicProfileScreenNode: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
         if collectionView == similarProfilesCollectionView {
             return 6
-        } else if collectionView == galleryCollectionView {
+        } else if collectionView == galleryCollectionView
+                    || collectionView == videoGalleryCollectionView
+                    || collectionView == channelGalleryCollectionView
+                    || collectionView == modelGalleryCollectionView
+                    || collectionView == eventGalleryCollectionView {
             return 1.0
         }
         return 0
@@ -1571,7 +2307,11 @@ extension PublicProfileScreenNode: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
         if collectionView == similarProfilesCollectionView {
             return UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
-        } else if collectionView == galleryCollectionView {
+        } else if collectionView == galleryCollectionView
+                    || collectionView == videoGalleryCollectionView
+                    || collectionView == channelGalleryCollectionView
+                    || collectionView == modelGalleryCollectionView
+                    || collectionView == eventGalleryCollectionView {
             return UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         }
         return UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
@@ -1583,34 +2323,59 @@ extension PublicProfileScreenNode: UICollectionViewDelegateFlowLayout {
 
 extension PublicProfileScreenNode: UIScrollViewDelegate {
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        galleryCollectionView.layoutIfNeeded()
-        
-        if !titleVisibilityActivated {
-            titleVisibilityActivated = true
-        }
         
         let offsetY = scrollView.contentOffset.y
-        let contentHeight = galleryCollectionView.contentSize.height
-        let frameHeight = galleryCollectionView.frame.size.height
         
-        let threshold = contentHeight - frameHeight - 100
+        // ПРАВИЛЬНЫЙ РАСЧЕТ ПАГИНАЦИИ (относительно основного скролла)
+        let contentHeight = scrollView.contentSize.height
+        let frameHeight = scrollView.bounds.height
         
-        if offsetY > threshold && galleryHasMore && !galleryIsLoading {
-            print("📜 [SCROLL] Triggering load more at offset=\(offsetY), threshold=\(threshold)")
-            loadNextGalleryPage()
+        // Триггер: за 500 пикселей до конца экрана
+        let threshold = contentHeight - frameHeight - 500
+        
+        if offsetY > threshold {
+            triggerLoadMoreForActiveTab()
         }
-        if currentTabIndex == 1 {
-            playVisibleVideos()
-        }
+        
         updateSegmentedBarPosition()
         updateNavigationBarTitleVisibility()
         
+        // Защита от скролла ниже контента
         let maxScrollY = scrollView.contentSize.height - scrollView.bounds.height
-        
         let bottomLimit = max(0, maxScrollY)
         
         if scrollView.contentOffset.y > bottomLimit {
             scrollView.contentOffset.y = bottomLimit
+        }
+    }
+    
+    // Менеджер загрузки для текущей вкладки
+    private func triggerLoadMoreForActiveTab() {
+        if model.isMyProfile {
+            switch currentTabIndex {
+            case 0:
+                if galleryHasMore && !galleryIsLoading { loadNextGalleryPage() }
+            case 1:
+                if videoGalleryHasMore && !videoGalleryIsLoading { loadNextVideoGalleryPage() }
+            default: break
+            }
+        } else if (modelRole == "model" || modelRole == "new_face") && !model.isMyProfile {
+            switch currentTabIndex {
+            case 0:
+                if galleryHasMore && !galleryIsLoading { loadNextGalleryPage() }
+            case 1:
+                if videoGalleryHasMore && !videoGalleryIsLoading { loadNextVideoGalleryPage() }
+            default: break
+            }
+        } else {
+            switch currentTabIndex {
+            case 0:
+                if galleryHasMore && !galleryIsLoading { loadNextGalleryPage() }
+            case 1:
+                if videoGalleryHasMore && !videoGalleryIsLoading { loadNextVideoGalleryPage() }
+                // Модели, каналы, эвенты - добавить пагинацию по аналогии
+            default: break
+            }
         }
     }
 }
@@ -1620,8 +2385,10 @@ extension PublicProfileScreenNode: UIScrollViewDelegate {
 
 extension PublicProfileScreenNode: ProfileInfoViewDelegate {
     func profileInfoViewDidUpdateContentHeight() {
-        setNeedsLayout()
-        layoutIfNeeded()
+        DispatchQueue.main.async {
+            self.setNeedsLayout()
+            self.layoutIfNeeded()
+        }
     }
 }
 
@@ -1629,20 +2396,75 @@ extension PublicProfileScreenNode: ProfileInfoViewDelegate {
 // MARK: - ProfileSegmentedBarDelegate
 
 extension PublicProfileScreenNode: ProfileSegmentedBarDelegate {
+    
+    private func getTabContainer(for index: Int) -> UIView {
+        if model.isMyProfile {
+            switch index {
+            case 0: return photoTabContainer
+            case 1: return videoTabContainer
+            default: return photoTabContainer
+            }
+        } else if (modelRole == "model" || modelRole == "new_face") && !model.isMyProfile {
+            switch index {
+            case 0: return photoTabContainer
+            case 1: return videoTabContainer
+            case 2: return channelTabContainer
+            default: return photoTabContainer
+            }
+        } else {
+            switch index {
+            case 0: return photoTabContainer
+            case 1: return videoTabContainer
+            case 2: return modelTabContainer
+            case 3: return channelTabContainer
+            case 4: return eventTabContainer
+            default: return photoTabContainer
+            }
+        }
+    }
+    
     func segmentedBar(_ segmentedBar: ProfileSegmentedBar, didSelectIndex index: Int) {
         guard index != currentTabIndex else { return }
-        if currentTabIndex == 1 {
-            stopVisibleVideos()
-        }
+        print("📍 Swiping to index: \(index)")
+        
+        let isSlidingLeft = index > currentTabIndex
+        let screenWidth = self.view.bounds.width
+        let offset = isSlidingLeft ? screenWidth : -screenWidth
+        
+        let oldContainer = getTabContainer(for: currentTabIndex)
+        let newContainer = getTabContainer(for: index)
+        
+        newContainer.transform = CGAffineTransform(translationX: offset, y: 0)
+        newContainer.isHidden = false
+        
+        loadDataForTab(index: index)
+        
         currentTabIndex = index
-        // Простое переключение между фото (0) и видео (1).
-        DispatchQueue.main.async {
-            self.setNeedsLayout()
-            self.layoutIfNeeded()
-            self.galleryCollectionView.reloadData()
-            if self.currentTabIndex == 1 {
-                self.playVisibleVideos()
-            }
+        updateCollectionsContainerHeight(animated: false)
+        
+        UIView.animate(withDuration: 0.35, delay: 0, options: .curveEaseInOut, animations: {
+            oldContainer.transform = CGAffineTransform(translationX: -offset, y: 0)
+            newContainer.transform = .identity
+            
+            self.contentViewStack.layoutIfNeeded()
+            self.view.layoutIfNeeded()
+        }, completion: { _ in
+            oldContainer.isHidden = true
+            oldContainer.transform = .identity
+        })
+    }
+    
+    private func loadDataForTab(index: Int) {
+        if model.isMyProfile {
+            if index == 1 && !videoGalleryInitialized { videoGalleryInitialized = true; loadVideoGallery() }
+        } else if (modelRole == "model" || modelRole == "new_face") && !model.isMyProfile {
+            if index == 1 && !videoGalleryInitialized { videoGalleryInitialized = true; loadVideoGallery() }
+            else if index == 2 && !channelGalleryInitialized { channelGalleryInitialized = true; loadChannelGallery() }
+        } else {
+            if index == 1 && !videoGalleryInitialized { videoGalleryInitialized = true; loadVideoGallery() }
+            else if index == 2 && !modelGalleryInitialized { modelGalleryInitialized = true; loadModelGallery() }
+            else if index == 3 && !channelGalleryInitialized { channelGalleryInitialized = true; loadChannelGallery() }
+            else if index == 4 && !eventGalleryInitialized { eventGalleryInitialized = true; loadEventGallery() }
         }
     }
 }
