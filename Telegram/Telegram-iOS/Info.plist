@@ -301,6 +301,7 @@
 	<key>UIAppFonts</key>
 	<array>
 		<string>SFCompactRounded-Semibold.otf</string>
+		<string>HelveticaNeue-Semibold.ttf</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

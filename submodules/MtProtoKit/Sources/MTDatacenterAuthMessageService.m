@@ -24,6 +24,7 @@
 @interface MTDatacenterAuthPublicKey : NSObject
 
 @property (nonatomic, strong, readonly) NSString *publicKey;
+@property (nonatomic, readonly) uint64_t overrideFingerprint;
 
 @end
 
@@ -33,11 +34,24 @@
     self = [super init];
     if (self != nil) {
         _publicKey = publicKey;
+        _overrideFingerprint = 0;
+    }
+    return self;
+}
+
+- (instancetype)initWithPublicKey:(NSString *)publicKey fingerprint:(uint64_t)fingerprint {
+    self = [super init];
+    if (self != nil) {
+        _publicKey = publicKey;
+        _overrideFingerprint = fingerprint;
     }
     return self;
 }
 
 - (uint64_t)fingerprintWithEncryptionProvider:(id<EncryptionProvider>)encryptionProvider {
+    if (_overrideFingerprint != 0) {
+        return _overrideFingerprint;
+    }
     return MTRsaFingerprint(encryptionProvider, _publicKey);
 }
 
@@ -48,7 +62,20 @@ static NSArray<MTDatacenterAuthPublicKey *> *defaultPublicKeys(bool isProduction
     static NSArray<MTDatacenterAuthPublicKey *> *productionPublicKeys = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
+        // [DIVO] DIVO server RSA public key with hardcoded fingerprint (same as Android)
+        MTDatacenterAuthPublicKey *divoKey = [[MTDatacenterAuthPublicKey alloc]
+             initWithPublicKey:@"-----BEGIN RSA PUBLIC KEY-----\n"
+             "MIIBCgKCAQEAvKLEOWTzt9Hn3/9Kdp/RdHcEhzmd8xXeLSpHIIzaXTLJDw8BhJy1\n"
+             "jR/iqeG8Je5yrtVabqMSkA6ltIpgylH///FojMsX1BHu4EPYOXQgB0qOi6kr08iX\n"
+             "ZIH9/iOPQOWDsL+Lt8gDG0xBy+sPe/2ZHdzKMjX6O9B4sOsxjFrk5qDoWDrioJor\n"
+             "AJ7eFAfPpOBf2w73ohXudSrJE0lbQ8pCWNpMY8cB9i8r+WBitcvouLDAvmtnTX7a\n"
+             "khoDzmKgpJBYliAY4qA73v7u5UIepE8QgV0jCOhxJCPubP8dg+/PlLLVKyxU5Cdi\n"
+             "QtZj2EMy4s9xlNKzX8XezE0MHEa6bQpnFwIDAQAB\n"
+             "-----END RSA PUBLIC KEY-----"
+             fingerprint:0xa9e071c1771060cdULL];
+
         testingPublicKeys = @[
+            divoKey,
             [[MTDatacenterAuthPublicKey alloc] initWithPublicKey:@"-----BEGIN RSA PUBLIC KEY-----\n"
              "MIIBCgKCAQEAyMEdY1aR+sCR3ZSJrtztKTKqigvO/vBfqACJLZtS7QMgCGXJ6XIR\n"
              "yy7mx66W0/sOFa7/1mAZtEoIokDP3ShoqF4fVNb6XeqgQfaUHd8wJpDWHcR2OFwv\n"
@@ -60,6 +87,7 @@ static NSArray<MTDatacenterAuthPublicKey *> *defaultPublicKeys(bool isProduction
         ];
 
         productionPublicKeys = @[
+            divoKey,
             [[MTDatacenterAuthPublicKey alloc] initWithPublicKey:@"-----BEGIN RSA PUBLIC KEY-----\n"
              "MIIBCgKCAQEA6LszBcC1LGzyr992NzE0ieY+BSaOW622Aa9Bd4ZHLl+TuFQ4lo4g\n"
              "5nKaMBwK/BIb9xUfg0Q29/2mgIR6Zr9krM7HjuIcCzFvDtr+L0GQjae9H0pRB2OO\n"
@@ -81,7 +109,6 @@ static MTDatacenterAuthPublicKey *selectPublicKey(id<EncryptionProvider> encrypt
     for (NSNumber *nFingerprint in fingerprints) {
         for (MTDatacenterAuthPublicKey *key in publicKeys) {
             uint64_t keyFingerprint = [key fingerprintWithEncryptionProvider:encryptionProvider];
-            
             if ([nFingerprint unsignedLongLongValue] == keyFingerprint) {
                 return key;
             }
@@ -419,11 +446,11 @@ static NSData *encryptRSAModernPadding(id<EncryptionProvider> encryptionProvider
         if ([_nonce isEqualToData:resPqMessage.nonce])
         {
             MTDatacenterAuthPublicKey *publicKey = selectPublicKey(_encryptionProvider, resPqMessage.serverPublicKeyFingerprints, _publicKeys);
-            
+
             if (publicKey == nil && mtProto.cdn && resPqMessage.serverPublicKeyFingerprints.count == 1 && _publicKeys.count == 1) {
                 publicKey = _publicKeys[0];
             }
-            
+
             if (publicKey == nil)
             {
                 if (MTLogEnabled()) {

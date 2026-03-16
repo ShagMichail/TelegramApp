@@ -24,6 +24,7 @@ import AlertUI
 import InAppPurchaseManager
 import ObjectiveC
 import AVFoundation
+import OnboardingUI
 
 private var ObjCKey_Delegate: Int?
 
@@ -34,7 +35,7 @@ private enum InnerState: Equatable {
 
 public final class AuthorizationSequenceController: NavigationController, ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     static func navigationBarTheme(_ theme: PresentationTheme) -> NavigationBarTheme {
-        return NavigationBarTheme(overallDarkAppearance: theme.overallDarkAppearance, buttonColor: theme.chat.inputPanel.panelControlColor, disabledButtonColor: theme.intro.disabledTextColor, primaryTextColor: theme.intro.primaryTextColor, backgroundColor: .clear, opaqueBackgroundColor: .clear, enableBackgroundBlur: false, separatorColor: .clear, badgeBackgroundColor: theme.rootController.navigationBar.badgeBackgroundColor, badgeStrokeColor: theme.rootController.navigationBar.badgeStrokeColor, badgeTextColor: theme.rootController.navigationBar.badgeTextColor, edgeEffectColor: .clear, style: .glass)
+        return NavigationBarTheme(overallDarkAppearance: theme.overallDarkAppearance, buttonColor: .white, disabledButtonColor: theme.intro.disabledTextColor, primaryTextColor: theme.intro.primaryTextColor, backgroundColor: .clear, opaqueBackgroundColor: .clear, enableBackgroundBlur: false, separatorColor: .clear, badgeBackgroundColor: theme.rootController.navigationBar.badgeBackgroundColor, badgeStrokeColor: theme.rootController.navigationBar.badgeStrokeColor, badgeTextColor: theme.rootController.navigationBar.badgeTextColor, edgeEffectColor: .clear)
     }
     
     private let sharedContext: SharedAccountContext
@@ -147,12 +148,37 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                     if let strings = strings {
                         strongSelf.presentationData = strongSelf.presentationData.withStrings(strings)
                     }
-                    let masterDatacenterId = strongSelf.account.masterDatacenterId
-                    let isTestingEnvironment = strongSelf.account.testingEnvironment
-                    
-                    let countryCode = AuthorizationSequenceCountrySelectionController.defaultCountryCode()
-                    
-                    let _ = strongSelf.engine.auth.setState(state: UnauthorizedAccountState(isTestingEnvironment: isTestingEnvironment, masterDatacenterId: masterDatacenterId, contents: .phoneEntry(countryCode: countryCode, number: ""))).startStandalone()
+
+                    let proceedToPhoneEntry = {
+                        guard let strongSelf = self else { return }
+                        let masterDatacenterId = strongSelf.account.masterDatacenterId
+                        let isTestingEnvironment = strongSelf.account.testingEnvironment
+                        let countryCode = AuthorizationSequenceCountrySelectionController.defaultCountryCode()
+                        let _ = strongSelf.engine.auth.setState(state: UnauthorizedAccountState(isTestingEnvironment: isTestingEnvironment, masterDatacenterId: masterDatacenterId, contents: .phoneEntry(countryCode: countryCode, number: ""))).startStandalone()
+                    }
+
+                    if !UserDefaults.standard.bool(forKey: "hasSeenOnboarding") {
+                        let onboarding = OnboardingScreenController()
+                        strongSelf.addChild(onboarding)
+                        onboarding.view.frame = strongSelf.view.bounds
+                        onboarding.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                        strongSelf.view.addSubview(onboarding.view)
+                        onboarding.didMove(toParent: strongSelf)
+                        onboarding.onFinish = { [weak onboarding, weak self] in
+                            // Clear nav stack so proceedToPhoneEntry animates without showing splash
+                            self?.setViewControllers([], animated: false)
+                            proceedToPhoneEntry()
+                            UIView.animate(withDuration: 0.3, delay: 0.05, options: [], animations: {
+                                onboarding?.view.alpha = 0
+                            }, completion: { _ in
+                                onboarding?.willMove(toParent: nil)
+                                onboarding?.view.removeFromSuperview()
+                                onboarding?.removeFromParent()
+                            })
+                        }
+                    } else {
+                        proceedToPhoneEntry()
+                    }
                 }
             }
         }
@@ -1149,97 +1175,16 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
             }, typeOfRole: typeOfRole)
             
             controller.signUpWithName = { [weak self, weak controller] firstName, lastName, modelinfo, avatarData, avatarAsset, avatarAdjustments, announceSignUp in
-                if let strongSelf = self {
-                    controller?.inProgress = true
-                    
-                    var videoStartTimestamp: Double? = nil
-                    if let adjustments = avatarAdjustments, adjustments.videoStartValue > 0.0 {
-                        videoStartTimestamp = adjustments.videoStartValue - adjustments.trimStartValue
-                    }
-                    
-                    let avatarVideo: Signal<UploadedPeerPhotoData?, NoError>?
-                    if let avatarAsset = avatarAsset as? AVAsset {
-                        let engine = strongSelf.engine
-                        avatarVideo = Signal<TelegramMediaResource?, NoError> { subscriber in
-                            let entityRenderer: LegacyPaintEntityRenderer? = avatarAdjustments.flatMap { adjustments in
-                                if let paintingData = adjustments.paintingData, paintingData.hasAnimation {
-                                    return LegacyPaintEntityRenderer(postbox: nil, adjustments: adjustments)
-                                } else {
-                                    return nil
-                                }
-                            }
-                            
-                            let tempFile = EngineTempBox.shared.tempFile(fileName: "video.mp4")
-                            let signal = TGMediaVideoConverter.convert(avatarAsset, adjustments: avatarAdjustments, path: tempFile.path, watcher: nil, entityRenderer: entityRenderer)!
-                            
-                            let signalDisposable = signal.start(next: { next in
-                                if let result = next as? TGMediaVideoConversionResult {
-                                    var value = stat()
-                                    if stat(result.fileURL.path, &value) == 0 {
-                                        if let data = try? Data(contentsOf: result.fileURL) {
-                                            let resource = LocalFileMediaResource(fileId: Int64.random(in: Int64.min ... Int64.max))
-                                            engine.account.postbox.mediaBox.storeResourceData(resource.id, data: data, synchronous: true)
-                                            subscriber.putNext(resource)
-                                            
-                                            EngineTempBox.shared.dispose(tempFile)
-                                        }
-                                    }
-                                    subscriber.putCompletion()
-                                }
-                            }, error: { _ in
-                            }, completed: nil)
-                            
-                            let disposable = ActionDisposable {
-                                signalDisposable?.dispose()
-                            }
-                            
-                            return ActionDisposable {
-                                disposable.dispose()
-                            }
-                        }
-                        |> mapToSignal { resource -> Signal<UploadedPeerPhotoData?, NoError> in
-                            if let resource = resource {
-                                return engine.auth.uploadedPeerVideo(resource: resource) |> map(Optional.init)
-                            } else {
-                                return .single(nil)
-                            }
-                        }
-                    } else {
-                        avatarVideo = nil
-                    }
-                    
-                    strongSelf.actionDisposable.set((signUpWithName(accountManager: strongSelf.sharedContext.accountManager, account: strongSelf.account, firstName: firstName, lastName: lastName, modelinfo: modelinfo, avatarData: avatarData, avatarVideo: avatarVideo, videoStartTimestamp: videoStartTimestamp, disableJoinNotifications: !announceSignUp, forcedPasswordSetupNotice: { value in
-                        guard let entry = CodableEntry(ApplicationSpecificCounterNotice(value: value)) else {
-                            return nil
-                        }
-                        return (ApplicationSpecificNotice.forcedPasswordSetupKey(), entry)
-                    })
-                    |> deliverOnMainQueue).startStrict(error: { error in
-                        Queue.mainQueue().async {
-                            if let strongSelf = self, let controller = controller {
-                                controller.inProgress = false
-                                
-                                let text: String
-                                switch error {
-                                    case .limitExceeded:
-                                        text = strongSelf.presentationData.strings.Login_CodeFloodError
-                                    case .codeExpired:
-                                        text = strongSelf.presentationData.strings.Login_CodeExpiredError
-                                    case .invalidFirstName:
-                                        text = strongSelf.presentationData.strings.Login_InvalidFirstNameError
-                                    case .invalidLastName:
-                                        text = strongSelf.presentationData.strings.Login_InvalidLastNameError
-                                    case .generic:
-                                        text = strongSelf.presentationData.strings.Login_UnknownError
-                                }
-                                
-                                controller.present(standardTextAlertController(theme: AlertControllerTheme(presentationData: strongSelf.presentationData), title: nil, text: text, actions: [TextAlertAction(type: .defaultAction, title: strongSelf.presentationData.strings.Common_OK, action: {})]), in: .window(.root))
-                                
-                                strongSelf.updateState(state: .state(.empty))
-                            }
-                        }
-                    }))
-                }
+                // DIVO: bypass server sign-up, authorize locally
+                guard let strongSelf = self else { return }
+                controller?.inProgress = true
+                // Set flag synchronously BEFORE async AccountManager changes so AppDelegate
+                // sees authorizationCompleted=true and waits for context instead of immediate dismiss
+                strongSelf.authorizationCompleted()
+                strongSelf.actionDisposable.set((divoCompleteAuthorization(accountManager: strongSelf.sharedContext.accountManager, account: strongSelf.account)
+                |> deliverOnMainQueue).startStrict(completed: {
+                    controller?.inProgress = false
+                }))
             }
         }
         
@@ -1400,20 +1345,8 @@ public final class AuthorizationSequenceController: NavigationController, ASAuth
                     if !self.otherAccountPhoneNumbers.1.isEmpty {
                         controllers.append(self.splashController())
                     }
-                    var previousSplashController: AuthorizationSequenceSplashController?
-                    for c in self.viewControllers {
-                        if let c = c as? AuthorizationSequenceSplashController {
-                            previousSplashController = c
-                            break
-                        }
-                    }
-                
-                    if let validLayout = self.validLayout, case .tablet = validLayout.deviceMetrics.type {
-                        previousSplashController = nil
-                    }
-                
-                    controllers.append(self.phoneEntryController(countryCode: countryCode, number: number, splashController: previousSplashController))
-                    self.setViewControllers(controllers, animated: !self.viewControllers.isEmpty && (previousSplashController == nil || self.viewControllers.count > 2))
+                    controllers.append(self.phoneEntryController(countryCode: countryCode, number: number, splashController: nil))
+                    self.setViewControllers(controllers, animated: !self.viewControllers.isEmpty)
                 case let .confirmationCodeEntry(number, type, phoneCodeHash, timeout, nextType, _, previousCodeEntry, usePrevious):
                     var controllers: [ViewController] = []
                     if !self.otherAccountPhoneNumbers.1.isEmpty {

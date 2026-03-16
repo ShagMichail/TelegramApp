@@ -1,0 +1,129 @@
+# Быстрый старт - Сборка Telegram iOS с Bazel
+
+## Требования
+
+| ПО | Версия |
+|----------|---------|
+| Xcode | 16.2+ |
+| Bazel | 8.4.2 (устанавливается автоматически через Bazelisk) |
+| macOS | Sequoia 15.x+ |
+| CMake | Последняя |
+| Homebrew | Последняя |
+
+### Установка зависимостей
+
+```bash
+# Установить Homebrew (если не установлен)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Установить Bazelisk (менеджер версий Bazel) и CMake
+brew install bazelisk cmake
+```
+
+## Сборка и запуск
+
+### 1. Клонирование
+
+```bash
+git clone --recursive -j8 https://github.com/ShagMichail/TelegramApp.git
+cd TelegramApp
+```
+
+### 2. Настройка конфигурации
+
+```bash
+mkdir -p build-input/configuration-repository
+cp -r build-system/example-configuration/* build-input/configuration-repository/
+
+cat > build-input/configuration-repository/MODULE.bazel << 'EOF'
+module(
+    name = "build_configuration",
+    version = "1.0.0",
+)
+EOF
+```
+
+### 3. Сборка (симулятор)
+
+```bash
+bazel build //Telegram:Telegram \
+  --define=disableProvisioningProfiles=true \
+  --cpu=ios_sim_arm64 \
+  --define=buildNumber=100001 \
+  --define=telegramVersion=12.2.2
+```
+
+### 4. Установка и запуск на симуляторе
+
+```bash
+# Посмотреть доступные симуляторы
+xcrun simctl list devices available
+
+# Запустить симулятор (указать имя или UUID устройства)
+xcrun simctl boot "iPhone 16"
+
+# Открыть окно симулятора
+open -a Simulator
+
+# Установить приложение
+xcrun simctl install booted bazel-bin/Telegram/Telegram.ipa
+
+# Запустить приложение
+xcrun simctl launch booted ph.telegra.Telegraph
+```
+
+### 5. Сборка для физического девайса
+
+```bash
+bazel build //Telegram:Telegram \
+  --compilation_mode=opt \
+  --cpu=ios_arm64 \
+  --define=buildNumber=100001 \
+  --define=telegramVersion=12.2.2 \
+  --//Telegram:disableExtensions=true
+```
+
+### 6. Установка на физический девайс
+
+Пример ниже использует **конкретный UDID девайса** (`51CB07C4-5E7A-5044-A4D3-8FABEDA1B647`).  
+У себя подставьте **UDID своего устройства**, который можно посмотреть в Xcode → `Devices and Simulators` или через `xcrun devicectl list devices`.
+
+```bash
+xcrun devicectl device install app \
+  bazel-bin/Telegram/Telegram.ipa \
+  --device 51CB07C4-5E7A-5044-A4D3-8FABEDA1B647
+```
+
+## Часто используемые команды
+
+```bash
+# Очистить сборку
+bazel clean
+
+# Полная очистка (пересобрать всё с нуля)
+bazel clean --expunge
+
+# Проверить версию Bazel
+bazel --version
+
+# Установить на конкретный симулятор (по UUID)
+xcrun simctl install <UUID> bazel-bin/Telegram/Telegram.ipa
+```
+
+## Алиасы для разработки (опционально)
+
+Добавьте в `~/.zshrc`, заменив путь на свой:
+
+```bash
+# Telegram iOS Build Aliases
+TELEGRAM_ROOT="$HOME/Projects/TelegramApp"  # <-- укажите свой путь
+
+alias tg-build='cd $TELEGRAM_ROOT && bazel build //Telegram:Telegram --define=disableProvisioningProfiles=true --cpu=ios_sim_arm64 --define=buildNumber=100001 --define=telegramVersion=12.2.2'
+alias tg-install='xcrun simctl install booted $TELEGRAM_ROOT/bazel-bin/Telegram/Telegram.ipa'
+alias tg-run='xcrun simctl launch booted ph.telegra.Telegraph'
+alias tg-boot='xcrun simctl boot "iPhone 16" 2>/dev/null || true && open -a Simulator'
+alias tg-go='tg-boot && tg-build && tg-install && tg-run'
+alias tg-clean='cd $TELEGRAM_ROOT && bazel clean --expunge'
+```
+
+Применить: `source ~/.zshrc`

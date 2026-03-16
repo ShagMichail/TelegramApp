@@ -72,7 +72,8 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     private let addPhotoButton: HighlightableButtonNode
     private let backNode: ButtonWithIconNode
     private let saveNode: ButtonWithIconNode
-    
+    private let bottomSpacerNode = ASDisplayNode()
+
     private var layoutArguments: (ContainerViewLayout, CGFloat)?
     
     private let appearanceTimestamp = CACurrentMediaTime()
@@ -120,19 +121,27 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         
         switch self.typeOfRole {
         case .talent:
-            titleText = "Apply as \n a new talent"
+            titleText = "Apply as\na new talent"
             nameAgencyText = "Full Name"
-            
+
         case .model:
-            titleText = "Apply as a \n Professional Model"
+            titleText = "Apply as a\nProfessional Model"
             nameAgencyText = "Full Name"
-            
+
         case .agencies:
-            titleText = "Apply as a \n agencies & brands"
+            titleText = "Apply as a\nAgencies & Brands"
             nameAgencyText = "Name Agency"
         }
-        
-        self.titleNode.attributedText = Font.helveticaNeue(titleText.uppercased(), 34)
+
+        let divoTitleFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 34.0) ?? Font.bold(34.0)
+        let divoTitleStyle = NSMutableParagraphStyle()
+        divoTitleStyle.alignment = .center
+        self.titleNode.attributedText = NSAttributedString(string: titleText.uppercased(), attributes: [
+            .font: divoTitleFont,
+            .foregroundColor: UIColor.white,
+            .kern: 0.5,
+            .paragraphStyle: divoTitleStyle
+        ])
         self.currentOptionNode = ASTextNode()
         self.currentOptionNode.isUserInteractionEnabled = false
         self.currentOptionNode.displaysAsynchronously = false
@@ -218,6 +227,7 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         
         self.addSubnode(self.backNode)
         self.addSubnode(self.saveNode)
+        self.addSubnode(self.bottomSpacerNode)
         
         self.addPhotoButton.addTarget(self, action: #selector(self.addPhotoPressed), forControlEvents: .touchUpInside)
         self.backNode.addTarget(self, action: #selector(self.backButtonPressed), forControlEvents: .touchUpInside)
@@ -258,86 +268,75 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
             insets.bottom = max(inputHeight, layout.standardInputHeight)
         }
         
-        let titleSize = self.titleNode.measure(CGSize(width: maximumWidth-40, height: .greatestFiniteMagnitude))
-
-        let additionalBottomInset: CGFloat = layout.size.width > 320.0 ? 90.0 : 10.0
-
-        self.titleNode.attributedText = NSAttributedString(string: "Apply as a agencies & brands".uppercased(), font: Font.bold(34), textColor: .white, paragraphAlignment: .center)
-
-        
-        let fieldHeight: CGFloat = 40.0
-        
         let sideInset: CGFloat = 24.0
-
-        let noticeSize = self.currentOptionNode.measure(CGSize(width: maximumWidth - 28.0, height: CGFloat.greatestFiniteMagnitude))
-        let sectionTitleSize = self.sectionTitleNode.measure(CGSize(width: maximumWidth, height: CGFloat.greatestFiniteMagnitude))
-        
+        let fieldHeight: CGFloat = 40.0
         let avatarSize: CGSize = CGSize(width: 100.0, height: 100.0)
-        var items: [AuthorizationLayoutItem] = []
-        
-        items.append(AuthorizationLayoutItem(node: self.titleNode, size: titleSize, spacingBefore: AuthorizationLayoutItemSpacing(weight: 10, maxValue: 10), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-        
-        items.append(AuthorizationLayoutItem(node: self.currentOptionNode, size: noticeSize, spacingBefore: AuthorizationLayoutItemSpacing(weight: 20.0, maxValue: 20.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-        
-        items.append(AuthorizationLayoutItem(node: self.addPhotoButton, size: avatarSize, spacingBefore: AuthorizationLayoutItemSpacing(weight: 16.0, maxValue: 16.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-        self.currentPhotoNode.frame = CGRect(origin: CGPoint(), size: avatarSize)
-        
-        items.append(AuthorizationLayoutItem(node: self.sectionTitleNode, size: CGSize(width: maximumWidth - sideInset * 2.0, height: sectionTitleSize.height), spacingBefore: AuthorizationLayoutItemSpacing(weight: 20.0, maxValue: 20.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0, maxValue: 0)))
-        
-        
+        let fieldWidth = maximumWidth - sideInset * 2.0
+        let centerX = floor(layout.size.width / 2.0)
+
+        let titleSize = self.titleNode.measure(CGSize(width: fieldWidth, height: .greatestFiniteMagnitude))
+        let noticeSize = self.currentOptionNode.measure(CGSize(width: fieldWidth, height: .greatestFiniteMagnitude))
+        let sectionTitleSize = self.sectionTitleNode.measure(CGSize(width: fieldWidth, height: .greatestFiniteMagnitude))
+
+        var y: CGFloat = max(navigationBarHeight, insets.top) + 60.0
+
+        // Title
+        self.titleNode.frame = CGRect(x: floor(centerX - titleSize.width / 2.0), y: y, width: titleSize.width, height: titleSize.height)
+        y += titleSize.height + 16.0
+
+        // Subtitle
+        self.currentOptionNode.frame = CGRect(x: floor(centerX - noticeSize.width / 2.0), y: y, width: noticeSize.width, height: noticeSize.height)
+        y += noticeSize.height + 20.0
+
+        // Photo button
+        self.addPhotoButton.frame = CGRect(x: floor(centerX - avatarSize.width / 2.0), y: y, width: avatarSize.width, height: avatarSize.height)
+        self.currentPhotoNode.frame = CGRect(origin: .zero, size: avatarSize)
+        y += avatarSize.height + 20.0
+
+        // Section title
+        self.sectionTitleNode.frame = CGRect(x: sideInset, y: y, width: fieldWidth, height: sectionTitleSize.height)
+        y += sectionTitleSize.height + 12.0
+
+        // Fields per role
         if typeOfRole == .agencies {
-            items.append(AuthorizationLayoutItem(node: self.nameAgency, size: CGSize(width: maximumWidth - sideInset * 2.0, height: fieldHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 10.0, maxValue: 10.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-            items.append(AuthorizationLayoutItem(node: self.chooseCountryField, size: CGSize(width: maximumWidth - sideInset * 2.0, height: fieldHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 12, maxValue: 12), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-            
-            items.append(AuthorizationLayoutItem(node: self.websiteField, size: CGSize(width: maximumWidth - sideInset * 2.0, height: fieldHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 16.0, maxValue: 16.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
+            self.nameAgency.frame = CGRect(x: sideInset, y: y, width: fieldWidth, height: fieldHeight)
+            y += fieldHeight + 10.0
+            self.chooseCountryField.frame = CGRect(x: sideInset, y: y, width: fieldWidth, height: fieldHeight)
+            y += fieldHeight + 16.0
+            self.websiteField.frame = CGRect(x: sideInset, y: y, width: fieldWidth, height: fieldHeight)
         }
-        
+
         if typeOfRole == .talent {
-            items.append(AuthorizationLayoutItem(node: self.nameAgency, size: CGSize(width: maximumWidth - sideInset * 2.0, height: fieldHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 10.0, maxValue: 10.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-            items.append(AuthorizationLayoutItem(node: self.chooseGenderField, size: CGSize(width: maximumWidth - sideInset * 2.0, height: fieldHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 12, maxValue: 12), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-            
-            items.append(AuthorizationLayoutItem(node: self.chooseCountryField, size: CGSize(width: maximumWidth - sideInset * 2.0, height: fieldHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 16.0, maxValue: 16.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-            
+            self.nameAgency.frame = CGRect(x: sideInset, y: y, width: fieldWidth, height: fieldHeight)
+            y += fieldHeight + 10.0
+            self.chooseGenderField.frame = CGRect(x: sideInset, y: y, width: fieldWidth, height: fieldHeight)
+            y += fieldHeight + 10.0
+            self.chooseCountryField.frame = CGRect(x: sideInset, y: y, width: fieldWidth, height: fieldHeight)
+            y += fieldHeight + 20.0
             let ageSliderHeight: CGFloat = 60.0
-            
-            items.append(AuthorizationLayoutItem(node: self.ageSliderNode, size: CGSize(width: maximumWidth, height: ageSliderHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 20.0, maxValue: 20.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
+            self.ageSliderNode.frame = CGRect(x: 0, y: y, width: maximumWidth, height: ageSliderHeight)
         }
-        
+
         if typeOfRole == .model {
-            items.append(AuthorizationLayoutItem(node: self.nameAgency, size: CGSize(width: maximumWidth - sideInset * 2.0, height: fieldHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 10.0, maxValue: 10.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-            items.append(AuthorizationLayoutItem(node: self.chooseGenderField, size: CGSize(width: maximumWidth - sideInset * 2.0, height: fieldHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 12, maxValue: 12), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-            
-            items.append(AuthorizationLayoutItem(node: self.chooseCountryField, size: CGSize(width: maximumWidth - sideInset * 2.0, height: fieldHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 16.0, maxValue: 16.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-            items.append(AuthorizationLayoutItem(node: self.chooseAgencyField, size: CGSize(width: maximumWidth - sideInset * 2.0, height: fieldHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 16.0, maxValue: 16.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
-            
+            self.nameAgency.frame = CGRect(x: sideInset, y: y, width: fieldWidth, height: fieldHeight)
+            y += fieldHeight + 10.0
+            self.chooseGenderField.frame = CGRect(x: sideInset, y: y, width: fieldWidth, height: fieldHeight)
+            y += fieldHeight + 10.0
+            self.chooseCountryField.frame = CGRect(x: sideInset, y: y, width: fieldWidth, height: fieldHeight)
+            y += fieldHeight + 10.0
+            self.chooseAgencyField.frame = CGRect(x: sideInset, y: y, width: fieldWidth, height: fieldHeight)
+            y += fieldHeight + 20.0
             let ageSliderHeight: CGFloat = 60.0
-            
-            items.append(AuthorizationLayoutItem(node: self.ageSliderNode, size: CGSize(width: maximumWidth, height: ageSliderHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 20.0, maxValue: 20.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
+            self.ageSliderNode.frame = CGRect(x: 0, y: y, width: maximumWidth, height: ageSliderHeight)
         }
-        
-        items.append(AuthorizationLayoutItem(node: self.websiteField, size: CGSize(width: maximumWidth - sideInset * 2.0, height: fieldHeight), spacingBefore: AuthorizationLayoutItemSpacing(weight: 16.0, maxValue: 16.0), spacingAfter: AuthorizationLayoutItemSpacing(weight: 0.0, maxValue: 0.0)))
 
-        let buttonWidth = (maximumWidth - 48.0 - 10.0) / 2.0
+        // Buttons
         let buttonHeight: CGFloat = 50.0
-        let bottomInset: CGFloat = 24.0
+        let buttonWidth = (fieldWidth - 10.0) / 2.0
+        let buttonY = layout.size.height - insets.bottom - buttonHeight - 24.0
 
-        let saveButtonFrame = CGRect(
-            x: floorToScreenPixels((layout.size.width - maximumWidth + 48.0) / 2.0) + buttonWidth + 10.0,
-            y: layout.size.height - insets.bottom - buttonHeight - bottomInset,
-            width: buttonWidth,
-            height: buttonHeight
-        )
-        transition.updateFrame(node: self.saveNode, frame: saveButtonFrame)
-
-        let backButtonFrame = CGRect(
-            x: floorToScreenPixels((layout.size.width - maximumWidth + 48.0) / 2.0),
-            y: layout.size.height - insets.bottom - buttonHeight - bottomInset,
-            width: buttonWidth,
-            height: buttonHeight
-        )
-        transition.updateFrame(node: self.backNode, frame: backButtonFrame)
-
-        let _ = layoutAuthorizationItems(bounds: CGRect(origin: CGPoint(x: 0.0, y: insets.top), size: CGSize(width: layout.size.width, height: layout.size.height - insets.top - insets.bottom - additionalBottomInset)), items: items, transition: transition, failIfDoesNotFit: false)
+        self.backNode.frame = CGRect(x: sideInset, y: buttonY, width: buttonWidth, height: buttonHeight)
+        self.saveNode.frame = CGRect(x: sideInset + buttonWidth + 10.0, y: buttonY, width: buttonWidth, height: buttonHeight)
     }
     
     func activateInput() {

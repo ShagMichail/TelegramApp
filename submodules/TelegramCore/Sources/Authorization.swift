@@ -15,7 +15,7 @@ public enum AuthorizationCodeRequestError {
     case appOutdated
 }
 
-func switchToAuthorizedAccount(transaction: AccountManagerModifier<TelegramAccountManagerTypes>, account: UnauthorizedAccount, isSupportUser: Bool) {
+public func switchToAuthorizedAccount(transaction: AccountManagerModifier<TelegramAccountManagerTypes>, account: UnauthorizedAccount, isSupportUser: Bool) {
     let nextSortOrder = (transaction.getRecords().map({ record -> Int32 in
         for attribute in record.attributes {
             if case let .sortOrder(sortOrder) = attribute {
@@ -36,6 +36,28 @@ func switchToAuthorizedAccount(transaction: AccountManagerModifier<TelegramAccou
     })
     transaction.setCurrentId(account.id)
     transaction.removeAuth()
+}
+
+// DIVO: bypass server sign-up, authorize locally with a dummy peerId
+public func divoCompleteAuthorization(accountManager: AccountManager<TelegramAccountManagerTypes>, account: UnauthorizedAccount) -> Signal<Never, NoError> {
+    let dummyPeerId = PeerId(namespace: Namespaces.Peer.CloudUser, id: PeerId.Id._internalFromInt64Value(1))
+    let authorizedState = AuthorizedAccountState(
+        isTestingEnvironment: account.testingEnvironment,
+        masterDatacenterId: account.masterDatacenterId,
+        peerId: dummyPeerId,
+        state: nil,
+        invalidatedChannels: []
+    )
+    // Postbox first: new Account reads AuthorizedAccountState when AccountManager creates it
+    return account.postbox.transaction { transaction -> Void in
+        transaction.setState(authorizedState)
+    }
+    |> mapToSignal { _ -> Signal<Never, NoError> in
+        return accountManager.transaction { transaction -> Void in
+            switchToAuthorizedAccount(transaction: transaction, account: account, isSupportUser: false)
+        }
+        |> ignoreValues
+    }
 }
 
 private struct Regex {
