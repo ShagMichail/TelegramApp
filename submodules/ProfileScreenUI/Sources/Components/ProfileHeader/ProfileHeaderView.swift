@@ -246,9 +246,17 @@ class ProfileHeaderView: UIView {
     
     func configure(with viewModel: UserProfileViewModel) {
         let text = viewModel.name.uppercased()
+        let paragraphStyle = NSMutableParagraphStyle()
+        let lineHeight = Font.helveticaNeue(34).lineHeight * 0.95
+        paragraphStyle.minimumLineHeight = lineHeight
+        paragraphStyle.maximumLineHeight = lineHeight
+        paragraphStyle.alignment = .left
         let attributes: [NSAttributedString.Key: Any] = [
             .font: Font.helveticaNeue(34),
             .foregroundColor: UIColor.white,
+            .kern: 0.5,
+            .paragraphStyle: paragraphStyle,
+            .baselineOffset: -2.0
         ]
         nameLabel.attributedText = NSAttributedString(string: text, attributes: attributes)
         tagLabel.text = viewModel.jobTitle
