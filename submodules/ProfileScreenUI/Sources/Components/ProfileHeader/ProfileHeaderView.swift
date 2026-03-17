@@ -74,6 +74,35 @@ class ProfileHeaderView: UIView {
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
+
+    /// В обычном `.scaleAspectFill` кроп центрируется. Для портретных фото это часто «съедает» верх (голову).
+    /// Поэтому для аватарки мы делаем квадратный кроп с приоритетом верхней части.
+    private func applyAvatarContentsRect(for image: UIImage?) {
+        guard let image, let cgImage = image.cgImage else {
+            avatarImageView.layer.contentsRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+            return
+        }
+
+        let width = CGFloat(cgImage.width)
+        let height = CGFloat(cgImage.height)
+        guard width > 0, height > 0 else {
+            avatarImageView.layer.contentsRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+            return
+        }
+
+        if height > width {
+            // Портрет: берём верхний квадрат.
+            let normalizedCropHeight = width / height
+            avatarImageView.layer.contentsRect = CGRect(x: 0.0, y: 0.0, width: 1.0, height: normalizedCropHeight)
+        } else if width > height {
+            // Альбом: берём центральный квадрат по X.
+            let normalizedCropWidth = height / width
+            let x = (1.0 - normalizedCropWidth) / 2.0
+            avatarImageView.layer.contentsRect = CGRect(x: x, y: 0.0, width: normalizedCropWidth, height: 1.0)
+        } else {
+            avatarImageView.layer.contentsRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+        }
+    }
     
     private let avatarSpinner: UIActivityIndicatorView = {
         let spinner = UIActivityIndicatorView(style: .large)
@@ -273,7 +302,14 @@ class ProfileHeaderView: UIView {
         onlineStatusView.isHidden = !viewModel.isOnline
         crownIconView.isHidden = !viewModel.isPremium
         
+        // Важно: в текущей архитектуре аватар может приезжать отдельно через `changeAvatar(with:)`.
+        // В `configure` часто передают `avatarImage: nil`, и если здесь сбрасывать contentsRect,
+        // то после повторного открытия экрана можно снова получить «центральный» кроп и обрезание головы.
+        // Поэтому:
+        // - если image есть -> выставляем и применяем кроп
+        // - если image нет -> НЕ трогаем contentsRect (оставляем то, что было выставлено в changeAvatar)
         if let image = viewModel.avatarImage {
+            applyAvatarContentsRect(for: image)
             avatarImageView.image = image
         }
     }
@@ -281,8 +317,10 @@ class ProfileHeaderView: UIView {
     func changeAvatar(with image: UIImage?) {
         if let image = image {
             avatarImageView.image = image
+            applyAvatarContentsRect(for: image)
         } else {
             avatarImageView.image = UIImage(systemName: "person.crop.circle.fill")
+            applyAvatarContentsRect(for: nil)
         }
     }
     
