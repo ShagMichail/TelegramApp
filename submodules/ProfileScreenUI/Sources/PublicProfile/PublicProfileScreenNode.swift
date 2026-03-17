@@ -24,6 +24,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private var navigationBarTitleView: ProfileNavigationBarTitleView?
     private var navigationBarTitleHeightConstraint: NSLayoutConstraint!
     
+    // Управление моментом, когда начинаем анимировать title в навбаре
+    private var titleVisibilityActivated = false
+    
     private var headerHeightConstraint: NSLayoutConstraint!
     private var socialHeightConstraint: NSLayoutConstraint!
     private let iconPlaceholder = "HeartActionIcon"
@@ -130,6 +133,15 @@ final class PublicProfileScreenNode: ASDisplayNode {
         button.isHidden = true
         return button
     }()
+
+    private enum ActionViewTags {
+        static let dmIcon = 9_101
+        static let dmLabel = 9_102
+
+        static let counterIcon = 9_201
+        static let counterCountLabel = 9_202
+        static let counterNameLabel = 9_203
+    }
     
     private let likesView: UIControl = {
         let control = UIControl()
@@ -1058,46 +1070,44 @@ final class PublicProfileScreenNode: ASDisplayNode {
     // Убираем шиммеры, после загрузки
     private func stopShimmers() {
         guard profileHeaderView.isHidden else { return }
-        
-        navigationBarTitleView?.alpha = 0
-        // если сделать тут, то из-за стека будет пролагивание вниз
-        profileHeaderView.isHidden = false
-        profileHeaderView.alpha = 0
-        
-        counterActionsStack.isHidden = false
-        counterActionsStack.alpha = 0
-        
-        profileInfoView.isHidden = false
-        profileInfoView.alpha = 0
-        
-        socialMediaStack.isHidden = false
-        socialMediaStack.alpha = 0
-        
-        currentAgencyView.isHidden = false
-        currentAgencyView.alpha = 0
-        
-        UIView.animate(withDuration: 0.3, delay: 0.1, options: .curveEaseInOut, animations: {
-            self.profileHeaderShimmerView.alpha = 0
-            self.actionsShimmerView.alpha = 0
-            self.profileInfoShimmerView.alpha = 0
-            self.socialShimmerView.alpha = 0
-            self.currentAgencyShimmerView.alpha = 0
-            
-            self.profileHeaderView.alpha = 1
-            self.profileHeaderView.isHidden = false
-            self.counterActionsStack.alpha = 1
-            self.profileInfoView.alpha = 1
-            self.socialMediaStack.alpha = 1
-            self.currentAgencyView.alpha = 1
-            
-        }) { (completed) in
-            if completed {
-                self.profileHeaderShimmerView.isHidden = true
-                self.actionsShimmerView.isHidden = true
-                self.profileInfoShimmerView.isHidden = true
-                self.socialShimmerView.isHidden = true
-                self.currentAgencyShimmerView.isHidden = true
-            }
+
+        // Важно: переключение шиммеров на контент должно быть без каких-либо анимаций,
+        // иначе некоторые блоки (например Current Agency) визуально «дергаются».
+        UIView.performWithoutAnimation {
+            // Полностью отключаем все implicit animations
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            CATransaction.setAnimationDuration(0.0)
+            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
+
+            // Мгновенно переключаем шиммеры на контент
+            profileHeaderShimmerView.isHidden = true
+            profileHeaderView.alpha = 1.0
+            profileHeaderView.isHidden = false  // Убедимся, что view виден
+
+            actionsShimmerView.isHidden = true
+            counterActionsStack.alpha = 1.0
+            counterActionsStack.isHidden = false
+
+            profileInfoShimmerView.isHidden = true
+            profileInfoView.alpha = 1.0
+            profileInfoView.isHidden = false
+
+            socialShimmerView.isHidden = true
+            socialMediaStack.alpha = 1.0
+            socialMediaStack.isHidden = false
+
+            currentAgencyShimmerView.isHidden = true
+            currentAgencyView.alpha = 1.0
+            currentAgencyView.isHidden = false
+
+            CATransaction.commit()
+
+            // Принудительно обновляем layout
+            self.contentViewStack.setNeedsLayout()
+            self.contentViewStack.layoutIfNeeded()
+            self.view.setNeedsLayout()
+            self.view.layoutIfNeeded()
         }
     }
     
@@ -1147,14 +1157,22 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     // Настройка кнопки чата/загрузки фотографии
     private func setupDmButtonContent() {
-        dmButton.subviews.forEach { $0.removeFromSuperview() }
-        
         var iconImageName = "Chat/Context Menu/MessageBubble"
         var labelText = "Send DM"
         if model.isMyProfile {
             iconImageName = "Avatar/AddAvatarIconLarge"
             labelText = "Upload your photos"
         }
+
+        // Важно: не пересоздаем subviews каждый раз (иначе UI заметно дергается при обновлениях)
+        if let iconImageView = dmButton.viewWithTag(ActionViewTags.dmIcon) as? UIImageView,
+           let label = dmButton.viewWithTag(ActionViewTags.dmLabel) as? UILabel {
+            iconImageView.image = UIImage(bundleImageName: iconImageName)
+            label.text = labelText
+            return
+        }
+
+        dmButton.subviews.forEach { $0.removeFromSuperview() }
         
         let iconImageView: UIImageView = {
             let imageView = UIImageView()
@@ -1162,6 +1180,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             imageView.tintColor = .white
             imageView.contentMode = .scaleAspectFit
             imageView.translatesAutoresizingMaskIntoConstraints = false
+            imageView.tag = ActionViewTags.dmIcon
             return imageView
         }()
         
@@ -1171,6 +1190,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             label.textColor = .white
             label.font = Font.helveticaNeue(13)
             label.translatesAutoresizingMaskIntoConstraints = false
+            label.tag = ActionViewTags.dmLabel
             return label
         }()
         
@@ -1196,6 +1216,17 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     // Создание кнопок счетчиков (лайки, просмотры, сохраненки)
     private func setupCounterView(_ container: UIControl, count: String, name: String, iconName: String) {
+        // Важно: не пересоздаем subviews/constraints каждый раз.
+        // Иначе при повторных updateWithUserDetail / refresh будет заметный «рывок».
+        if let iconImageView = container.viewWithTag(ActionViewTags.counterIcon) as? UIImageView,
+           let countLabel = container.viewWithTag(ActionViewTags.counterCountLabel) as? UILabel,
+           let nameLabel = container.viewWithTag(ActionViewTags.counterNameLabel) as? UILabel {
+            iconImageView.image = UIImage(bundleImageName: iconName)
+            countLabel.text = count
+            nameLabel.text = name
+            return
+        }
+
         container.subviews.forEach { $0.removeFromSuperview() }
         
         let icon: UIImageView = {
@@ -1206,6 +1237,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             imageView.translatesAutoresizingMaskIntoConstraints = false
             imageView.widthAnchor.constraint(equalToConstant: 20).isActive = true
             imageView.heightAnchor.constraint(equalToConstant: 20).isActive = true
+            imageView.tag = ActionViewTags.counterIcon
             return imageView
         }()
         
@@ -1214,6 +1246,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             label.text = count
             label.font = UIFont.boldSystemFont(ofSize: 14)
             label.textColor = .white
+            label.tag = ActionViewTags.counterCountLabel
             return label
         }()
         
@@ -1222,6 +1255,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             label.text = name
             label.font = UIFont.systemFont(ofSize: 10)
             label.textColor = .white
+            label.tag = ActionViewTags.counterNameLabel
             return label
         }()
         
@@ -1466,21 +1500,42 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     // Первоначальная настройка титула NavigationBar
     private func setupNavigationBarTitle(name: String, info: String? = nil) {
-        let titleView = ProfileNavigationBarTitleView()
-        
-        titleView.configure(name: name, info: info)
-        
-        self.navigationBarTitleView = titleView
-        
-        if let controller = self.controller {
-            controller.navigationItem.titleView = titleView
+        // Проверяем, не создаем ли мы titleView повторно
+        if let existingTitleView = self.navigationBarTitleView {
+            existingTitleView.configure(name: name, info: info)
+        } else {
+            let titleView = ProfileNavigationBarTitleView()
+            
+            titleView.configure(name: name, info: info)
+            
+            self.navigationBarTitleView = titleView
+            
+            if let controller = self.controller {
+                controller.navigationItem.titleView = titleView
+            }
         }
+
+        // Важно: после загрузки titleView НЕ должен появляться мгновенно.
+        // Делаем состояние консистентным сразу после конфигурации.
+        if !titleVisibilityActivated {
+            navigationBarTitleView?.alpha = 0.0
+        }
+        updateNavigationBarTitleVisibility()
     }
     
     // Обновление титула NavigationBar
     private func updateNavigationBarTitleVisibility() {
         guard let titleView = navigationBarTitleView,
               let (_, navigationBarHeight) = self.containerLayout else { return }
+
+        // Пока мы не активировали механику появления заголовка (после загрузки данных),
+        // держим его скрытым — он должен появляться только при скролле.
+        guard titleVisibilityActivated else {
+            if titleView.alpha != 0.0 {
+                titleView.alpha = 0.0
+            }
+            return
+        }
         
         let offsetY = scrollView.contentOffset.y
         
@@ -1502,6 +1557,19 @@ final class PublicProfileScreenNode: ASDisplayNode {
         if titleView.alpha != alpha {
             titleView.alpha = alpha
         }
+    }
+    
+    // Активация анимации заголовка навбара
+    private func activateTitleVisibility() {
+        guard !titleVisibilityActivated else { return }
+        titleVisibilityActivated = true
+        
+        // Принудительно обновляем layout, чтобы анимация заголовка заработала
+        self.setNeedsLayout()
+        self.layoutIfNeeded()
+
+        // И сразу же пересчитываем видимость заголовка для текущего offset.
+        updateNavigationBarTitleVisibility()
     }
     
     
@@ -1563,17 +1631,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
             self.modelRole = "agency_employee"
             setupNavigationBarTitle(name: detail.agency?.title ?? "No name")
             
-            profileHeaderView.configure(with: UserProfileViewModel(
-                name: detail.agency?.title ?? "No name",
-                age: nil,
-                location: detail.agency?.address?.city?.name ?? "",
-                countryFlag: Self.flag(for: detail.agency?.address?.city?.countryCode),
-                jobTitle: detail.role?.lowercased() ?? "model",
-                avatarImage: nil,
-                isPremium: true,
-                isOnline: true
-            ))
-            
             if let photoURLString = detail.agency?.photo?.fullUrl, let photoURL = CDNURLHelper.convertToCDNURL(photoURLString) {
                 headerImageView.loadImage(from: photoURL)
             }
@@ -1589,16 +1646,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
             self.modelRole = "model"
             let age = detail.birthday.flatMap { calculateAge(from: $0) } ?? 0
             setupNavigationBarTitle(name: detail.fullName ?? "No name", info: "\(age) y.o • \(detail.city?.name ?? "")")
-            profileHeaderView.configure(with: UserProfileViewModel(
-                name: detail.fullName ?? "No name",
-                age: age,
-                location: detail.city?.name ?? "",
-                countryFlag: Self.flag(for: detail.city?.countryCode),
-                jobTitle: detail.role ?? "model",
-                avatarImage: nil,
-                isPremium: true,
-                isOnline: true
-            ))
             
             if let photoURLString = detail.photo?.fullUrl, let photoURL = CDNURLHelper.convertToCDNURL(photoURLString) {
                 headerImageView.loadImage(from: photoURL)
@@ -1632,9 +1679,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
         }
         
         let stats = detail.statistic
-        setupCounterView(likesView, count: "\(stats?.followersCount ?? 0)", name: "Like", iconName: "Instant View/Favorite")
-        setupCounterView(viewsView, count: "\(stats?.viewsCount ?? 0)", name: "Viewed", iconName: "Instant View/Visibility")
-        setupCounterView(savesView, count: "\(stats?.followingCount ?? 0)", name: "Save", iconName: "Instant View/Bookmark")
+        // Обновляем экшен-блок без пересоздания subviews, чтобы не было «дерганья» после загрузки
+        UIView.performWithoutAnimation {
+            setupCounterView(likesView, count: "\(stats?.followersCount ?? 0)", name: "Like", iconName: "Instant View/Favorite")
+            setupCounterView(viewsView, count: "\(stats?.viewsCount ?? 0)", name: "Viewed", iconName: "Instant View/Visibility")
+            setupCounterView(savesView, count: "\(stats?.followingCount ?? 0)", name: "Save", iconName: "Instant View/Bookmark")
+            self.counterActionsContainer.layoutIfNeeded()
+        }
         // что такое Save в модели?
         
 //        let socialIcons = ["Models/instaIcon", "Models/TikTokIcon", "Models/youtubeIcon", "Models/webIcon"]
@@ -1656,6 +1707,39 @@ final class PublicProfileScreenNode: ASDisplayNode {
         populateSocialMedia(handles: handles, icons: socialIcons)
         
         stopShimmers()
+        activateTitleVisibility()
+        
+        // Теперь устанавливаем информацию профиля после того, как шиммеры скрыты
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            if detail.role == "agency_employee" {
+                let viewModel = UserProfileViewModel(
+                    name: detail.agency?.title ?? "No name",
+                    age: nil,
+                    location: detail.agency?.address?.city?.name ?? "",
+                    countryFlag: Self.flag(for: detail.agency?.address?.city?.countryCode),
+                    jobTitle: detail.role?.lowercased() ?? "model",
+                    avatarImage: nil,
+                    isPremium: true,
+                    isOnline: true
+                )
+                self.profileHeaderView.configure(with: viewModel)
+            } else {
+                let age = detail.birthday.flatMap { self.calculateAge(from: $0) } ?? 0
+                let viewModel = UserProfileViewModel(
+                    name: detail.fullName ?? "No name",
+                    age: age,
+                    location: detail.city?.name ?? "",
+                    countryFlag: Self.flag(for: detail.city?.countryCode),
+                    jobTitle: detail.role ?? "model",
+                    avatarImage: nil,
+                    isPremium: true,
+                    isOnline: true
+                )
+                self.profileHeaderView.configure(with: viewModel)
+            }
+        }
     }
     
     // Добавление фотографий в галерею пагинацией
