@@ -15,6 +15,12 @@ import MapResourceToAvatarSizes
 import ContextUI
 
 public final class PublicProfileScreenController: TelegramBaseController {
+
+    private func debugLog(_ message: String) {
+        #if DEBUG
+        Logger.shared.log("PublicProfile", message)
+        #endif
+    }
     
     private var controllerNode: PublicProfileScreenNode {
         return self.displayNode as! PublicProfileScreenNode
@@ -101,7 +107,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
     }
     
     @objc private func showEditMenuPressed() {
-        print("📝 Edit menu button pressed")
+        // debug: removed
         
         let items: [EditMenuViewController.MenuItem] = [
             .init(title: "Edit Profile", action: { [weak self] in
@@ -130,7 +136,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
     }
 
     private func navigateToEditProfile() {
-        print("Переход на Edit Profile")
+        // debug: removed
         let socialLinksController = EditProfileController(context: self.context, presentationData: self.presentationData, userDetailData: userDetailModel, updatePhoto: { [weak self] image in
             self?.controllerNode.currentPhoto = image
         })
@@ -138,18 +144,16 @@ public final class PublicProfileScreenController: TelegramBaseController {
     }
     
     private func navigateToChangeBackground() {
-        print("Переход на Change Background")
+        // debug: removed
         // Открытие пикера или контроллера
     }
     
     private func navigateToEditSocialLinks() {
-        // print("Переход на Social Links")
         let socialLinksController = EditSocialLinksController(context: self.context, presentationData: self.presentationData, userDetailData: userDetailModel)
         self.push(socialLinksController)
     }
     
     private func navigateToManageExperience() {
-        // print("Переход на Manage Work Experience")
         let historyController = WorkExperienceController(context: self.context, model: self.model)
         self.push(historyController)
     }
@@ -216,7 +220,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
                     }
                 }
             } catch {
-                print("[DivoAPI] user/\(userId) error: \(error)")
+                self.debugLog("[DivoAPI] user/\(userId) error: \(error)")
             }
         }
     }
@@ -237,7 +241,6 @@ public final class PublicProfileScreenController: TelegramBaseController {
 // Загрузка фотографий
 extension PublicProfileScreenController {
     func loadGalleryPage(userId: Int, offset: Int) {
-        print("📡 [GALLERY REQUEST] offset=\(offset), limit=6, userId=\(userId)")
         // Устанавливаем флаг загрузки перед запросом
         controllerNode.setGalleryLoading(true)
         
@@ -256,7 +259,6 @@ extension PublicProfileScreenController {
                     method: "POST",
                     body: body
                 )
-                print("📥 [GALLERY RESPONSE] items=\(response.data.items.count), pagination.offset=\(response.data.pagination.meta.currentOffset), pagination.total=\(response.data.pagination.meta.totalCount)")
                 await MainActor.run {
                     if !isMyProfile {
                         self.controllerNode.appendGalleryPhotos(response.data, isMyProfile: model.isMyProfile)
@@ -266,7 +268,7 @@ extension PublicProfileScreenController {
                     }
                 }
             } catch {
-                print("[DivoAPI] user/\(userId) error: \(error)")
+                self.debugLog("[DivoAPI] user/\(userId) error: \(error)")
                 // Сбрасываем флаг при ошибке
                 controllerNode.setGalleryLoading(false)
             }
@@ -277,7 +279,9 @@ extension PublicProfileScreenController {
 // Загрузка видео
 extension PublicProfileScreenController {
     func loadVideoGalleryPage(userId: Int, offset: Int) {
-        print("🎬 [VIDEO REQUEST] offset=\(offset), limit=6, userId=\(userId)")
+        // Важно: выставляем флаг загрузки синхронно ДО старта async Task.
+        // Иначе при быстром скролле может уйти второй запрос с тем же offset.
+        controllerNode.setVideoGalleryLoading(true)
         var body: GalleryListRequest
         if !isMyProfile {
             body = GalleryListRequest(offset: offset, limit: 6, userId: userId)
@@ -292,13 +296,12 @@ extension PublicProfileScreenController {
                     method: "POST",
                     body: body
                 )
-                print("📥 [VIDEO RESPONSE] items=\(response.data.items.count), offset=\(response.data.pagination.meta.currentOffset), total=\(response.data.pagination.meta.totalCount)")
                 
                 await MainActor.run {
                     if !isMyProfile {
                         self.controllerNode.appendVideoGalleryItems(
                             response.data.items,
-                            totalCount: response.data.pagination.meta.totalCount,
+                            pagination: response.data.pagination.meta,
                             isMyProfile: model.isMyProfile
                         )
                     } else {
@@ -306,14 +309,15 @@ extension PublicProfileScreenController {
                         // для тестов своего профиля
                         self.controllerNode.appendVideoGalleryItems(
                             response.data.items,
-                            totalCount: response.data.pagination.meta.totalCount,
+                            pagination: response.data.pagination.meta,
                             isMyProfile: isMyProfile
                         )
                     }
                 }
             } catch {
-                print("[DivoAPI] user-videos error: \(error)")
+                self.debugLog("[DivoAPI] user-videos error: \(error)")
                 await MainActor.run {
+                    controllerNode.videoGalleryRequestDidFail(offset: offset)
                     controllerNode.setVideoGalleryLoading(false)
                 }
             }
@@ -325,11 +329,11 @@ extension PublicProfileScreenController {
 extension PublicProfileScreenController {
     func loadTelegramChannels() {
         guard let userId = model.userId else {
-            print("❌ [CHANNELS] userId is nil")
+            debugLog("❌ [CHANNELS] userId is nil")
             return
         }
-        
-        print("📢 [CHANNELS] Starting load for userId: \(userId)")
+
+        debugLog("📢 [CHANNELS] Starting load for userId: \(userId)")
 
         let mockChannels: [ProfileChannelItem] = [
             ProfileChannelItem(
@@ -418,10 +422,10 @@ extension PublicProfileScreenController {
             )
         ]
         
-        print("📢 [CHANNELS] Created \(mockChannels.count) mock channels")
+        debugLog("📢 [CHANNELS] Created \(mockChannels.count) mock channels")
         
         DispatchQueue.main.async { [weak self] in
-            print("📢 [CHANNELS] Calling updateChannelsList with \(mockChannels.count) items")
+            self?.debugLog("📢 [CHANNELS] Calling updateChannelsList with \(mockChannels.count) items")
             self?.controllerNode.updateChannelsList(mockChannels)
         }
     }
@@ -431,11 +435,11 @@ extension PublicProfileScreenController {
 extension PublicProfileScreenController {
     func loadModels() {
         guard let userId = model.userId else {
-            print("❌ [MODELS] userId is nil")
+            debugLog("❌ [MODELS] userId is nil")
             return
         }
-        
-        print("📢 [MODELS] Starting load for userId: \(userId)")
+
+        debugLog("📢 [MODELS] Starting load for userId: \(userId)")
 
         let mockModels: [ModelItem] = [
             ModelItem(
@@ -512,10 +516,10 @@ extension PublicProfileScreenController {
             )
         ]
         
-        print("📢 [MODELS] Created \(mockModels.count) mock models")
+        debugLog("📢 [MODELS] Created \(mockModels.count) mock models")
         
         DispatchQueue.main.async { [weak self] in
-            print("📢 [MODELS] Calling updateModelsList with \(mockModels.count) items")
+            self?.debugLog("📢 [MODELS] Calling updateModelsList with \(mockModels.count) items")
             self?.controllerNode.updateModelsList(mockModels)
         }
     }
@@ -525,11 +529,11 @@ extension PublicProfileScreenController {
 extension PublicProfileScreenController {
     func loadEvents() {
         guard let userId = model.userId else {
-            print("❌ [EVENTS] userId is nil")
+            debugLog("❌ [EVENTS] userId is nil")
             return
         }
-        
-        print("📢 [EVENTS] Starting load for userId: \(userId)")
+
+        debugLog("📢 [EVENTS] Starting load for userId: \(userId)")
 
         let mockEvents: [EventItem] = [
             EventItem(
@@ -630,10 +634,10 @@ extension PublicProfileScreenController {
             )
         ]
         
-        print("📢 [EVENTS] Created \(mockEvents.count) mock events")
+        debugLog("📢 [EVENTS] Created \(mockEvents.count) mock events")
         
         DispatchQueue.main.async { [weak self] in
-            print("📢 [EVENTS] Calling updateEventsList with \(mockEvents.count) items")
+            self?.debugLog("📢 [EVENTS] Calling updateEventsList with \(mockEvents.count) items")
             self?.controllerNode.updateEventsList(mockEvents)
         }
     }
@@ -667,8 +671,8 @@ extension PublicProfileScreenController {
     
     private func loadInteractionData(type: InteractionListType, completion: @escaping ([InteractionUser]) -> Void) {
         guard let userId = model.userId else { return }
-        
-        print("📡 [INTERACTIONS] Requesting data for \(type.title), userId: \(userId)")
+
+        debugLog("📡 [INTERACTIONS] Requesting data for \(type.title), userId: \(userId)")
         
         // TODO: Здесь будет сетевой запрос. Например:
         // let path = (type == .likes) ? "/user/likes" : "/user/views"
@@ -688,7 +692,7 @@ extension PublicProfileScreenController {
                 InteractionUser(id: 7, name: "Haute Daily", role: "Agency", avatarUrl: nil, isPremium: false)
             ]
             
-            print("📥 [INTERACTIONS] Loaded \(mockData.count) users for \(type.title)")
+            self.debugLog("📥 [INTERACTIONS] Loaded \(mockData.count) users for \(type.title)")
             
             // Возвращаем данные в контроллер шторки на главный поток
             DispatchQueue.main.async {

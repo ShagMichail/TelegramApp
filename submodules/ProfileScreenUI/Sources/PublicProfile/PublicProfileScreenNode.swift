@@ -414,6 +414,11 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private var videoGalleryCurrentOffset: Int = 0
     private var videoGalleryIsLoading: Bool = false
     private var videoGalleryHasMore: Bool = true
+    /// Защита от повторного запроса одной и той же страницы (особенно offset=0)
+    private var videoGalleryRequestedOffsets: Set<Int> = []
+    /// Последний offset, который мы отправили в запросе. Нужен, чтобы корректно вычислять nextOffset
+    /// независимо от того, что означает `pagination.meta.currentOffset` (current vs next).
+    private var videoGalleryLastRequestedOffset: Int?
     
     private lazy var videoGalleryCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -1379,7 +1384,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.similarProfilesOffset = self.similarProfiles.count
         self.similarProfilesHasMore = self.similarProfiles.count < totalCount
         
-        print("👥 [SIMILAR] Загружено \(profiles.count) профилей. Всего: \(self.similarProfiles.count) из \(totalCount)")
+        // debug: removed
         
         if previousCount == 0 {
             similarProfilesCollectionView.reloadData()
@@ -1747,12 +1752,11 @@ final class PublicProfileScreenNode: ASDisplayNode {
         let newPhotos = photos.items
         let totalCount = photos.pagination.meta.totalCount
         let serverOffset = photos.pagination.meta.currentOffset
-        let serverLimit = photos.pagination.meta.limit
         
         if !galleryInitialized {
             self.galleryPhotos = []
             galleryInitialized = true
-            print("🧹 [PAGINATION] Cleared galleryPhotos array (first load)")
+            // debug: pagination logs removed
         }
         
         let previousCount = self.galleryPhotos.count
@@ -1762,10 +1766,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.galleryHasMore = self.galleryPhotos.count < totalCount
         self.galleryIsLoading = false
         
-        print("🖼️ [PAGINATION] Загружено \(newPhotos.count) фото")
-        print("  - Server: offset=\(serverOffset), limit=\(serverLimit), total=\(totalCount)")
-        print("  - Before: \(previousCount), After: \(self.galleryPhotos.count), Next offset: \(self.galleryCurrentOffset)")
-        print("  - HasMore: \(self.galleryHasMore)")
+        // debug: pagination logs removed
         
         if previousCount == 0 {
             let hasPhotos = !self.galleryPhotos.isEmpty
@@ -1825,15 +1826,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
         galleryIsLoading = false
         galleryHasMore = true
         galleryInitialized = false
-        print("🔄 [PAGINATION] Reset gallery pagination state")
+        // debug: removed
     }
     
     // Флаг загрузки галереи
     func setGalleryLoading(_ loading: Bool) {
         galleryIsLoading = loading
-        if loading {
-            print("⏳ [PAGINATION] Set galleryIsLoading = true")
-        }
+        // debug: removed
     }
     
     // Проверка, есть ли еще фотографии на бэке для загрузки в галереи
@@ -1864,6 +1863,12 @@ final class PublicProfileScreenNode: ASDisplayNode {
     // Загрузка видео галереи
     func loadVideoGallery() {
         guard let userId = model.userId else { return }
+
+        // Первый запрос всегда offset=0. Ставим флаг загрузки и фиксируем offset,
+        // чтобы быстрый скролл не инициировал второй параллельный запрос.
+        videoGalleryIsLoading = true
+        videoGalleryRequestedOffsets.insert(0)
+        videoGalleryLastRequestedOffset = 0
         
         if let controller = self.controller as? PublicProfileScreenController {
             controller.loadVideoGalleryPage(userId: userId, offset: 0)
@@ -1871,16 +1876,34 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     // Добавление элементов видео галереи из API
-    func appendVideoGalleryItems(_ items: [UserVideoItem], totalCount: Int, isMyProfile: Bool) {
+    func appendVideoGalleryItems(_ items: [UserVideoItem], pagination: Meta, isMyProfile: Bool) {
         let previousCount = videoGalleryItems.count
-        
+
         let validVideoExtensions: Set<String> = ["mp4", "mov", "avi", "mkv", "webm"]
-        
+        let validPreviewExtensions: Set<String> = ["jpg", "jpeg", "png", "webp", "heic"]
+
         let photoItems: [UserPhoto] = items.compactMap { item in
-            guard let videoFile = item.files.first,
-                  let ext = videoFile.fileExtension?.lowercased(),
-                  validVideoExtensions.contains(ext) else {
-                return nil
+            // Ищем именно видео-файл, а не "первый попавшийся".
+            let videoFile = item.files.first(where: { file in
+                guard let ext = file.fileExtension?.lowercased() else { return false }
+                return validVideoExtensions.contains(ext)
+            })
+
+            guard let videoFile else { return nil }
+
+            // Превью может быть отдельным файлом в item.files
+            let previewFile = item.files.first(where: { file in
+                guard let ext = file.fileExtension?.lowercased() else { return false }
+                return validPreviewExtensions.contains(ext)
+            })
+
+            let previewUserFile: UserFile? = previewFile.map {
+                UserFile(
+                    fileName: $0.fileName,
+                    fullUrl: $0.fullUrl,
+                    fileExtension: $0.fileExtension,
+                    fileUuid: $0.fileUuid
+                )
             }
 
             return UserPhoto(
@@ -1893,19 +1916,38 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 ),
                 likesCount: item.likesCount,
                 isLikedByUser: item.isLikedByUser,
-                preview: nil
+                preview: previewUserFile
             )
         }
-        
-        videoGalleryItems.append(contentsOf: photoItems)
-        
-        videoGalleryTotalCount = totalCount
-        videoGalleryCurrentOffset += items.count
-        
-        videoGalleryHasMore = videoGalleryCurrentOffset < totalCount
+
+        // 1) Дедуп входящих элементов (API иногда может вернуть пересекающиеся страницы,
+        // а также мы должны быть устойчивы к повторному запросу одного offset)
+        let existingIds = Set(videoGalleryItems.map { $0.id })
+        let uniquePhotoItems = photoItems.filter { !existingIds.contains($0.id) }
+
+        videoGalleryItems.append(contentsOf: uniquePhotoItems)
+
+        // 2) Offset: у API может быть два варианта:
+        // - currentOffset == offset из запроса (классический offset)
+        // - currentOffset == nextOffset (курсор-подобное поведение)
+        // Чтобы не гадать, ориентируемся на то, совпадает ли currentOffset с тем, что мы запрашивали.
+        videoGalleryTotalCount = pagination.totalCount
+        let nextOffset: Int
+        if let lastRequested = videoGalleryLastRequestedOffset, pagination.currentOffset == lastRequested {
+            // Классический offset: следующий = offset + количество элементов, которое вернул сервер.
+            // Используем items.count (а не uniquePhotoItems.count), чтобы pagination не ломалась
+            // из-за фильтрации по расширению / дедупликации.
+            nextOffset = pagination.currentOffset + items.count
+        } else {
+            // Если сервер уже вернул nextOffset — используем его напрямую.
+            nextOffset = pagination.currentOffset
+        }
+        videoGalleryCurrentOffset = nextOffset
+
+        videoGalleryHasMore = videoGalleryItems.count < pagination.totalCount
         videoGalleryIsLoading = false
-        
-        print("🎬 [VIDEO] Пришло с сервера: \(items.count), Из них видео: \(photoItems.count). Всего в UI: \(videoGalleryItems.count) из \(totalCount)")
+
+        // debug: pagination logs removed
                 
         if previousCount == 0 {
             let hasVideos = !self.videoGalleryItems.isEmpty
@@ -1922,22 +1964,22 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 self.updateAllCollectionViewHeights(layout: layout)
                 if self.currentTabIndex == 1 { self.updateCollectionsContainerHeight(animated: true) }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.checkAndLoadMoreVideoGallery()
-            }
-        } else if !photoItems.isEmpty {
-            let newIndices = (previousCount..<(previousCount + photoItems.count)).map { IndexPath(item: $0, section: 0) }
+            // Важно: не инициируем автоматическую цепочку подгрузки страниц здесь.
+            // Иначе при большом контенте можно быстро выкачать все страницы,
+            // что приводит к большому количеству ячеек/AVPlayer и фризам.
+        } else if !uniquePhotoItems.isEmpty {
+            let newIndices = (previousCount..<(previousCount + uniquePhotoItems.count)).map { IndexPath(item: $0, section: 0) }
             self.videoGalleryCollectionView.performBatchUpdates({
                 self.videoGalleryCollectionView.insertItems(at: newIndices)
                 if let layout = self.containerLayout?.0 {
                     self.updateAllCollectionViewHeights(layout: layout)
                     if self.currentTabIndex == 1 { self.updateCollectionsContainerHeight(animated: true) }
                 }
-            }, completion: { [weak self] _ in
-                self?.checkAndLoadMoreVideoGallery()
+            }, completion: { _ in
+                // Пагинацию триггерим только через основной scrollViewDidScroll threshold.
             })
         } else {
-            self.checkAndLoadMoreVideoGallery()
+            // Пагинацию триггерим только через основной scrollViewDidScroll threshold.
         }
     }
     
@@ -1960,29 +2002,30 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoGalleryCollectionView.layoutIfNeeded()
     }
     
-    // Проверка загрузки следующих видео
-    func checkAndLoadMoreVideoGallery() {
-        guard videoGalleryHasMore && !videoGalleryIsLoading else { return }
-        
-        videoGalleryCollectionView.layoutIfNeeded()
-        
-        let contentHeight = videoGalleryCollectionView.contentSize.height
-        let frameHeight = videoGalleryCollectionView.frame.size.height
-        
-        if contentHeight <= frameHeight {
-            loadNextVideoGalleryPage()
-        }
-    }
+    // NOTE: checkAndLoadMoreVideoGallery() intentionally removed.
     
     // Загрузка следующей страницы видео
     func loadNextVideoGalleryPage() {
         guard !videoGalleryIsLoading && videoGalleryHasMore, let userId = model.userId else { return }
-        
+
+        // Гейт от повторного запроса той же страницы.
+        // Это защищает от ситуаций, когда несколько scroll событий подряд вызывают пагинацию.
+        let offset = videoGalleryCurrentOffset
+        guard !videoGalleryRequestedOffsets.contains(offset) else { return }
+        videoGalleryRequestedOffsets.insert(offset)
+        videoGalleryLastRequestedOffset = offset
+
         videoGalleryIsLoading = true
         
         if let controller = self.controller as? PublicProfileScreenController {
-            controller.loadVideoGalleryPage(userId: userId, offset: videoGalleryCurrentOffset)
+            controller.loadVideoGalleryPage(userId: userId, offset: offset)
         }
+    }
+
+    /// Вызвать при ошибке запроса, чтобы разрешить повторную попытку загрузки этой страницы.
+    func videoGalleryRequestDidFail(offset: Int) {
+        videoGalleryIsLoading = false
+        videoGalleryRequestedOffsets.remove(offset)
     }
     
     // Сброс пагинации видео галереи
@@ -1992,15 +2035,15 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoGalleryCurrentOffset = 0
         videoGalleryIsLoading = false
         videoGalleryHasMore = true
-        print("🔄 [VIDEO] Reset video gallery pagination state")
+        videoGalleryRequestedOffsets.removeAll()
+        videoGalleryLastRequestedOffset = nil
+        // debug: pagination logs removed
     }
     
     // Флаг загрузки галереи видео
     func setVideoGalleryLoading(_ loading: Bool) {
         videoGalleryIsLoading = loading
-        if loading {
-            print("⏳ [PAGINATION] Set videoGalleryIsLoading = true")
-        }
+        // debug: removed
     }
     
     
@@ -2040,7 +2083,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         channelGalleryCollectionView.heightAnchor.constraint(equalToConstant: max(channelsHeight, 1.0)).isActive = true
         channelGalleryCollectionView.layoutIfNeeded()
         
-        print("📏 [CHANNELS] Updated height to \(channelsHeight) for \(channelGalleryItems.count) items")
+        // debug: removed
     }
     
     
@@ -2078,7 +2121,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         modelGalleryCollectionView.heightAnchor.constraint(equalToConstant: max(modelsHeight, 1.0)).isActive = true
         modelGalleryCollectionView.layoutIfNeeded()
         
-        print("📏 [MODELS] Updated height to \(modelsHeight) for \(modelGalleryItems.count) items")
+        // debug: removed
     }
     
     
@@ -2116,7 +2159,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         eventGalleryCollectionView.heightAnchor.constraint(equalToConstant: max(eventsHeight, 1.0)).isActive = true
         eventGalleryCollectionView.layoutIfNeeded()
         
-        print("📏 [EVENTS] Updated height to \(eventsHeight) for \(eventGalleryItems.count) items")
+        // debug: removed
     }
     
     
@@ -2319,8 +2362,8 @@ extension PublicProfileScreenNode: UICollectionViewDataSource {
 extension PublicProfileScreenNode: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         if collectionView == similarProfilesCollectionView {
-            let profile = similarProfiles[indexPath.item]
-            print("👤 Selected similar profile: \(profile.name)")
+            _ = similarProfiles[indexPath.item]
+            // debug: removed
             // TODO: Открыть профиль выбранного пользователя
             // handleSimilarProfileTap(profile)
         }
@@ -2329,6 +2372,8 @@ extension PublicProfileScreenNode: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         if collectionView == videoGalleryCollectionView,
            let videoCell = cell as? VideoGalleryCell {
+            // Тяжёлый fallback (first-frame) запускаем только для реально видимых ячеек.
+            videoCell.willDisplay()
             videoCell.play()
         }
     }
@@ -2336,7 +2381,7 @@ extension PublicProfileScreenNode: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         if collectionView == videoGalleryCollectionView,
            let videoCell = cell as? VideoGalleryCell {
-            videoCell.stop()
+            videoCell.stopAndReleasePlayer()
         }
     }
 }
@@ -2509,7 +2554,7 @@ extension PublicProfileScreenNode: ProfileSegmentedBarDelegate {
     
     func segmentedBar(_ segmentedBar: ProfileSegmentedBar, didSelectIndex index: Int) {
         guard index != currentTabIndex else { return }
-        print("📍 Swiping to index: \(index)")
+        // debug: removed
         
         let isSlidingLeft = index > currentTabIndex
         let screenWidth = self.view.bounds.width
