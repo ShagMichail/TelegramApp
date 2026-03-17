@@ -207,6 +207,7 @@ final class EditProfileNode: ASDisplayNode {
     var currentPhoto: UIImage? = nil {
         didSet {
             avatarImageView.image = currentPhoto
+            avatarImageView.applyAvatarTopCropIfNeeded(image: currentPhoto)
         }
     }
     
@@ -253,6 +254,7 @@ final class EditProfileNode: ASDisplayNode {
                 ImageLoader.shared.load(url: avatarURL) { [weak self] image in
                     if let image = image {
                         self?.avatarImageView.image = image
+                        self?.avatarImageView.applyAvatarTopCropIfNeeded(image: image)
                     }
                 }
             }

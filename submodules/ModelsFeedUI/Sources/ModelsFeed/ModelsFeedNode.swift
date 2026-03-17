@@ -384,10 +384,6 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
                 if isPaginating && indexPath.item == cards.count {
                     return flowLayout.itemSize
                 }
-                let card = cards[indexPath.item]
-                if card.previewImagesName.isEmpty && card.previewImageURLs.isEmpty {
-                    return CGSize(width: flowLayout.itemSize.width, height: 360)
-                }
                 return flowLayout.itemSize
             }
         }

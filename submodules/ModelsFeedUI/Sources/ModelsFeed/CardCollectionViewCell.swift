@@ -316,8 +316,9 @@ final class CardCollectionViewCell: UICollectionViewCell {
 
         let previewHeight: CGFloat = 100
         if hasPreviews {
+            let previewY = bounds.height - sidePadding - previewHeight
             previewScrollView.frame = CGRect(x: sidePadding,
-                                             y: bounds.height - sidePadding - previewHeight,
+                                             y: previewY,
                                              width: bounds.width - 2 * sidePadding,
                                              height: previewHeight)
             let imageSize: CGFloat = 100
@@ -328,7 +329,8 @@ final class CardCollectionViewCell: UICollectionViewCell {
             previewScrollView.contentSize = CGSize(width: stackWidth, height: previewHeight)
         } else {
             previewScrollView.frame = .zero
-            previewStackView.frame = .zero
+            previewStackView.frame = CGRect(x: 0, y: 0, width: 0, height: 0)
+            previewScrollView.contentSize = .zero
         }
 
         let actionsY: CGFloat
@@ -369,7 +371,7 @@ final class CardCollectionViewCell: UICollectionViewCell {
         avatarImageView.layer.cornerRadius = avatarSize / 2
 
         let textX = avatarImageView.frame.maxX + 10
-        let maxTextRight = secondaryActionsBackgroundView.frame.minX - 10
+        let maxTextRight = reactionsStackView.frame.minX - 10
         let textWidth = max(0, maxTextRight - textX)
         let fittingSize = nameLabel.sizeThatFits(CGSize(width: textWidth, height: .greatestFiniteMagnitude))
         let textHeight = min(fittingSize.height, 82)
@@ -400,9 +402,13 @@ final class CardCollectionViewCell: UICollectionViewCell {
 
         if let url = model.avatarImageURL {
             avatarImageView.backgroundColor = placeholderColor
-            avatarImageView.loadImage(from: url)
+            avatarImageView.loadImage(from: url) { [weak self] image in
+                guard let self else { return }
+                self.avatarImageView.applyAvatarTopCropIfNeeded(image: image)
+            }
         } else {
             avatarImageView.image = UIImage(named: model.avatarImageName)
+            avatarImageView.applyAvatarTopCropIfNeeded(image: avatarImageView.image)
         }
 
         avatarImageView.backgroundColor = .white
@@ -443,6 +449,7 @@ final class CardCollectionViewCell: UICollectionViewCell {
         mainImageView.image = nil
         avatarImageView.cancelImageLoad()
         avatarImageView.image = nil
+        avatarImageView.layer.contentsRect = CGRect(x: 0, y: 0, width: 1, height: 1)
         previewStackView.arrangedSubviews.forEach {
             ($0 as? UIImageView)?.cancelImageLoad()
             $0.removeFromSuperview()

@@ -446,73 +446,85 @@ extension PublicProfileScreenController {
                 name: "Vogue",
                 role: "Model",
                 isPremium: true,
-                customAvatarURL: nil
+                customAvatarURL: nil,
+                localAvatarName: "Models/image5"
             ),
             ModelItem(
                 name: "Vogue",
                 role: "Model",
                 isPremium: true,
-                customAvatarURL: nil
+                customAvatarURL: nil,
+                localAvatarName: "Models/image5"
             ),
             ModelItem(
                 name: "Vogue",
                 role: "Model",
                 isPremium: false,
-                customAvatarURL: nil
+                customAvatarURL: nil,
+                localAvatarName: "Models/image5"
             ),
             ModelItem(
                 name: "Vogue",
                 role: "Model",
                 isPremium: false,
-                customAvatarURL: nil
+                customAvatarURL: nil,
+                localAvatarName: "Models/image5"
             ),
             ModelItem(
                 name: "Vogue",
                 role: "Model",
                 isPremium: false,
-                customAvatarURL: nil
+                customAvatarURL: nil,
+                localAvatarName: "Models/image5"
             ),
             ModelItem(
                 name: "Vogue",
                 role: "Model",
                 isPremium: true,
-                customAvatarURL: nil
+                customAvatarURL: nil,
+                localAvatarName: "Models/image5"
             ),
             ModelItem(
                 name: "Vogue",
                 role: "Model",
                 isPremium: true,
-                customAvatarURL: nil
+                customAvatarURL: nil,
+                localAvatarName: "Models/image5"
             ),
             ModelItem(
                 name: "Vogue",
                 role: "Model",
                 isPremium: true,
-                customAvatarURL: nil
+                customAvatarURL: nil,
+                localAvatarName: "Models/image5"
             ),
             ModelItem(
                 name: "Vogue",
                 role: "Model",
                 isPremium: false,
-                customAvatarURL: nil
+                customAvatarURL: nil,
+                localAvatarName: "Models/image5"
             ),
             ModelItem(
                 name: "Vogue",
                 role: "Model",
                 isPremium: false,
-                customAvatarURL: nil
+                customAvatarURL: nil,
+                localAvatarName: "Models/image5"
             ),
             ModelItem(
                 name: "Vogue",
                 role: "Model",
                 isPremium: true,
-                customAvatarURL: nil
+                customAvatarURL: nil,
+                localAvatarName: "Models/image5"
             ),
             ModelItem(
                 name: "Vogue",
                 role: "Model",
                 isPremium: false,
-                customAvatarURL: nil
+                customAvatarURL: nil,
+                localAvatarName: "Models/image5"
             )
         ]
         
