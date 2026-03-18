@@ -51,7 +51,7 @@ final class DivoTextField: ASDisplayNode, UITextFieldDelegate {
         
         let prefixAttr: [NSAttributedString.Key: Any] = [
             .font: Font.bold(16.0),
-            .foregroundColor: UIColor(white: 1.0, alpha: 0.4)
+            .foregroundColor: UIColor(white: 1.0, alpha: 1.0)
         ]
         fullString.append(NSAttributedString(string: prefix, attributes: prefixAttr))
         

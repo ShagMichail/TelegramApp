@@ -48,7 +48,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
     private var containerLayout: (ContainerViewLayout, CGFloat)?
     
     // для разработки
-    private var isMyProfile: Bool = false
+    private var isMyProfile: Bool = true
     
     public init(context: AccountContext, model: ProfileModel, peer: Peer? = nil) {
         self.context = context
@@ -137,10 +137,10 @@ public final class PublicProfileScreenController: TelegramBaseController {
 
     private func navigateToEditProfile() {
         // debug: removed
-        let socialLinksController = EditProfileController(context: self.context, presentationData: self.presentationData, userDetailData: userDetailModel, updatePhoto: { [weak self] image in
+        let editProfileController = EditProfileController(context: self.context, presentationData: self.presentationData, userDetailData: userDetailModel, updatePhoto: { [weak self] image in
             self?.controllerNode.currentPhoto = image
         })
-        self.push(socialLinksController)
+        self.push(editProfileController)
     }
     
     private func navigateToChangeBackground() {
@@ -149,7 +149,22 @@ public final class PublicProfileScreenController: TelegramBaseController {
     }
     
     private func navigateToEditSocialLinks() {
-        let socialLinksController = EditSocialLinksController(context: self.context, presentationData: self.presentationData, userDetailData: userDetailModel)
+        
+        let tiktok = userDetailModel?.model?.tiktokUrl ?? ""
+        let youtube = userDetailModel?.model?.youtubeUrl ?? ""
+        let telegram = userDetailModel?.model?.telegramUrl ?? ""
+        let instagram = userDetailModel?.model?.instagramUrl ?? ""
+        let website = userDetailModel?.model?.websiteUrl ?? ""
+        
+        let linksData = LinksData(
+            tiktokUrl: self.controllerNode.extractHandle(from: tiktok),
+            youtubeUrl: self.controllerNode.extractHandle(from: youtube),
+            telegramUrl: self.controllerNode.extractHandle(from: telegram),
+            instagramUrl: self.controllerNode.extractHandle(from: instagram),
+            websiteUrl: self.controllerNode.extractHandle(from: website)
+        )
+        let socialLinksController = EditSocialLinksController(context: self.context, presentationData: self.presentationData, linksData: linksData)
+        socialLinksController.delegate = self
         self.push(socialLinksController)
     }
     
@@ -190,7 +205,9 @@ public final class PublicProfileScreenController: TelegramBaseController {
     
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        getUserProfile()
+        if !profileLoaded {
+            getUserProfile()
+        }
         getUserGalleryProfile()
     }
     
@@ -711,5 +728,12 @@ extension PublicProfileScreenController {
                 completion(mockData)
             }
         }
+    }
+}
+
+extension PublicProfileScreenController: EditSocialLinksDelegat {
+    func didUpdateProfileData() {
+        self.profileLoaded = false
+        self.getUserProfile()
     }
 }

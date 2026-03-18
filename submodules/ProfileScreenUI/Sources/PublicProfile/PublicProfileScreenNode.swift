@@ -569,6 +569,27 @@ final class PublicProfileScreenNode: ASDisplayNode {
     var onLikesTapped: (() -> Void)?
     var onViewsTapped: (() -> Void)?
     var onSavesTapped: (() -> Void)?
+
+    // В PublicProfileScreenNode.swift (снаружи класса или внутри)
+
+    private enum SocialIcon: String {
+        case instagram = "Models/instaIcon"
+        case tiktok = "Models/TikTokIcon"
+        case youtube = "Models/youtubeIcon"
+        case telegram = "Models/telegramIcon" // Предполагаемое имя
+        case website = "Models/webIcon"
+        
+        // Хелпер для получения иконки по URL
+        static func icon(for urlString: String) -> String {
+            let lowercased = urlString.lowercased()
+            if lowercased.contains("instagram.com") { return self.instagram.rawValue }
+            if lowercased.contains("tiktok.com") { return self.tiktok.rawValue }
+            if lowercased.contains("youtube.com") { return self.youtube.rawValue }
+            if lowercased.contains("t.me") || lowercased.contains("telegram.me") { return self.telegram.rawValue }
+            // Если это не одна из соцсетей, считаем, что это персональный сайт
+            return self.website.rawValue
+        }
+    }
     
     
     // MARK: - Init
@@ -1334,7 +1355,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
         
         NSLayoutConstraint.activate([
             stack.centerXAnchor.constraint(equalTo: button.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: button.centerYAnchor)
+            stack.centerYAnchor.constraint(equalTo: button.centerYAnchor),
+            stack.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 4),
+            stack.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -4),
         ])
         
         return button
@@ -1453,48 +1476,34 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     // Создаем все кнопки социальный сетей
-    private func populateSocialMedia(handles: [String], icons: [String]) {
-        UIView.animate(withDuration: 0.3, animations: {
-            
-            if handles.isEmpty {
-                self.socialMediaContainer.alpha = 0
+    private func populateSocialMedia(links: [String]) {
+        
+        socialMediaStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        if !links.isEmpty {
+            for link in links {
+                let iconName = SocialIcon.icon(for: link)
                 
-                self.socialHeightConstraint?.isActive = false
-                self.socialHeightConstraint = self.socialMediaContainer.heightAnchor.constraint(equalToConstant: 0)
-                self.socialHeightConstraint.isActive = true
-                self.titleEditContainer.removeFromSuperview()
+                let handle = extractHandle(from: link)
                 
-            } else {
-                self.socialMediaContainer.alpha = 1
-                
-                self.socialMediaStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-                
-                for (index, handle) in handles.enumerated() {
-                    let iconName = icons[safe: index] ?? self.iconPlaceholder
-                    if handles.count == 1 {
-                        self.socialMediaStack.addArrangedSubview(self.createSocialOneMediaButton(handle: handle, iconName: iconName))
-                    } else {
-                        self.socialMediaStack.addArrangedSubview(self.createSocialMediaButton(handle: handle, iconName: iconName))
-                    }
+                if links.count == 1 {
+                    socialMediaStack.addArrangedSubview(createSocialOneMediaButton(handle: handle, iconName: iconName))
+                } else {
+                    socialMediaStack.addArrangedSubview(createSocialMediaButton(handle: handle, iconName: iconName))
                 }
-                
-                self.socialHeightConstraint?.isActive = false
-                let newHeight: CGFloat = (handles.count == 1) ? 44 : 68
-                self.socialHeightConstraint = self.socialMediaContainer.heightAnchor.constraint(equalToConstant: newHeight)
-                self.socialHeightConstraint.isActive = true
-            }
-            
-            self.view.layoutIfNeeded()
-            
-        }) { completed in
-            if completed && handles.isEmpty {
-                self.socialMediaContainer.isHidden = true
-            } else {
-                self.socialMediaContainer.isHidden = false
             }
         }
+        
+        let shouldBeVisible = !links.isEmpty
+        
+        if socialMediaContainer.isHidden == shouldBeVisible {
+            UIView.animate(withDuration: 0.3, animations: {
+                self.socialMediaContainer.isHidden = !shouldBeVisible
+                self.contentViewStack.layoutIfNeeded()
+            })
+        }
     }
-    
+        
     // Получаем картинку флага в зависимости от кода страны
     private static func flag(for countryCode: String?) -> String {
         guard let code = countryCode, code.count == 2 else { return "" }
@@ -1579,6 +1588,26 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     
     // MARK: - Internal
+
+    // Функция для извлечения имени пользователя или домена
+    func extractHandle(from urlString: String) -> String {
+        let cleaned = urlString
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+            .replacingOccurrences(of: "www.", with: "")
+        
+        let components = cleaned.split(separator: "/")
+        
+        if cleaned.starts(with: "t.me"), components.count > 1 {
+            return String(components[1])
+        }
+        
+        if let first = components.first, (first.contains("instagram") || first.contains("youtube") || first.contains("tiktok")), components.count > 1 {
+            return String(components[1])
+        }
+        
+        return String(components.first ?? "")
+    }
     
     func loadSimilarProfiles() {
         // TODO: Заменить на API запрос
@@ -1693,23 +1722,16 @@ final class PublicProfileScreenNode: ASDisplayNode {
         }
         // что такое Save в модели?
         
-//        let socialIcons = ["Models/instaIcon", "Models/TikTokIcon", "Models/youtubeIcon", "Models/webIcon"]
-//        let networks = detail.userSocialNetworks ?? []
-//        let handlesFromApi = networks.compactMap { network -> String? in
-//            let handle = network.username ?? network.url ?? ""
-//            return handle.isEmpty ? nil : handle
-//        }
-//        let handles = handlesFromApi.isEmpty ? ["instagram", "tiktok", "youtube", "website"] : handlesFromApi
+        var socialLinks: [String] = []
+    
+        // Собираем все непустые ссылки в один массив
+        if let tiktok = detail.model?.tiktokUrl, !tiktok.isEmpty { socialLinks.append(tiktok) }
+        if let youtube = detail.model?.youtubeUrl, !youtube.isEmpty { socialLinks.append(youtube) }
+        if let telegram = detail.model?.telegramUrl, !telegram.isEmpty { socialLinks.append(telegram) }
+        if let instagram = detail.model?.instagramUrl, !instagram.isEmpty { socialLinks.append(instagram) }
+        if let website = detail.model?.websiteUrl, !website.isEmpty { socialLinks.append(website) }
         
-        let socialIcons = ["Models/instaIcon", "Models/TikTokIcon", "Models/youtubeIcon", "Models/webIcon"]
-        let networks = detail.userSocialNetworks ?? []
-        let handlesFromApi = networks.compactMap { network -> String? in
-            let handle = network.username ?? network.url ?? ""
-            return handle.isEmpty ? nil : handle
-        }
-        let handles = handlesFromApi
-        
-        populateSocialMedia(handles: handles, icons: socialIcons)
+        populateSocialMedia(links: socialLinks)
         
         stopShimmers()
         activateTitleVisibility()

@@ -14,6 +14,11 @@ import SearchUI
 import LegacyMediaPickerUI
 import CountrySelectionUI
 import ChatScheduleTimeController
+
+protocol EditSocialLinksDelegat: AnyObject {
+    func didUpdateProfileData()
+}
+
 public class EditSocialLinksController: ViewController, UINavigationControllerDelegate {
     private let context: AccountContext
     
@@ -23,12 +28,14 @@ public class EditSocialLinksController: ViewController, UINavigationControllerDe
     
     private var presentationData: PresentationData
     private var presentationDataDisposable: Any?
-    private var userDetailData: UserDetail?
-    
-    public init(context: AccountContext, presentationData: PresentationData, userDetailData: UserDetail?) {
+    private var linksData: LinksData
+
+    weak var delegate: EditSocialLinksDelegat?
+
+    public init(context: AccountContext, presentationData: PresentationData, linksData: LinksData) {
         self.context = context
-        self.userDetailData = userDetailData
-        
+        self.linksData = linksData
+
         self.presentationData = presentationData
         
         let darkNavigationTheme = NavigationBarTheme(
@@ -100,8 +107,8 @@ public class EditSocialLinksController: ViewController, UINavigationControllerDe
     override public func loadDisplayNode() {
         let currentAvatarMixin = Atomic<NSObject?>(value: nil)
         let theme = self.presentationData.theme
-        
-        self.displayNode = EditSocialLinksNode(context: self.context, presentationData: self.presentationData, userDetailData: userDetailData, addPhoto: { [weak self] in
+
+        self.displayNode = EditSocialLinksNode(context: self.context, presentationData: self.presentationData, linksData: linksData, addPhoto: { [weak self] in
             presentLegacyAvatarPicker(holder: currentAvatarMixin, signup: true, theme: theme, present: { c, a in
                 self?.view.endEditing(true)
                 self?.present(c, in: .window(.root), with: a)
@@ -115,16 +122,20 @@ public class EditSocialLinksController: ViewController, UINavigationControllerDe
 //                self?.avatarAdjustments = adjustments
             })
         })
-        
+
         self.createEventNode.showAlert = { [weak self] text in
             self?.showAlert(text: text)
         }
         
+        self.createEventNode.saveSocialLinks = { [weak self] linksData in
+            self?.saveSocialLinks(linksData: linksData)
+        }
+
         self.displayNodeDidLoad()
     }
     
     private func showAlert(text: String) {
-        
+
         let alertController = textAlertController(
             context: context, title: nil,
             text: text, actions: [
@@ -135,6 +146,40 @@ public class EditSocialLinksController: ViewController, UINavigationControllerDe
         present(alertController, in: .window(.root))
     }
     
+    private func saveSocialLinks(linksData: LinksData) {
+        Task { @MainActor in
+            do {
+                let request = UpdateSocialLinksRequest(
+                    model: UpdateSocialLinksRequest.ModelData(
+                        tiktokUrl: linksData.tiktokUrl.isEmpty ? nil : linksData.tiktokUrl,
+                        youtubeUrl: linksData.youtubeUrl.isEmpty ? nil : linksData.youtubeUrl,
+                        telegramUrl: linksData.telegramUrl.isEmpty ? nil : linksData.telegramUrl,
+                        instagramUrl: linksData.instagramUrl.isEmpty ? nil : linksData.instagramUrl,
+                        websiteUrl: linksData.websiteUrl.isEmpty ? nil : linksData.websiteUrl
+                    )
+                )
+
+                let response: UpdateSocialLinksResponse = try await DivoAPIClient.shared.request(
+                    path: "/user/update-profile",
+                    method: "POST",
+                    body: request
+                )
+
+                print("✅ Social links successfully saved: \(response.message ?? "OK")")
+                self.delegate?.didUpdateProfileData()
+                self.createEventNode.toggleSpinner(active: false)
+                self.showAlert(text: "Social links updated")
+
+                self.navigationController?.popViewController(animated: true)
+
+            } catch {
+                print("❌ Error saving social links: \(error)")
+                self.createEventNode.toggleSpinner(active: false)
+                self.showAlert(text: error.localizedDescription)
+            }
+        }
+    }
+
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
     }

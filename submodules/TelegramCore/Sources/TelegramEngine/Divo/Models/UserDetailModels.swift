@@ -66,12 +66,70 @@ public struct UserFile: Decodable {
     }
 }
 
+public struct LinksData {
+    public let tiktokUrl: String
+    public let youtubeUrl: String
+    public let telegramUrl: String
+    public let instagramUrl: String
+    public let websiteUrl: String
+
+    public init(tiktokUrl: String, youtubeUrl: String, telegramUrl: String, instagramUrl: String, websiteUrl: String) {
+        self.tiktokUrl = tiktokUrl
+        self.youtubeUrl = youtubeUrl
+        self.telegramUrl = telegramUrl
+        self.instagramUrl = instagramUrl
+        self.websiteUrl = websiteUrl
+    }
+}
+
+public struct UpdateSocialLinksRequest: Encodable {
+    public let model: ModelData
+
+    public struct ModelData: Encodable {
+        public let tiktokUrl: String?
+        public let youtubeUrl: String?
+        public let telegramUrl: String?
+        public let instagramUrl: String?
+        public let websiteUrl: String?
+
+        public init(tiktokUrl: String?, youtubeUrl: String?, telegramUrl: String?, instagramUrl: String?, websiteUrl: String?) {
+            self.tiktokUrl = tiktokUrl
+            self.youtubeUrl = youtubeUrl
+            self.telegramUrl = telegramUrl
+            self.instagramUrl = instagramUrl
+            self.websiteUrl = websiteUrl
+        }
+    }
+
+    public init(model: ModelData) {
+        self.model = model
+    }
+}
+
+public struct UpdateSocialLinksResponse: Decodable {
+    public let message: String?
+    public let data: UserDetail?
+    public let errors: [String]?
+
+    public init(message: String?, data: UserDetail?, errors: [String]?) {
+        self.message = message
+        self.data = data
+        self.errors = errors
+    }
+}
+
 public struct UserModelInfo: Decodable {
     public let agency: UserAgencyInfo?
     public let education: String?
     public let workExperience: String?
     public let languages: String?
     public let profileUrl: String?
+    public let description: String?
+    public let tiktokUrl: String?
+    public let youtubeUrl: String?
+    public let telegramUrl: String?
+    public let instagramUrl: String?
+    public let websiteUrl: String?
     public let additionalInformation: String?
     public let hasInternationalPassport: Bool?
     public let hasTattoo: Bool?
