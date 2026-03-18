@@ -1,9 +1,27 @@
 import UIKit
 import AVKit
 import Display
+import TelegramCore
 
 final class VideoGalleryCell: UICollectionViewCell {
     static let reuseIdentifier = "VideoGalleryCell"
+
+    private enum Constants {
+        static let softTimeoutSeconds: TimeInterval = 30.0
+        static let hardTimeoutSeconds: TimeInterval = 60.0
+        static let softTimeoutMessage = "Загрузка…"
+        static let hardTimeoutMessage = "Не удалось загрузить"
+
+        // Генерация first-frame из remote-URL через AVAssetImageGenerator может быть дорогой.
+        // Поэтому:
+        // - ограничиваем параллелизм
+        // - кешируем результат в памяти на время сессии
+        static let thumbnailGenerationParallelism: Int = 2
+        static let thumbnailMaximumSize = CGSize(width: 480.0, height: 480.0)
+    }
+
+    private static let firstFrameCache = NSCache<NSString, UIImage>()
+    private static let thumbnailGenerationSemaphore = DispatchSemaphore(value: Constants.thumbnailGenerationParallelism)
 
     private let thumbnailImageView: UIImageView = {
         let iv = UIImageView()
@@ -56,14 +74,68 @@ final class VideoGalleryCell: UICollectionViewCell {
         return view
     }()
 
+    private let fallbackContainer: UIView = {
+        let view = UIView()
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+        view.layer.cornerRadius = 6
+        view.clipsToBounds = true
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.isHidden = true
+        return view
+    }()
+
+    private let fallbackIconView: UIImageView = {
+        let imageView = UIImageView()
+        if #available(iOS 13.0, *) {
+            imageView.image = UIImage(systemName: "exclamationmark.triangle.fill")
+        }
+        imageView.contentMode = .scaleAspectFit
+        imageView.tintColor = .white
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+
+    private let fallbackLabel: UILabel = {
+        let label = UILabel()
+        label.font = Font.helveticaNeue(11)
+        label.textColor = .white
+        label.textAlignment = .center
+        label.numberOfLines = 2
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.text = "Видео недоступно"
+        return label
+    }()
+
+    // Сейчас fallback UI отключён (по требованию): не показываем плашки ошибок/загрузки,
+    // чтобы не мигало поверх превью/плеера. Оставляем инфраструктуру (view) на будущее.
+    private let isFallbackEnabled: Bool = false
+
     private var player: AVPlayer?
     private var isPlaying: Bool = false
     private var playerItemStatusObservation: NSKeyValueObservation?
     private var canAutoPlay: Bool = false
+    private var shouldAutoPlayWhenReady: Bool = false
+
+    private var configurationId: Int = 0
 
     private var currentVideoUrl: URL?
     private var retryCount = 0
     private let maxRetries = 3
+
+    private var showPreviewURL: URL?
+    private var previewUrlString: String?
+    private var shimmerTimeoutWorkItem: DispatchWorkItem?
+    private var hardFailureWorkItem: DispatchWorkItem?
+
+    private var thumbnailGenerator: AVAssetImageGenerator?
+    private var isGeneratingThumbnail: Bool = false
+
+    private var thumbnailGenerationWatchdogWorkItem: DispatchWorkItem?
+
+    /// Становится true, когда в ячейке появился любой реальный визуальный контент
+    /// (превью-картинка, сгенерированный кадр или готовый к показу плеер).
+    /// Используется, чтобы не показывать fallback поверх уже появившегося контента.
+    private var hasVisualContent: Bool = false
 
     private var timeObserverToken: Any?
     private var totalDurationSeconds: Double = 0
@@ -83,10 +155,14 @@ final class VideoGalleryCell: UICollectionViewCell {
         contentView.addSubview(thumbnailImageView)
         contentView.layer.addSublayer(playerLayer)
         contentView.addSubview(shimmerContainer)
+        contentView.addSubview(fallbackContainer)
         contentView.addSubview(titleLabel)
 
         contentView.addSubview(durationContainer)
         durationContainer.addSubview(durationLabel)
+
+        fallbackContainer.addSubview(fallbackIconView)
+        fallbackContainer.addSubview(fallbackLabel)
 
         NSLayoutConstraint.activate([
             thumbnailImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
@@ -111,6 +187,23 @@ final class VideoGalleryCell: UICollectionViewCell {
             durationLabel.leadingAnchor.constraint(equalTo: durationContainer.leadingAnchor, constant: 4),
             durationLabel.trailingAnchor.constraint(equalTo: durationContainer.trailingAnchor, constant: -4)
         ])
+
+        NSLayoutConstraint.activate([
+            fallbackContainer.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            fallbackContainer.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            fallbackContainer.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 8),
+            fallbackContainer.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -8),
+
+            fallbackIconView.topAnchor.constraint(equalTo: fallbackContainer.topAnchor, constant: 8),
+            fallbackIconView.centerXAnchor.constraint(equalTo: fallbackContainer.centerXAnchor),
+            fallbackIconView.widthAnchor.constraint(equalToConstant: 18),
+            fallbackIconView.heightAnchor.constraint(equalToConstant: 18),
+
+            fallbackLabel.topAnchor.constraint(equalTo: fallbackIconView.bottomAnchor, constant: 6),
+            fallbackLabel.leadingAnchor.constraint(equalTo: fallbackContainer.leadingAnchor, constant: 10),
+            fallbackLabel.trailingAnchor.constraint(equalTo: fallbackContainer.trailingAnchor, constant: -10),
+            fallbackLabel.bottomAnchor.constraint(equalTo: fallbackContainer.bottomAnchor, constant: -8)
+        ])
     }
 
     override func layoutSubviews() {
@@ -128,13 +221,22 @@ final class VideoGalleryCell: UICollectionViewCell {
     }
 
     func configure(with videoUrl: String, previewUrl: String? = nil, title: String? = nil) {
+        configurationId &+= 1
+        let currentConfigurationId = configurationId
+
         titleLabel.text = title ?? ""
-        durationContainer.isHidden = true
+        // Длительность — визуальный маркер видео. Сразу показываем контейнер,
+        // а точное значение подставим позже, когда сможем получить duration.
+        durationContainer.isHidden = false
+        durationLabel.text = "—:—"
 
         self.canAutoPlay = Int.random(in: 1...4) == 1
+        // willDisplay может случиться до readyToPlay, поэтому запоминаем желание автозапуска.
+        self.shouldAutoPlayWhenReady = false
 
         shimmerContainer.isHidden = false
         shimmerContainer.alpha = 1.0
+        hideFallback()
         if self.window != nil && !shimmerContainer.isHidden {
             shimmerContainer.stopShimmering()
             shimmerContainer.startShimmering()
@@ -146,20 +248,111 @@ final class VideoGalleryCell: UICollectionViewCell {
         }
 
         self.currentVideoUrl = url
+        self.previewUrlString = previewUrl
         self.retryCount = 0
+        self.hasVisualContent = false
 
-        loadThumbnail(for: url, fallbackPreviewUrl: previewUrl, attempt: 1)
-        setupPlayer(with: url)
+        // Длительность считаем независимо от плеера (плеер будем создавать лениво).
+        // Для remote-URL просим "не точную" длительность — обычно быстрее.
+        loadDuration(
+            from: AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false]),
+            expectedUrl: url,
+            configurationId: currentConfigurationId
+        )
+
+        // Попробуем быстро показать превью, чтобы не видеть черный экран,
+        // пока AVPlayer подгружает asset.
+        if let previewUrl, let preview = URL(string: previewUrl) {
+            showPreviewURL = preview
+            ImageLoader.shared.load(url: preview) { [weak self] image in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    guard self.configurationId == currentConfigurationId, self.showPreviewURL == preview else { return }
+
+                    if let image {
+                        self.thumbnailImageView.image = image
+                        self.hasVisualContent = true
+                        self.hideFallback()
+                        // Как только у нас есть хоть что-то (превью) — можно убрать шиммер.
+                        if !self.shimmerContainer.isHidden {
+                            self.hideShimmer()
+                        }
+                    }
+                }
+            }
+        } else {
+            showPreviewURL = nil
+            thumbnailImageView.image = nil
+        }
+
+        scheduleShimmerTimeout()
+    }
+
+    /// Вызываем из `willDisplay`. Идея: тяжелый fallback (first-frame из видео)
+    /// запускаем только для реально видимых ячеек, иначе prefetch/reuse
+    /// может сильно замедлять первичную загрузку и скролл.
+    func willDisplay() {
+        guard let url = currentVideoUrl else { return }
+        // Если есть previewUrl — first-frame не нужен.
+        loadThumbnail(for: url, fallbackPreviewUrl: previewUrlString, attempt: 1, configurationId: configurationId)
+    }
+
+    private func scheduleShimmerTimeout() {
+        shimmerTimeoutWorkItem?.cancel()
+        hardFailureWorkItem?.cancel()
+
+        // 1) Мягкий таймаут: при отключённом fallback UI ничего не показываем.
+        // Оставляем этот таймер только чтобы иметь точку расширения, но по факту не меняем UI.
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            if self.isFallbackEnabled {
+                // legacy behavior: keep for future
+                if !self.shimmerContainer.isHidden {
+                    self.hideShimmer()
+                    if !self.hasVisualContent {
+                        self.showFallback(message: Constants.softTimeoutMessage)
+                    }
+                }
+            }
+        }
+        shimmerTimeoutWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + Constants.softTimeoutSeconds, execute: workItem)
+
+        // 2) Жёсткий таймаут: через длительное время останавливаем shimmer,
+        // чтобы не крутить вечную анимацию. Сообщение НЕ показываем.
+        let hardFailureItem = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            guard !self.hasVisualContent else { return }
+            self.hideShimmer()
+            if self.isFallbackEnabled {
+                self.showFallback(message: Constants.hardTimeoutMessage)
+            }
+        }
+        hardFailureWorkItem = hardFailureItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + Constants.hardTimeoutSeconds, execute: hardFailureItem)
     }
 
     private func setupPlayer(with url: URL) {
         cleanUpPlayerObservers()
 
-        let asset = AVAsset(url: url)
-        loadDuration(from: asset)
+        // NOTE: Для remote-URL подсказка "precise duration" может сильно замедлять старт.
+        // Нам достаточно приблизительной длительности (таймер в углу), поэтому отключаем.
+        let asset = AVURLAsset(
+            url: url,
+            options: [AVURLAssetPreferPreciseDurationAndTimingKey: false]
+        )
 
         let playerItem = AVPlayerItem(asset: asset)
+        if #available(iOS 10.0, *) {
+            // Меньше ждать буферизации перед стартом (быстрее первый кадр).
+            // Риск: на плохой сети может чаще подстопорить.
+            playerItem.preferredForwardBufferDuration = 1.0
+        }
         player = AVPlayer(playerItem: playerItem)
+        if #available(iOS 10.0, *) {
+            // Снижает стартовую задержку, но может увеличить шанс stalling на плохой сети.
+            player?.automaticallyWaitsToMinimizeStalling = false
+        }
         player?.isMuted = true
         player?.actionAtItemEnd = .none
         playerLayer.player = player
@@ -171,8 +364,19 @@ final class VideoGalleryCell: UICollectionViewCell {
 
             DispatchQueue.main.async {
                 if item.status == .readyToPlay {
+                    self.shimmerTimeoutWorkItem?.cancel()
+                    self.hardFailureWorkItem?.cancel()
                     self.hideShimmer()
-                    self.durationContainer.isHidden = false
+                    self.hasVisualContent = true
+                    self.hideFallback()
+
+                    // durationContainer уже показан, обновим текст таймера позже (если сможем посчитать duration).
+
+                    // Автопроигрывание (рандомно canAutoPlay) — запускаем когда player готов.
+                    if self.canAutoPlay, self.shouldAutoPlayWhenReady {
+                        self.player?.play()
+                        self.isPlaying = true
+                    }
                 } else if item.status == .failed {
                     self.handlePlayerError()
                 }
@@ -189,7 +393,9 @@ final class VideoGalleryCell: UICollectionViewCell {
 
     private func handlePlayerError() {
         guard retryCount < maxRetries, let url = currentVideoUrl else {
+            shimmerTimeoutWorkItem?.cancel()
             hideShimmer()
+            showFallback(message: "Видео недоступно")
             return
         }
 
@@ -215,7 +421,7 @@ final class VideoGalleryCell: UICollectionViewCell {
         }
     }
 
-    private func loadDuration(from asset: AVAsset) {
+    private func loadDuration(from asset: AVAsset, expectedUrl: URL, configurationId: Int) {
         asset.loadValuesAsynchronously(forKeys: ["duration"]) { [weak self] in
             var error: NSError? = nil
             let status = asset.statusOfValue(forKey: "duration", error: &error)
@@ -226,8 +432,12 @@ final class VideoGalleryCell: UICollectionViewCell {
 
                 if !seconds.isNaN && !seconds.isInfinite {
                     DispatchQueue.main.async {
-                        self?.totalDurationSeconds = seconds
-                        self?.durationLabel.text = self?.formatDuration(seconds: seconds)
+                        guard let self = self else { return }
+                        // Ячейка могла переиспользоваться, игнорируем результаты старого запроса.
+                        guard self.configurationId == configurationId, self.currentVideoUrl == expectedUrl else { return }
+
+                        self.totalDurationSeconds = seconds
+                        self.durationLabel.text = self.formatDuration(seconds: seconds)
                     }
                 }
             }
@@ -241,31 +451,130 @@ final class VideoGalleryCell: UICollectionViewCell {
         return String(format: "%d:%02d", minutes, remainingSeconds)
     }
 
-    private func loadThumbnail(for videoUrl: URL, fallbackPreviewUrl: String?, attempt: Int) {
-        if let previewString = fallbackPreviewUrl, let previewURL = URL(string: previewString) {
-            // TODO: integrate ImageLoader to load preview image if needed
-            _ = previewURL
+    private func loadThumbnail(for videoUrl: URL, fallbackPreviewUrl: String?, attempt: Int, configurationId: Int) {
+        // Если превью задано — мы уже показываем его через ImageLoader.
+        // Здесь оставляем генерацию thumbnail из видео только как fallback.
+        if fallbackPreviewUrl != nil {
             return
         }
 
-        DispatchQueue.global(qos: .userInitiated).async {
-            let asset = AVAsset(url: videoUrl)
+        let cacheKey = videoUrl.absoluteString as NSString
+        if let cachedImage = Self.firstFrameCache.object(forKey: cacheKey) {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                guard self.configurationId == configurationId, self.currentVideoUrl == videoUrl else { return }
+                self.thumbnailImageView.image = cachedImage
+                self.hasVisualContent = true
+                self.hideFallback()
+                if !self.shimmerContainer.isHidden {
+                    self.hideShimmer()
+                }
+            }
+            return
+        }
+
+        guard !isGeneratingThumbnail else {
+            return
+        }
+        isGeneratingThumbnail = true
+
+        // Если генератор "зависнет" и не вызовет callback (такое бывает на remote asset),
+        // обязательно освобождаем слот семафора и разрешаем повторную попытку.
+        thumbnailGenerationWatchdogWorkItem?.cancel()
+        let watchdog = DispatchWorkItem { [weak self] in
+            guard let self = self else {
+                return
+            }
+            // Если состояние уже не актуально — ничего не делаем.
+            guard self.configurationId == configurationId, self.currentVideoUrl == videoUrl else {
+                return
+            }
+            guard self.isGeneratingThumbnail else {
+                return
+            }
+            self.thumbnailGenerator?.cancelAllCGImageGeneration()
+            self.thumbnailGenerator = nil
+            self.isGeneratingThumbnail = false
+
+            // Дадим шанс повторной попытке.
+            if attempt < self.maxRetries {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                    self?.loadThumbnail(for: videoUrl, fallbackPreviewUrl: fallbackPreviewUrl, attempt: attempt + 1, configurationId: configurationId)
+                }
+            }
+        }
+        thumbnailGenerationWatchdogWorkItem = watchdog
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12.0, execute: watchdog)
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            // Ограничиваем параллельную генерацию, чтобы быстрый скролл не создавал
+            // десятки тяжелых операций одновременно.
+            Self.thumbnailGenerationSemaphore.wait()
+
+            // Семафор мы захватили — сигналим строго один раз через замыкание,
+            // и делаем это на main, чтобы не было гонок с prepareForReuse.
+            var didSignal = false
+            let signalOnceOnMain: () -> Void = {
+                DispatchQueue.main.async {
+                    guard !didSignal else { return }
+                    didSignal = true
+                    Self.thumbnailGenerationSemaphore.signal()
+                }
+            }
+
+            guard let self = self else {
+                signalOnceOnMain()
+                return
+            }
+            guard self.configurationId == configurationId, self.currentVideoUrl == videoUrl else {
+                signalOnceOnMain()
+                DispatchQueue.main.async { [weak self] in
+                    self?.isGeneratingThumbnail = false
+                }
+                return
+            }
+
+            let asset = AVURLAsset(
+                url: videoUrl,
+                options: [AVURLAssetPreferPreciseDurationAndTimingKey: false]
+            )
             let imageGenerator = AVAssetImageGenerator(asset: asset)
             imageGenerator.appliesPreferredTrackTransform = true
+            imageGenerator.maximumSize = Constants.thumbnailMaximumSize
+            self.thumbnailGenerator = imageGenerator
 
             let time = CMTime(seconds: 0.1, preferredTimescale: 600)
+            imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { [weak self] _, cgImage, _, result, _ in
+                signalOnceOnMain()
 
-            do {
-                let cgImage = try imageGenerator.copyCGImage(at: time, actualTime: nil)
-                let image = UIImage(cgImage: cgImage)
+                DispatchQueue.main.async {
+                    guard let self = self else {
+                        return
+                    }
 
-                DispatchQueue.main.async { [weak self] in
-                    self?.thumbnailImageView.image = image
-                }
-            } catch {
-                if attempt < self.maxRetries {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
-                        self?.loadThumbnail(for: videoUrl, fallbackPreviewUrl: fallbackPreviewUrl, attempt: attempt + 1)
+                    self.thumbnailGenerationWatchdogWorkItem?.cancel()
+                    self.isGeneratingThumbnail = false
+                    self.thumbnailGenerator = nil
+
+                    guard self.configurationId == configurationId, self.currentVideoUrl == videoUrl else { return }
+
+                    if result == .succeeded, let cgImage {
+                        let image = UIImage(cgImage: cgImage)
+                        Self.firstFrameCache.setObject(image, forKey: cacheKey)
+                        self.thumbnailImageView.image = image
+                        self.hasVisualContent = true
+                        self.hideFallback()
+                        // Как только смогли показать кадр — прекращаем shimmer,
+                        // чтобы не видеть «черный экран» на медленной загрузке плеера.
+                        if !self.shimmerContainer.isHidden {
+                            self.hideShimmer()
+                        }
+                    } else {
+                        if attempt < self.maxRetries {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                                self?.loadThumbnail(for: videoUrl, fallbackPreviewUrl: fallbackPreviewUrl, attempt: attempt + 1, configurationId: configurationId)
+                            }
+                        }
                     }
                 }
             }
@@ -281,14 +590,38 @@ final class VideoGalleryCell: UICollectionViewCell {
         }
     }
 
+    private func showFallback(message: String) {
+        guard isFallbackEnabled else {
+            return
+        }
+        fallbackLabel.text = message
+        fallbackContainer.isHidden = false
+    }
+
+    private func hideFallback() {
+        fallbackContainer.isHidden = true
+    }
+
     func play() {
         guard canAutoPlay else {
             return
         }
 
+        // willDisplay сообщает, что ячейка на экране — хотим автоплей.
+        shouldAutoPlayWhenReady = true
+
+        // Плеер создаем лениво — только для тех ячеек, которые реально должны автопроигрываться.
+        if player == nil, let url = currentVideoUrl {
+            setupPlayer(with: url)
+        }
+
         guard let player = player, !isPlaying else { return }
-        player.play()
-        isPlaying = true
+
+        // Если player ещё не readyToPlay — реально стартанём в observe(status).
+        if player.currentItem?.status == .readyToPlay {
+            player.play()
+            isPlaying = true
+        }
     }
 
     func pause() {
@@ -302,10 +635,21 @@ final class VideoGalleryCell: UICollectionViewCell {
         player.pause()
         player.seek(to: .zero)
         isPlaying = false
+        shouldAutoPlayWhenReady = false
         durationLabel.text = formatDuration(seconds: totalDurationSeconds)
     }
 
+    /// Вызывать, когда ячейка уехала с экрана — освобождаем AVPlayer, чтобы не копить ресурсы.
+    func stopAndReleasePlayer() {
+        stop()
+        cleanUpPlayerObservers()
+        playerLayer.player = nil
+        player = nil
+    }
+
     @objc private func playerItemDidReachEnd(_ notification: Notification) {
+        // Лупаем только если видео реально играет (иначе можно получить скрытое воспроизведение/нагрузку).
+        guard isPlaying else { return }
         player?.seek(to: .zero)
         player?.play()
     }
@@ -323,16 +667,32 @@ final class VideoGalleryCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
-        stop()
-        cleanUpPlayerObservers()
+        stopAndReleasePlayer()
+
+        thumbnailGenerator?.cancelAllCGImageGeneration()
+        thumbnailGenerator = nil
+        isGeneratingThumbnail = false
+        thumbnailGenerationWatchdogWorkItem?.cancel()
+        thumbnailGenerationWatchdogWorkItem = nil
+
+        shimmerTimeoutWorkItem?.cancel()
+        shimmerTimeoutWorkItem = nil
+        hardFailureWorkItem?.cancel()
+        hardFailureWorkItem = nil
 
         playerLayer.player = nil
         player = nil
         titleLabel.text = nil
+        thumbnailImageView.cancelImageLoad()
         thumbnailImageView.image = nil
         canAutoPlay = false
+        shouldAutoPlayWhenReady = false
+        configurationId &+= 1
         currentVideoUrl = nil
+        showPreviewURL = nil
+        previewUrlString = nil
         totalDurationSeconds = 0
+        hasVisualContent = false
 
         durationContainer.isHidden = true
         durationLabel.text = ""
@@ -340,10 +700,15 @@ final class VideoGalleryCell: UICollectionViewCell {
         shimmerContainer.layer.removeAllAnimations()
         shimmerContainer.alpha = 1.0
         shimmerContainer.isHidden = false
+        fallbackContainer.isHidden = true
     }
 
     deinit {
         cleanUpPlayerObservers()
+        shimmerTimeoutWorkItem?.cancel()
+        hardFailureWorkItem?.cancel()
+        thumbnailGenerator?.cancelAllCGImageGeneration()
+        thumbnailGenerationWatchdogWorkItem?.cancel()
     }
 }
 

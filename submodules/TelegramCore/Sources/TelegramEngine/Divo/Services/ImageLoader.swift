@@ -36,10 +36,15 @@ public extension UIImageView {
     }
 
     func loadImage(from url: URL?, placeholder: UIImage? = nil) {
+        loadImage(from: url, placeholder: placeholder, completion: nil)
+    }
+
+    func loadImage(from url: URL?, placeholder: UIImage? = nil, completion: ((UIImage?) -> Void)?) {
         image = placeholder
         currentLoadingURL = url
         guard let url = url else {
             removeShimmerOverlay()
+            completion?(nil)
             return
         }
 
@@ -48,7 +53,41 @@ public extension UIImageView {
         ImageLoader.shared.load(url: url) { [weak self] loadedImage in
             guard self?.currentLoadingURL == url else { return }
             self?.image = loadedImage
+            // По умолчанию используем стандартный кроп (центрированный). Для аватаров можно
+            // отдельно вызвать `applyAvatarTopCropIfNeeded(image:)`.
             self?.removeShimmerOverlay()
+            completion?(loadedImage)
+        }
+    }
+
+    /// Кроп для круглых аватарок: для портретных фото берём верхний квадрат,
+    /// чтобы лицо/голова не «съедались» при центрированном `.scaleAspectFill`.
+    ///
+    /// Выставляет `layer.contentsRect`.
+    func applyAvatarTopCropIfNeeded(image: UIImage?) {
+        guard let image, let cgImage = image.cgImage else {
+            layer.contentsRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+            return
+        }
+
+        let width = CGFloat(cgImage.width)
+        let height = CGFloat(cgImage.height)
+        guard width > 0, height > 0 else {
+            layer.contentsRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+            return
+        }
+
+        if height > width {
+            // Портрет: верхний квадрат.
+            let normalizedCropHeight = width / height
+            layer.contentsRect = CGRect(x: 0.0, y: 0.0, width: 1.0, height: normalizedCropHeight)
+        } else if width > height {
+            // Альбом: центральный квадрат по X.
+            let normalizedCropWidth = height / width
+            let x = (1.0 - normalizedCropWidth) / 2.0
+            layer.contentsRect = CGRect(x: x, y: 0.0, width: normalizedCropWidth, height: 1.0)
+        } else {
+            layer.contentsRect = CGRect(x: 0, y: 0, width: 1, height: 1)
         }
     }
 

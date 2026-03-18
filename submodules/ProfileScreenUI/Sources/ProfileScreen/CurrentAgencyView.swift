@@ -61,6 +61,8 @@ final class CurrentAgencyView: UIView {
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
+
+    private var lastLogoURL: URL?
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -114,16 +116,34 @@ final class CurrentAgencyView: UIView {
     }
     
     func configure(name: String?, logoURL: URL?) {
-        agencyNameLabel.text = name?.uppercased() ?? "UNKNOWN AGENCY"
-        
-        logoImageView.image = nil
-        
-        if let url = logoURL {
-            ImageLoader.shared.load(url: url) { [weak self] image in
-                DispatchQueue.main.async {
-                    if let image = image {
-                        self?.logoImageView.image = image
-                    }
+        // Обновление текста может попасть внутрь чужих animation-блоков (layoutIfNeeded),
+        // поэтому делаем его явно без анимации и сразу фиксируем layout.
+        UIView.performWithoutAnimation {
+            self.agencyNameLabel.text = name?.uppercased() ?? "UNKNOWN AGENCY"
+            self.agencyNameLabel.layer.removeAllAnimations()
+            self.layoutIfNeeded()
+        }
+
+        // Не сбрасываем картинку каждый раз в nil — это вызывает заметное «мигание/анимацию» блока.
+        // Перезагружаем только если URL действительно изменился.
+        guard lastLogoURL != logoURL else { return }
+        lastLogoURL = logoURL
+
+        // Если url нет — чистим изображение (без анимации).
+        guard let url = logoURL else {
+            UIView.performWithoutAnimation {
+                self.logoImageView.image = nil
+                self.layoutIfNeeded()
+            }
+            return
+        }
+
+        ImageLoader.shared.load(url: url) { [weak self] image in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                UIView.performWithoutAnimation {
+                    self.logoImageView.image = image
+                    self.layoutIfNeeded()
                 }
             }
         }
