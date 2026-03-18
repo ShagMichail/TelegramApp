@@ -50,7 +50,7 @@ bazel build //Telegram:Telegram \
   --define=disableProvisioningProfiles=true \
   --cpu=ios_sim_arm64 \
   --define=buildNumber=100001 \
-  --define=telegramVersion=12.2.2
+  --define=telegramVersion=11.8.1
 ```
 
 ### 4. Установка и запуск на симуляторе
@@ -74,18 +74,28 @@ xcrun simctl launch booted ph.telegra.Telegraph
 
 ### 5. Сборка для физического девайса
 
+#### Настройка перед сборкой
+
+В файле `build-input/configuration-repository/variables.bzl` установить:
+
+```python
+telegram_aps_environment = "development"
+```
+
+В папке `build-input/configuration-repository/provisioning/` должен лежать файл с именем `Telegram.mobileprovision` — **development** профиль (aps-environment=development).
+
 ```bash
 bazel build //Telegram:Telegram \
   --compilation_mode=opt \
   --cpu=ios_arm64 \
   --define=buildNumber=100001 \
-  --define=telegramVersion=12.2.2 \
+  --define=telegramVersion=11.8.1 \
   --//Telegram:disableExtensions=true
 ```
 
 ### 6. Установка на физический девайс
 
-Пример ниже использует **конкретный UDID девайса** (`51CB07C4-5E7A-5044-A4D3-8FABEDA1B647`).  
+Пример ниже использует **конкретный UDID девайса** (`51CB07C4-5E7A-5044-A4D3-8FABEDA1B647`).
 У себя подставьте **UDID своего устройства**, который можно посмотреть в Xcode → `Devices and Simulators` или через `xcrun devicectl list devices`.
 
 ```bash
@@ -93,6 +103,43 @@ xcrun devicectl device install app \
   bazel-bin/Telegram/Telegram.ipa \
   --device 51CB07C4-5E7A-5044-A4D3-8FABEDA1B647
 ```
+
+### 7. Сборка для TestFlight (дистрибуция)
+
+#### Настройка перед сборкой
+
+1. В файле `build-input/configuration-repository/variables.bzl` установить:
+
+```python
+telegram_aps_environment = "production"
+```
+
+2. В папке `build-input/configuration-repository/provisioning/` должен лежать файл с именем `Telegram.mobileprovision` — **distribution** профиль (aps-environment=production, App Store / TestFlight).
+
+3. **Определить номер сборки.** Посмотреть последний `buildNumber` в TestFlight (App Store Connect) и прибавить 1. Например, если последняя сборка `17` — ставим `18`.
+
+#### Команда сборки
+
+```bash
+bazel build //Telegram:Telegram \
+  --compilation_mode=opt \
+  --cpu=ios_arm64 \
+  --define=buildNumber=18 \
+  --define=telegramVersion=11.8.1 \
+  --//Telegram:disableExtensions=true
+```
+
+> **Важно:** `buildNumber` должен быть строго больше предыдущей сборки в TestFlight, иначе загрузка завершится ошибкой.
+
+#### Загрузка в TestFlight
+
+После успешной сборки IPA находится по пути `bazel-bin/Telegram/Telegram.ipa`.
+Загрузить можно через **Transporter** (приложение из Mac App Store):
+
+1. Открыть Transporter
+2. Перетащить `Telegram.ipa` в окно приложения
+3. Нажать **Deliver**
+4. Через несколько минут сборка появится в App Store Connect → TestFlight
 
 ## Часто используемые команды
 
@@ -118,7 +165,7 @@ xcrun simctl install <UUID> bazel-bin/Telegram/Telegram.ipa
 # Telegram iOS Build Aliases
 TELEGRAM_ROOT="$HOME/Projects/TelegramApp"  # <-- укажите свой путь
 
-alias tg-build='cd $TELEGRAM_ROOT && bazel build //Telegram:Telegram --define=disableProvisioningProfiles=true --cpu=ios_sim_arm64 --define=buildNumber=100001 --define=telegramVersion=12.2.2'
+alias tg-build='cd $TELEGRAM_ROOT && bazel build //Telegram:Telegram --define=disableProvisioningProfiles=true --cpu=ios_sim_arm64 --define=buildNumber=100001 --define=telegramVersion=11.8.1'
 alias tg-install='xcrun simctl install booted $TELEGRAM_ROOT/bazel-bin/Telegram/Telegram.ipa'
 alias tg-run='xcrun simctl launch booted ph.telegra.Telegraph'
 alias tg-boot='xcrun simctl boot "iPhone 16" 2>/dev/null || true && open -a Simulator'
