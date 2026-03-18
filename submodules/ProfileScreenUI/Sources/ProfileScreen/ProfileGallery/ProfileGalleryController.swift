@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import AVFoundation
 import Display
 import TelegramBaseController
 import TelegramCore
@@ -69,9 +70,25 @@ public class ProfileGalleryController: TelegramBaseController {
         fatalError("init(coder:) has not been implemented")
     }
     
+    override public func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        // При открытии галереи с видео переключаемся на .playback,
+        // чтобы звук воспроизводился корректно через динамик.
+        if isVideoGallery {
+            try? AVAudioSession.sharedInstance().setCategory(.playback)
+            try? AVAudioSession.sharedInstance().setActive(true)
+        }
+    }
+
     override public func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         self.galleryNode.pauseAllVideos()
+        // Восстанавливаем .ambient чтобы после закрытия галереи
+        // фоновая музыка других приложений возобновилась.
+        if isVideoGallery {
+            try? AVAudioSession.sharedInstance().setCategory(.ambient, options: .mixWithOthers)
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
     
     override public func loadDisplayNode() {

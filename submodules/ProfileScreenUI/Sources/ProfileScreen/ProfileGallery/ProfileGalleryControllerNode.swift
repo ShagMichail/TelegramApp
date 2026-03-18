@@ -351,7 +351,7 @@ extension ProfileGalleryControllerNode: UICollectionViewDataSource {
             if self.isVideoGallery {
                 let video = self.videos[indexPath.item]
                 if let previewFile = video.files.first(where: { MediaFormatValidator.isImage($0.fileExtension) }), let previewUrl = previewFile.fullUrl {
-                    cell.configure(with: previewUrl, isVideo: true)
+                    cell.configure(with: previewUrl, isVideo: false)
                 }
             } else {
                 let photo = self.photos[indexPath.item]

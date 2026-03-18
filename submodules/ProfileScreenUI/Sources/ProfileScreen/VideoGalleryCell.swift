@@ -1,5 +1,6 @@
 import UIKit
 import AVKit
+import AVFoundation
 import Display
 import TelegramCore
 
@@ -334,6 +335,10 @@ final class VideoGalleryCell: UICollectionViewCell {
 
     private func setupPlayer(with url: URL) {
         cleanUpPlayerObservers()
+
+        // Ячейки сетки автоматически воспроизводят видео без звука.
+        // Используем .ambient + .mixWithOthers, чтобы не прерывать фоновую музыку других приложений.
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, options: .mixWithOthers)
 
         // NOTE: Для remote-URL подсказка "precise duration" может сильно замедлять старт.
         // Нам достаточно приблизительной длительности (таймер в углу), поэтому отключаем.
