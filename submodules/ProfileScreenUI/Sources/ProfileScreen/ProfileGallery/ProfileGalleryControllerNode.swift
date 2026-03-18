@@ -11,8 +11,8 @@ import PhotoResources
 final class ProfileGalleryControllerNode: ASDisplayNode {
 
     private let context: AccountContext
-    private let photos: [UserPhoto]
-    private let videos: [UserVideoItem]
+    private var photos: [UserPhoto]
+    private var videos: [UserVideoItem]
     private let initialIndex: Int
     private let isVideoGallery: Bool
     
@@ -21,14 +21,18 @@ final class ProfileGalleryControllerNode: ASDisplayNode {
     private var presentationData: PresentationData
     private var mainCollectionView: UICollectionView!
     private var previewCollectionView: UICollectionView!
-    private var currentIndex: Int
     private var previewHeight: CGFloat = 80
     private var isSyncingScroll = false
     private var isFirstLayout = true
     private var panGesture: UIPanGestureRecognizer!
+    private var _currentIndex: Int
+    
+    // 🚀 Флаг для блокировки спама запросов
+    private var isLoadingMore = false
     
     var onIndexChanged: ((Int, Int) -> Void)?
-
+    var requestMoreData: (() -> Void)?
+    var currentIndex: Int { return _currentIndex }
     
     // MARK: - Init
 
@@ -48,7 +52,7 @@ final class ProfileGalleryControllerNode: ASDisplayNode {
         self.initialIndex = initialIndex
         self.isVideoGallery = isVideoGallery
         self.controller = controller
-        self.currentIndex = initialIndex
+        self._currentIndex = initialIndex
         
         super.init()
         
@@ -126,6 +130,39 @@ final class ProfileGalleryControllerNode: ASDisplayNode {
         for cell in self.mainCollectionView.visibleCells {
             (cell as? VideoGalleryCellNode)?.pause()
         }
+    }
+
+    func updateData(photos:[UserPhoto], videos: [UserVideoItem]) {
+        self.isLoadingMore = false // 🚀 Снимаем блокировку запросов
+        
+        let oldPhotosCount = self.photos.count
+        let oldVideosCount = self.videos.count
+        
+        self.photos = photos
+        self.videos = videos
+        
+        let oldCount = self.isVideoGallery ? oldVideosCount : oldPhotosCount
+        let newCount = self.isVideoGallery ? videos.count : photos.count
+        
+        if newCount > oldCount {
+            let indexPaths = (oldCount..<newCount).map { IndexPath(item: $0, section: 0) }
+            
+            self.mainCollectionView.performBatchUpdates({
+                self.mainCollectionView.insertItems(at: indexPaths)
+            }, completion: nil)
+            
+            self.previewCollectionView.performBatchUpdates({
+                self.previewCollectionView.insertItems(at: indexPaths)
+            }, completion: nil)
+            
+        } 
+        // 🚀 ВАЖНО: Мы удалили блок else { reloadData() }, чтобы не убивать ячейки и не фризить UI!
+        
+        self.updatePreviewSelection()
+    }
+    
+    func finishLoadingWithoutNewData() {
+        self.isLoadingMore = false // 🚀 Разрешаем запрашивать снова при дальнейшем скролле
     }
 
 
@@ -297,8 +334,10 @@ extension ProfileGalleryControllerNode: UICollectionViewDataSource {
             if self.isVideoGallery {
                 let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "VideoCell", for: indexPath) as! VideoGalleryCellNode
                 let video = self.videos[indexPath.item]
-                if let firstFile = video.files.first {
-                    cell.configure(with: firstFile)
+                
+                // 🚀 ИСПРАВЛЕНИЕ: Берем именно ВИДЕО файл, а не первую попавшуюся картинку-превью
+                if let videoFile = video.files.first(where: { MediaFormatValidator.isVideo($0.fileExtension) }) {
+                    cell.configure(with: videoFile)
                 }
                 return cell
             } else {
@@ -311,7 +350,7 @@ extension ProfileGalleryControllerNode: UICollectionViewDataSource {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PreviewCell", for: indexPath) as! PreviewCell
             if self.isVideoGallery {
                 let video = self.videos[indexPath.item]
-                if let firstFile = video.files.first, let previewUrl = firstFile.fullUrl {
+                if let previewFile = video.files.first(where: { MediaFormatValidator.isImage($0.fileExtension) }), let previewUrl = previewFile.fullUrl {
                     cell.configure(with: previewUrl, isVideo: true)
                 }
             } else {
@@ -353,7 +392,7 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         if collectionView == self.previewCollectionView {
-            self.currentIndex = indexPath.item
+            self._currentIndex = indexPath.item
             self.mainCollectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: true)
         }
     }
@@ -378,8 +417,15 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
             
             let page = Int(round(progress))
             let totalCount = self.isVideoGallery ? self.videos.count : self.photos.count
+            
+            // 🚀 ИСПРАВЛЕНИЕ: Блокируем спам запросов
+            if page >= totalCount - 3 && !self.isLoadingMore {
+                self.isLoadingMore = true
+                self.requestMoreData?()
+            }
+            
             if page != self.currentIndex && page >= 0 && page < totalCount {
-                self.currentIndex = page
+                self._currentIndex = page
                 self.onIndexChanged?(page, totalCount)
                 if self.isVideoGallery {
                     self.playVideo(at: page)
@@ -398,8 +444,15 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
                 
                 let page = Int(round(progress))
                 let totalCount = self.isVideoGallery ? self.videos.count : self.photos.count
+
+                // 🚀 ИСПРАВЛЕНИЕ: Блокируем спам запросов
+                if page >= totalCount - 3 && !self.isLoadingMore {
+                    self.isLoadingMore = true
+                    self.requestMoreData?()
+                }
+            
                 if page != self.currentIndex && page >= 0 && page < totalCount {
-                    self.currentIndex = page
+                    self._currentIndex = page
                     self.onIndexChanged?(page, totalCount)
                     if self.isVideoGallery {
                         self.playVideo(at: page)
@@ -467,21 +520,6 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
         }
     }
 
-    private func updateVideoPlaybackState() {
-        guard self.isVideoGallery else { return }
-        
-        for cell in self.mainCollectionView.visibleCells {
-            if let videoCell = cell as? VideoGalleryCellNode,
-               let indexPath = self.mainCollectionView.indexPath(for: videoCell) {
-                if indexPath.item == self.currentIndex {
-                    videoCell.play()
-                } else {
-                    videoCell.pause()
-                }
-            }
-        }
-    }
-    
     private func updatePreviewCellsScale() {
         let centerX = previewCollectionView.contentOffset.x + previewCollectionView.bounds.width / 2.0
         

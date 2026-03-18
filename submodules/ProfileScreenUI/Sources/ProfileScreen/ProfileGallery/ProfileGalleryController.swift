@@ -1,32 +1,32 @@
 import Foundation
 import UIKit
-import AVFoundation
 import Display
-import AsyncDisplayKit
 import TelegramBaseController
 import TelegramCore
 import TelegramPresentationData
 import AccountContext
 import PhotoResources
 
-// MARK: - Profile Gallery Controller
-
 public class ProfileGalleryController: TelegramBaseController {
-
     private var galleryNode: ProfileGalleryControllerNode {
         return self.displayNode as! ProfileGalleryControllerNode
     }
     private var presentationData: PresentationData
+    private var photos: [UserPhoto]
+    private var videos: [UserVideoItem]
     
     private let context: AccountContext
-    private let photos: [UserPhoto]
-    private let videos: [UserVideoItem]
     private let initialIndex: Int
     private let isVideoGallery: Bool
     
-
-    // MARK: - Init
-
+    public var requestMoreData: (() -> Void)? {
+        didSet {
+            if self.isNodeLoaded {
+                self.galleryNode.requestMoreData = requestMoreData
+            }
+        }
+    }
+    
     public init(
         context: AccountContext,
         photos: [UserPhoto] = [],
@@ -68,10 +68,7 @@ public class ProfileGalleryController: TelegramBaseController {
     required public init(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-
-
-    // MARK: - Override
-
+    
     override public func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         self.galleryNode.pauseAllVideos()
@@ -87,18 +84,28 @@ public class ProfileGalleryController: TelegramBaseController {
             isVideoGallery: self.isVideoGallery,
             controller: self
         )
+        self.displayNode.backgroundColor = .black
+        self.galleryNode.requestMoreData = self.requestMoreData
         
         self.galleryNode.onIndexChanged = { [weak self] index, total in
             self?.title = "\(index + 1) of \(total)"
         }
         
-        self.displayNode.backgroundColor = .black
-    
-        self.galleryNode.onIndexChanged = {[weak self] index, total in
-            self?.title = "\(index + 1) of \(total)"
-        }
-        
         self.displayNodeDidLoad()
+    }
+    
+    public func updateData(photos: [UserPhoto], videos:[UserVideoItem]) {
+        self.photos = photos
+        self.videos = videos
+        
+        self.galleryNode.updateData(photos: photos, videos: videos)
+        
+        let totalCount = self.isVideoGallery ? videos.count : photos.count
+        self.title = "\(self.galleryNode.currentIndex + 1) of \(totalCount)"
+    }
+    
+    public func finishLoadingWithoutNewData() {
+        self.galleryNode.finishLoadingWithoutNewData()
     }
     
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
