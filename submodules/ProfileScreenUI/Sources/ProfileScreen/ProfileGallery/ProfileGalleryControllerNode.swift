@@ -365,9 +365,6 @@ extension ProfileGalleryControllerNode: UICollectionViewDataSource {
                     cell.configure(with: previewUrl, isVideo: false)
                 }
             }
-            DispatchQueue.main.async {[weak self] in
-                self?.updatePreviewCellsScale()
-            }
             return cell
         }
     }
@@ -433,12 +430,9 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
             if page != self.currentIndex && page >= 0 && page < totalCount {
                 self._currentIndex = page
                 self.onIndexChanged?(page, totalCount)
-                if self.isVideoGallery {
-                    self.playVideo(at: page)
-                }
             }
             isSyncingScroll = false
-            
+
         } else if scrollView == self.previewCollectionView {
             isSyncingScroll = true
             if let previewLayout = self.previewCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
@@ -460,9 +454,6 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
                 if page != self.currentIndex && page >= 0 && page < totalCount {
                     self._currentIndex = page
                     self.onIndexChanged?(page, totalCount)
-                    if self.isVideoGallery {
-                        self.playVideo(at: page)
-                    }
                 }
             }
             updatePreviewCellsScale()

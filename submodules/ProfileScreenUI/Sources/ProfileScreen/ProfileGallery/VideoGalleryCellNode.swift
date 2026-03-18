@@ -18,6 +18,7 @@ final class VideoGalleryCellNode: UICollectionViewCell {
     private var playerItem: AVPlayerItem?
     private var statusObservation: NSKeyValueObservation?
     private var displayLink: CADisplayLink?
+    private var pendingVideoURL: URL?
 
     private weak var nativeControlsView: UIView?
 
@@ -50,34 +51,19 @@ final class VideoGalleryCellNode: UICollectionViewCell {
 
     func configure(with file: UserVideoFile) {
         resetPlayer()
-        loadingSpinner.startAnimating()
-        
-        guard let urlString = file.fullUrl, let url = URL(string: urlString) else {
-            loadingSpinner.stopAnimating()
-            return
-        }
-        
-        playerItem = AVPlayerItem(url: url)
-        player = AVPlayer(playerItem: playerItem)
-        
-        player?.isMuted = false
-        playerViewController.player = player
-        
-        statusObservation = playerItem?.observe(\.status, options:[.new]) { [weak self] item, _ in
-            DispatchQueue.main.async {
-                if item.status == .readyToPlay || item.status == .failed {
-                    self?.loadingSpinner.stopAnimating()
-                }
-            }
-        }
-        
-        NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: playerItem, queue: .main) { [weak self] _ in
-            self?.player?.seek(to: .zero)
-            self?.player?.play()
-        }
+        guard let urlString = file.fullUrl, let url = URL(string: urlString) else { return }
+        // Только запоминаем URL — плеер создаём лениво в play(),
+        // чтобы не нагружать главный поток при быстром скролле.
+        pendingVideoURL = url
     }
-    
-    func play() { player?.play() }
+
+    func play() {
+        if player == nil, let url = pendingVideoURL {
+            setupPlayer(with: url)
+        }
+        player?.play()
+    }
+
     func pause() { player?.pause() }
     
 
@@ -132,18 +118,41 @@ final class VideoGalleryCellNode: UICollectionViewCell {
         return nil
     }
 
+    private func setupPlayer(with url: URL) {
+        loadingSpinner.startAnimating()
+
+        playerItem = AVPlayerItem(url: url)
+        player = AVPlayer(playerItem: playerItem)
+        player?.isMuted = false
+        playerViewController.player = player
+
+        statusObservation = playerItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
+            DispatchQueue.main.async {
+                if item.status == .readyToPlay || item.status == .failed {
+                    self?.loadingSpinner.stopAnimating()
+                }
+            }
+        }
+
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: playerItem, queue: .main) { [weak self] _ in
+            self?.player?.seek(to: .zero)
+            self?.player?.play()
+        }
+    }
+
     private func resetPlayer() {
         statusObservation?.invalidate()
         statusObservation = nil
-        
+
         NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
-        
+
         player?.pause()
         player = nil
         playerItem = nil
+        pendingVideoURL = nil
         playerViewController.player = nil
         loadingSpinner.stopAnimating()
-        
+
         nativeControlsView = nil
     }
 }
