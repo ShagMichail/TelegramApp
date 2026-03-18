@@ -1,5 +1,6 @@
 import UIKit
 import AVKit
+import AVFoundation
 import Display
 import TelegramCore
 
@@ -22,6 +23,13 @@ final class VideoGalleryCell: UICollectionViewCell {
 
     private static let firstFrameCache = NSCache<NSString, UIImage>()
     private static let thumbnailGenerationSemaphore = DispatchSemaphore(value: Constants.thumbnailGenerationParallelism)
+
+    /// Возвращает закешированный first-frame для указанного URL (CDN-строка).
+    /// Используется в PreviewCell, чтобы не генерировать миниатюру повторно если
+    /// VideoGalleryCell уже сделал это раньше (надёжный кадр с ретраями).
+    static func cachedFirstFrame(for urlString: String) -> UIImage? {
+        return firstFrameCache.object(forKey: urlString as NSString)
+    }
 
     private let thumbnailImageView: UIImageView = {
         let iv = UIImageView()
@@ -152,8 +160,8 @@ final class VideoGalleryCell: UICollectionViewCell {
     private func setupViews() {
         contentView.clipsToBounds = true
 
-        contentView.addSubview(thumbnailImageView)
         contentView.layer.addSublayer(playerLayer)
+        contentView.addSubview(thumbnailImageView)
         contentView.addSubview(shimmerContainer)
         contentView.addSubview(fallbackContainer)
         contentView.addSubview(titleLabel)
@@ -225,10 +233,8 @@ final class VideoGalleryCell: UICollectionViewCell {
         let currentConfigurationId = configurationId
 
         titleLabel.text = title ?? ""
-        // Длительность — визуальный маркер видео. Сразу показываем контейнер,
-        // а точное значение подставим позже, когда сможем получить duration.
-        durationContainer.isHidden = false
-        durationLabel.text = "—:—"
+        durationContainer.isHidden = true
+        durationLabel.text = ""
 
         self.canAutoPlay = Int.random(in: 1...4) == 1
         // willDisplay может случиться до readyToPlay, поэтому запоминаем желание автозапуска.
@@ -276,6 +282,15 @@ final class VideoGalleryCell: UICollectionViewCell {
                         // Как только у нас есть хоть что-то (превью) — можно убрать шиммер.
                         if !self.shimmerContainer.isHidden {
                             self.hideShimmer()
+                        }
+                    } else {
+                        // Preview URL вернул nil (404, битый файл и т.п.) —
+                        // сбрасываем previewUrlString чтобы loadThumbnail не вышел раньше времени,
+                        // и генерируем first-frame из самого видео как fallback.
+                        self.previewUrlString = nil
+                        self.showPreviewURL = nil
+                        if let videoUrl = self.currentVideoUrl {
+                            self.loadThumbnail(for: videoUrl, fallbackPreviewUrl: nil, attempt: 1, configurationId: currentConfigurationId)
                         }
                     }
                 }
@@ -335,6 +350,10 @@ final class VideoGalleryCell: UICollectionViewCell {
     private func setupPlayer(with url: URL) {
         cleanUpPlayerObservers()
 
+        // Ячейки сетки автоматически воспроизводят видео без звука.
+        // Используем .ambient + .mixWithOthers, чтобы не прерывать фоновую музыку других приложений.
+        try? AVAudioSession.sharedInstance().setCategory(.ambient, options: .mixWithOthers)
+
         // NOTE: Для remote-URL подсказка "precise duration" может сильно замедлять старт.
         // Нам достаточно приблизительной длительности (таймер в углу), поэтому отключаем.
         let asset = AVURLAsset(
@@ -369,6 +388,12 @@ final class VideoGalleryCell: UICollectionViewCell {
                     self.hideShimmer()
                     self.hasVisualContent = true
                     self.hideFallback()
+
+                    // Плавно скрываем превью-картинку, чтобы проявился playerLayer.
+                    // Это убирает эффект «чёрного экрана» между шиммером и видео.
+                    UIView.animate(withDuration: 0.2) {
+                        self.thumbnailImageView.alpha = 0
+                    }
 
                     // durationContainer уже показан, обновим текст таймера позже (если сможем посчитать duration).
 
@@ -430,7 +455,7 @@ final class VideoGalleryCell: UICollectionViewCell {
                 let duration = asset.duration
                 let seconds = CMTimeGetSeconds(duration)
 
-                if !seconds.isNaN && !seconds.isInfinite {
+                if !seconds.isNaN && !seconds.isInfinite && seconds > 0 {
                     DispatchQueue.main.async {
                         guard let self = self else { return }
                         // Ячейка могла переиспользоваться, игнорируем результаты старого запроса.
@@ -438,7 +463,16 @@ final class VideoGalleryCell: UICollectionViewCell {
 
                         self.totalDurationSeconds = seconds
                         self.durationLabel.text = self.formatDuration(seconds: seconds)
+                        self.durationContainer.isHidden = false
                     }
+                } else if seconds == 0 {
+                    // Нулевая длительность означает, что moov-атом находится в конце файла.
+                    // Повторяем запрос с точным режимом — он скачает достаточно данных для метаданных.
+                    let preciseAsset = AVURLAsset(
+                        url: expectedUrl,
+                        options: [AVURLAssetPreferPreciseDurationAndTimingKey: true]
+                    )
+                    self?.loadDuration(from: preciseAsset, expectedUrl: expectedUrl, configurationId: configurationId)
                 }
             }
         }
@@ -534,16 +568,25 @@ final class VideoGalleryCell: UICollectionViewCell {
                 return
             }
 
+            // На первой попытке используем быстрый режим (moov в начале файла — норма).
+            // На повторных — включаем точный: он справится с файлами, где moov в конце.
             let asset = AVURLAsset(
                 url: videoUrl,
-                options: [AVURLAssetPreferPreciseDurationAndTimingKey: false]
+                options: [AVURLAssetPreferPreciseDurationAndTimingKey: attempt > 1]
             )
             let imageGenerator = AVAssetImageGenerator(asset: asset)
             imageGenerator.appliesPreferredTrackTransform = true
             imageGenerator.maximumSize = Constants.thumbnailMaximumSize
             self.thumbnailGenerator = imageGenerator
 
-            let time = CMTime(seconds: 0.1, preferredTimescale: 600)
+            // Прогрессивные временные метки: попытка 1 → 0.1 с, 2 → 1.5 с, 3 → 30 % длины видео (мин. 3 с).
+            let seekSeconds: Double
+            switch attempt {
+            case 1:  seekSeconds = 0.1
+            case 2:  seekSeconds = 1.5
+            default: seekSeconds = max(self.totalDurationSeconds * 0.3, 3.0)
+            }
+            let time = CMTime(seconds: seekSeconds, preferredTimescale: 600)
             imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { [weak self] _, cgImage, _, result, _ in
                 signalOnceOnMain()
 
@@ -559,6 +602,14 @@ final class VideoGalleryCell: UICollectionViewCell {
                     guard self.configurationId == configurationId, self.currentVideoUrl == videoUrl else { return }
 
                     if result == .succeeded, let cgImage {
+                        // Если кадр почти чёрный (fade-in / тёмное начало) — повторяем
+                        // с более поздней меткой, чтобы не кешировать чёрное превью.
+                        if self.isEssentiallyBlack(cgImage), attempt < self.maxRetries {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                                self?.loadThumbnail(for: videoUrl, fallbackPreviewUrl: fallbackPreviewUrl, attempt: attempt + 1, configurationId: configurationId)
+                            }
+                            return
+                        }
                         let image = UIImage(cgImage: cgImage)
                         Self.firstFrameCache.setObject(image, forKey: cacheKey)
                         self.thumbnailImageView.image = image
@@ -579,6 +630,25 @@ final class VideoGalleryCell: UICollectionViewCell {
                 }
             }
         }
+    }
+
+    /// Возвращает `true`, если изображение почти полностью чёрное (средняя яркость < 15/255).
+    /// Используется для обнаружения кадра fade-in / тёмного начала видео.
+    private func isEssentiallyBlack(_ cgImage: CGImage) -> Bool {
+        let size = CGSize(width: 1, height: 1)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        var pixel: [UInt8] = [0, 0, 0, 0]
+        guard let context = CGContext(
+            data: &pixel,
+            width: 1, height: 1,
+            bitsPerComponent: 8,
+            bytesPerRow: 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return false }
+        context.draw(cgImage, in: CGRect(origin: .zero, size: size))
+        let brightness = (Int(pixel[0]) + Int(pixel[1]) + Int(pixel[2])) / 3
+        return brightness < 15
     }
 
     private func hideShimmer() {
@@ -685,6 +755,7 @@ final class VideoGalleryCell: UICollectionViewCell {
         titleLabel.text = nil
         thumbnailImageView.cancelImageLoad()
         thumbnailImageView.image = nil
+        thumbnailImageView.alpha = 1.0
         canAutoPlay = false
         shouldAutoPlayWhenReady = false
         configurationId &+= 1

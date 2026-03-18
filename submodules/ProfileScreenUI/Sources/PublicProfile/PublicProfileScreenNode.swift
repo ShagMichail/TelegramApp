@@ -565,12 +565,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     
     // MARK: - Sheet View
-    
+
     var onLikesTapped: (() -> Void)?
     var onViewsTapped: (() -> Void)?
     var onSavesTapped: (() -> Void)?
-    
-    
+    var onGalleryItemTapped: ((Int, Int) -> Void)? // (tabIndex, itemIndex)
+
+
     // MARK: - Init
     
     init(controller: ViewController, context: AccountContext, presentationData: PresentationData, model: ProfileModel) {
@@ -1826,7 +1827,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
         galleryIsLoading = false
         galleryHasMore = true
         galleryInitialized = false
-        // debug: removed
+        if let controller = self.controller as? PublicProfileScreenController {
+            controller.clearGalleryData()
+        }
+        print("🔄 [PAGINATION] Reset gallery pagination state")
     }
     
     // Флаг загрузки галереи
@@ -1874,28 +1878,15 @@ final class PublicProfileScreenNode: ASDisplayNode {
             controller.loadVideoGalleryPage(userId: userId, offset: 0)
         }
     }
-    
-    // Добавление элементов видео галереи из API
+
     func appendVideoGalleryItems(_ items: [UserVideoItem], pagination: Meta, isMyProfile: Bool) {
         let previousCount = videoGalleryItems.count
 
-        let validVideoExtensions: Set<String> = ["mp4", "mov", "avi", "mkv", "webm"]
-        let validPreviewExtensions: Set<String> = ["jpg", "jpeg", "png", "webp", "heic"]
-
         let photoItems: [UserPhoto] = items.compactMap { item in
-            // Ищем именно видео-файл, а не "первый попавшийся".
-            let videoFile = item.files.first(where: { file in
-                guard let ext = file.fileExtension?.lowercased() else { return false }
-                return validVideoExtensions.contains(ext)
-            })
-
+            let videoFile = item.files.first(where: { MediaFormatValidator.isVideo($0.fileExtension) })
             guard let videoFile else { return nil }
 
-            // Превью может быть отдельным файлом в item.files
-            let previewFile = item.files.first(where: { file in
-                guard let ext = file.fileExtension?.lowercased() else { return false }
-                return validPreviewExtensions.contains(ext)
-            })
+            let previewFile = item.files.first(where: { MediaFormatValidator.isImage($0.fileExtension) })
 
             let previewUserFile: UserFile? = previewFile.map {
                 UserFile(
@@ -1920,26 +1911,16 @@ final class PublicProfileScreenNode: ASDisplayNode {
             )
         }
 
-        // 1) Дедуп входящих элементов (API иногда может вернуть пересекающиеся страницы,
-        // а также мы должны быть устойчивы к повторному запросу одного offset)
         let existingIds = Set(videoGalleryItems.map { $0.id })
         let uniquePhotoItems = photoItems.filter { !existingIds.contains($0.id) }
 
         videoGalleryItems.append(contentsOf: uniquePhotoItems)
 
-        // 2) Offset: у API может быть два варианта:
-        // - currentOffset == offset из запроса (классический offset)
-        // - currentOffset == nextOffset (курсор-подобное поведение)
-        // Чтобы не гадать, ориентируемся на то, совпадает ли currentOffset с тем, что мы запрашивали.
         videoGalleryTotalCount = pagination.totalCount
         let nextOffset: Int
         if let lastRequested = videoGalleryLastRequestedOffset, pagination.currentOffset == lastRequested {
-            // Классический offset: следующий = offset + количество элементов, которое вернул сервер.
-            // Используем items.count (а не uniquePhotoItems.count), чтобы pagination не ломалась
-            // из-за фильтрации по расширению / дедупликации.
             nextOffset = pagination.currentOffset + items.count
         } else {
-            // Если сервер уже вернул nextOffset — используем его напрямую.
             nextOffset = pagination.currentOffset
         }
         videoGalleryCurrentOffset = nextOffset
@@ -1947,8 +1928,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoGalleryHasMore = videoGalleryItems.count < pagination.totalCount
         videoGalleryIsLoading = false
 
-        // debug: pagination logs removed
-                
         if previousCount == 0 {
             let hasVideos = !self.videoGalleryItems.isEmpty
             self.videoGalleryStatusView.isHidden = hasVideos
@@ -1964,9 +1943,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 self.updateAllCollectionViewHeights(layout: layout)
                 if self.currentTabIndex == 1 { self.updateCollectionsContainerHeight(animated: true) }
             }
-            // Важно: не инициируем автоматическую цепочку подгрузки страниц здесь.
-            // Иначе при большом контенте можно быстро выкачать все страницы,
-            // что приводит к большому количеству ячеек/AVPlayer и фризам.
         } else if !uniquePhotoItems.isEmpty {
             let newIndices = (previousCount..<(previousCount + uniquePhotoItems.count)).map { IndexPath(item: $0, section: 0) }
             self.videoGalleryCollectionView.performBatchUpdates({
@@ -1975,11 +1951,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
                     self.updateAllCollectionViewHeights(layout: layout)
                     if self.currentTabIndex == 1 { self.updateCollectionsContainerHeight(animated: true) }
                 }
-            }, completion: { _ in
-                // Пагинацию триггерим только через основной scrollViewDidScroll threshold.
-            })
-        } else {
-            // Пагинацию триггерим только через основной scrollViewDidScroll threshold.
+            }, completion: nil)
         }
     }
     
@@ -2037,7 +2009,11 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoGalleryHasMore = true
         videoGalleryRequestedOffsets.removeAll()
         videoGalleryLastRequestedOffset = nil
-        // debug: pagination logs removed
+
+        if let controller = self.controller as? PublicProfileScreenController {
+            controller.clearGalleryData()
+        }
+        print("🔄 [VIDEO] Reset video gallery pagination state")
     }
     
     // Флаг загрузки галереи видео
@@ -2366,9 +2342,13 @@ extension PublicProfileScreenNode: UICollectionViewDelegate {
             // debug: removed
             // TODO: Открыть профиль выбранного пользователя
             // handleSimilarProfileTap(profile)
+        } else if collectionView == galleryCollectionView {
+            onGalleryItemTapped?(0, indexPath.item)
+        } else if collectionView == videoGalleryCollectionView {
+            onGalleryItemTapped?(1, indexPath.item)
         }
     }
-    
+
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         if collectionView == videoGalleryCollectionView,
            let videoCell = cell as? VideoGalleryCell {
@@ -2377,7 +2357,7 @@ extension PublicProfileScreenNode: UICollectionViewDelegate {
             videoCell.play()
         }
     }
-    
+
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         if collectionView == videoGalleryCollectionView,
            let videoCell = cell as? VideoGalleryCell {

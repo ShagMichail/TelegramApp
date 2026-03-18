@@ -13,6 +13,22 @@ import LegacyMediaPickerUI
 import Postbox
 import MapResourceToAvatarSizes
 import ContextUI
+import GalleryUI
+
+enum MediaFormatValidator {
+    static let videoExtensions: Set<String> = ["mp4", "mov", "avi", "mkv", "webm"]
+    static let imageExtensions: Set<String> = ["jpg", "jpeg", "png", "webp", "heic"]
+    
+    static func isVideo(_ ext: String?) -> Bool {
+        guard let ext = ext?.lowercased() else { return false }
+        return videoExtensions.contains(ext)
+    }
+    
+    static func isImage(_ ext: String?) -> Bool {
+        guard let ext = ext?.lowercased() else { return false }
+        return imageExtensions.contains(ext)
+    }
+}
 
 public final class PublicProfileScreenController: TelegramBaseController {
 
@@ -44,11 +60,21 @@ public final class PublicProfileScreenController: TelegramBaseController {
     
     private var galleryLoaded: Bool = false
     private var profileLoaded: Bool = false
-    
+
     private var containerLayout: (ContainerViewLayout, CGFloat)?
-    
+
+    private weak var activeGalleryController: ProfileGalleryController?
+
     // для разработки
     private var isMyProfile: Bool = false
+    
+    internal var currentGalleryPhotos: [UserPhoto] = []
+    internal var currentGalleryVideos: [UserVideoItem] = []
+    
+    internal func clearGalleryData() {
+        currentGalleryPhotos = []
+        currentGalleryVideos = []
+    }
     
     public init(context: AccountContext, model: ProfileModel, peer: Peer? = nil) {
         self.context = context
@@ -165,19 +191,23 @@ public final class PublicProfileScreenController: TelegramBaseController {
             presentationData: self.presentationData,
             model: model
         )
-        
+
         self.controllerNode.onLikesTapped = {[weak self] in
             self?.presentInteractionSheet(type: .likes)
         }
-        
+
         self.controllerNode.onViewsTapped = { [weak self] in
             self?.presentInteractionSheet(type: .views)
         }
-        
+
         self.controllerNode.onSavesTapped = {[weak self] in
             self?.presentInteractionSheet(type: .saves)
         }
-        
+
+        self.controllerNode.onGalleryItemTapped = { [weak self] tabIndex, itemIndex in
+            self?.openFullScreenGallery(tabIndex: tabIndex, itemIndex: itemIndex)
+        }
+
         self.displayNodeDidLoad()
     }
     
@@ -238,20 +268,18 @@ public final class PublicProfileScreenController: TelegramBaseController {
     }
 }
 
-// Загрузка фотографий
+// MARK: - Загрузка фотографий
 extension PublicProfileScreenController {
     func loadGalleryPage(userId: Int, offset: Int) {
-        // Устанавливаем флаг загрузки перед запросом
         controllerNode.setGalleryLoading(true)
-        
+
         var body: GalleryListRequest
         if !isMyProfile {
             body = GalleryListRequest(offset: offset, limit: 6, userId: userId)
         } else {
-            // для тестов модели 31999
             body = GalleryListRequest(offset: offset, limit: 6, userId: 31999)
         }
-        
+
         Task {
             do {
                 let response: UserGalleryResponse = try await DivoAPIClient.shared.request(
@@ -260,35 +288,83 @@ extension PublicProfileScreenController {
                     body: body
                 )
                 await MainActor.run {
-                    if !isMyProfile {
-                        self.controllerNode.appendGalleryPhotos(response.data, isMyProfile: model.isMyProfile)
+                    let isMy = !self.isMyProfile ? self.model.isMyProfile : self.isMyProfile
+                    
+                    let existingIds = Set(self.currentGalleryPhotos.map { $0.id })
+                    let newPhotos = response.data.items.filter { !existingIds.contains($0.id) }
+                    
+                    self.controllerNode.appendGalleryPhotos(response.data, isMyProfile: isMy)
+                    self.currentGalleryPhotos.append(contentsOf: newPhotos)
+                    
+                    // 🚀 ЗАЩИТА: Обновляем только если есть что-то новое, иначе просто снимаем флаг загрузки
+                    if !newPhotos.isEmpty {
+                        self.activeGalleryController?.updateData(photos: self.currentGalleryPhotos, videos: self.currentGalleryVideos)
                     } else {
-                        // для тестов своего профиля
-                        self.controllerNode.appendGalleryPhotos(response.data, isMyProfile: isMyProfile)
+                        // Сообщаем галерее, что загрузка окончена (чтобы она сняла блок)
+                        self.activeGalleryController?.finishLoadingWithoutNewData()
                     }
                 }
             } catch {
                 self.debugLog("[DivoAPI] user/\(userId) error: \(error)")
-                // Сбрасываем флаг при ошибке
                 controllerNode.setGalleryLoading(false)
+                self.activeGalleryController?.finishLoadingWithoutNewData()
             }
         }
     }
+    
+    // Открытие галереи на полный экран
+    private func openFullScreenGallery(tabIndex: Int, itemIndex: Int) {
+        print("🖼️ [GALLERY] Opening full-screen gallery, tabIndex=\(tabIndex), itemIndex=\(itemIndex)")
+        
+        guard itemIndex >= 0 else { return }
+        let galleryController: ProfileGalleryController
+        
+        if tabIndex == 0 {
+            guard !currentGalleryPhotos.isEmpty, itemIndex < currentGalleryPhotos.count else { return }
+            galleryController = ProfileGalleryController(
+                context: self.context,
+                photos: currentGalleryPhotos,
+                initialIndex: itemIndex,
+                isVideoGallery: false
+            )
+        } else if tabIndex == 1 {
+            guard !currentGalleryVideos.isEmpty, itemIndex < currentGalleryVideos.count else { return }
+            galleryController = ProfileGalleryController(
+                context: self.context,
+                videos: currentGalleryVideos,
+                initialIndex: itemIndex,
+                isVideoGallery: true
+            )
+        } else {
+            return
+        }
+        
+        galleryController.requestMoreData = { [weak self] in
+            guard let self = self else { return }
+            if tabIndex == 0 {
+                self.controllerNode.loadNextGalleryPage()
+            } else if tabIndex == 1 {
+                self.controllerNode.loadNextVideoGalleryPage()
+            }
+        }
+        
+        self.activeGalleryController = galleryController
+        self.push(galleryController)
+    }
 }
 
-// Загрузка видео
+
+// MARK: - Загрузка видео
 extension PublicProfileScreenController {
     func loadVideoGalleryPage(userId: Int, offset: Int) {
-        // Важно: выставляем флаг загрузки синхронно ДО старта async Task.
-        // Иначе при быстром скролле может уйти второй запрос с тем же offset.
         controllerNode.setVideoGalleryLoading(true)
         var body: GalleryListRequest
         if !isMyProfile {
             body = GalleryListRequest(offset: offset, limit: 6, userId: userId)
         } else {
-            // для тестов модели 31999
             body = GalleryListRequest(offset: offset, limit: 6, userId: 31999)
         }
+        
         Task {
             do {
                 let response: UserVideoGalleryResponse = try await DivoAPIClient.shared.request(
@@ -298,20 +374,27 @@ extension PublicProfileScreenController {
                 )
                 
                 await MainActor.run {
-                    if !isMyProfile {
-                        self.controllerNode.appendVideoGalleryItems(
-                            response.data.items,
-                            pagination: response.data.pagination.meta,
-                            isMyProfile: model.isMyProfile
-                        )
+                    let videoItems:[UserVideoItem] = response.data.items.filter { item in
+                        item.files.contains { MediaFormatValidator.isVideo($0.fileExtension) }
+                    }
+                    
+                    let existingIds = Set(self.currentGalleryVideos.map { $0.id })
+                    let newVideos = videoItems.filter { !existingIds.contains($0.id) }
+                    
+                    let isMy = !self.isMyProfile ? self.model.isMyProfile : self.isMyProfile
+                    
+                    self.controllerNode.appendVideoGalleryItems(
+                        videoItems,
+                        pagination: response.data.pagination.meta,
+                        isMyProfile: isMy
+                    )
+                    self.currentGalleryVideos.append(contentsOf: newVideos)
+                    
+                    // 🚀 ЗАЩИТА: Обновляем только если пришло новое видео
+                    if !newVideos.isEmpty {
+                        self.activeGalleryController?.updateData(photos: self.currentGalleryPhotos, videos: self.currentGalleryVideos)
                     } else {
-                        
-                        // для тестов своего профиля
-                        self.controllerNode.appendVideoGalleryItems(
-                            response.data.items,
-                            pagination: response.data.pagination.meta,
-                            isMyProfile: isMyProfile
-                        )
+                        self.activeGalleryController?.finishLoadingWithoutNewData()
                     }
                 }
             } catch {
@@ -319,6 +402,7 @@ extension PublicProfileScreenController {
                 await MainActor.run {
                     controllerNode.videoGalleryRequestDidFail(offset: offset)
                     controllerNode.setVideoGalleryLoading(false)
+                    self.activeGalleryController?.finishLoadingWithoutNewData()
                 }
             }
         }
