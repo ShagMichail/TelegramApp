@@ -1,0 +1,506 @@
+import Foundation
+import UIKit
+import AVFoundation
+import Display
+import AsyncDisplayKit
+import TelegramCore
+import TelegramPresentationData
+import AccountContext
+import PhotoResources
+
+final class ProfileGalleryControllerNode: ASDisplayNode {
+
+    private let context: AccountContext
+    private let photos: [UserPhoto]
+    private let videos: [UserVideoItem]
+    private let initialIndex: Int
+    private let isVideoGallery: Bool
+    
+    private weak var controller: ViewController?
+    
+    private var presentationData: PresentationData
+    private var mainCollectionView: UICollectionView!
+    private var previewCollectionView: UICollectionView!
+    private var currentIndex: Int
+    private var previewHeight: CGFloat = 80
+    private var isSyncingScroll = false
+    private var isFirstLayout = true
+    private var panGesture: UIPanGestureRecognizer!
+    
+    var onIndexChanged: ((Int, Int) -> Void)?
+
+    
+    // MARK: - Init
+
+    init(
+        context: AccountContext,
+        presentationData: PresentationData,
+        photos:[UserPhoto],
+        videos: [UserVideoItem],
+        initialIndex: Int,
+        isVideoGallery: Bool,
+        controller: ViewController
+    ) {
+        self.context = context
+        self.presentationData = presentationData
+        self.photos = photos
+        self.videos = videos
+        self.initialIndex = initialIndex
+        self.isVideoGallery = isVideoGallery
+        self.controller = controller
+        self.currentIndex = initialIndex
+        
+        super.init()
+        
+        self.backgroundColor = .black
+        
+        self.setupMainCollectionView()
+        self.setupPreviewCollectionView()
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+
+    // MARK: - Override
+
+    override public func didLoad() {
+        super.didLoad()
+        self.panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+        self.panGesture.delegate = self
+        self.panGesture.cancelsTouchesInView = false
+        self.view.addGestureRecognizer(self.panGesture)
+        self.initializeScrollPosition()
+    }
+
+
+    // MARK: - Internal
+
+    func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        
+        self.isSyncingScroll = true
+        
+        if let flowLayout = self.mainCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+            flowLayout.itemSize = layout.size
+            flowLayout.invalidateLayout()
+        }
+        
+        if let previewLayout = self.previewCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+            let inset = (layout.size.width - previewLayout.itemSize.width) / 2.0
+            previewLayout.sectionInset = UIEdgeInsets(top: 0, left: inset, bottom: 0, right: inset)
+            previewLayout.invalidateLayout()
+        }
+        
+        self.mainCollectionView.layoutIfNeeded()
+        self.previewCollectionView.layoutIfNeeded()
+        
+        if self.isFirstLayout {
+            self.isFirstLayout = false
+            
+            let mainOffset = CGPoint(x: CGFloat(self.initialIndex) * layout.size.width, y: 0)
+            self.mainCollectionView.setContentOffset(mainOffset, animated: false)
+            
+            if let previewLayout = self.previewCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+                let itemTotalWidth = previewLayout.itemSize.width + previewLayout.minimumLineSpacing
+                let targetPreviewOffset = CGPoint(x: CGFloat(self.initialIndex) * itemTotalWidth, y: 0)
+                self.previewCollectionView.setContentOffset(targetPreviewOffset, animated: false)
+            }
+            
+            self.mainCollectionView.layoutIfNeeded()
+            self.previewCollectionView.layoutIfNeeded()
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                guard let self = self else { return }
+                self.updatePreviewSelection()
+                self.updatePreviewCellsScale()
+                self.playVideo(at: self.currentIndex)
+            }
+        }
+        
+        self.isSyncingScroll = false
+    }
+
+    func pauseAllVideos() {
+        guard self.isVideoGallery else { return }
+        for cell in self.mainCollectionView.visibleCells {
+            (cell as? VideoGalleryCellNode)?.pause()
+        }
+    }
+
+
+    // MARK: - Private
+    
+    private func initializeScrollPosition() {
+        guard self.photos.isEmpty == false || self.videos.isEmpty == false else { return }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            guard let self = self else { return }
+
+            let mainOffset = CGPoint(x: CGFloat(self.initialIndex) * self.mainCollectionView.bounds.width, y: 0)
+            self.mainCollectionView.setContentOffset(mainOffset, animated: false)
+            
+            if let previewLayout = self.previewCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+                let itemTotalWidth = previewLayout.itemSize.width + previewLayout.minimumLineSpacing
+                let targetPreviewOffset = CGPoint(x: CGFloat(self.initialIndex) * itemTotalWidth, y: 0)
+                self.previewCollectionView.setContentOffset(targetPreviewOffset, animated: false)
+            }
+            
+            self.mainCollectionView.layoutIfNeeded()
+            self.previewCollectionView.layoutIfNeeded()
+            
+            self.updatePreviewSelection()
+            self.updatePreviewCellsScale()
+        }
+    }
+    
+    private func updatePreviewSelection() {
+        for cell in self.previewCollectionView.visibleCells {
+            if let previewCell = cell as? PreviewCell,
+               let indexPath = self.previewCollectionView.indexPath(for: previewCell) {
+                previewCell.isSelected = indexPath.item == self.currentIndex
+            }
+        }
+    }
+    
+    private func setupMainCollectionView() {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        layout.minimumLineSpacing = 0
+        layout.minimumInteritemSpacing = 0
+        
+        let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        cv.backgroundColor = .black
+        cv.isPagingEnabled = true
+        cv.showsHorizontalScrollIndicator = false
+        cv.decelerationRate = .fast
+        cv.dataSource = self
+        cv.delegate = self
+        cv.translatesAutoresizingMaskIntoConstraints = false
+        cv.contentInsetAdjustmentBehavior = .never
+        
+        if self.isVideoGallery {
+            cv.register(VideoGalleryCellNode.self, forCellWithReuseIdentifier: "VideoCell")
+        } else {
+            cv.register(PhotoGalleryCellNode.self, forCellWithReuseIdentifier: "PhotoCell")
+        }
+        
+        self.view.addSubview(cv)
+        self.mainCollectionView = cv
+        
+        NSLayoutConstraint.activate([
+            cv.topAnchor.constraint(equalTo: self.view.topAnchor),
+            cv.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            cv.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            cv.bottomAnchor.constraint(equalTo: self.view.bottomAnchor)
+        ])
+    }
+    
+    private func setupPreviewCollectionView() {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        layout.itemSize = CGSize(width: 50, height: 50)
+        layout.minimumInteritemSpacing = 16
+        layout.minimumLineSpacing = 16
+        
+        let cv = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        cv.backgroundColor = .clear
+        cv.showsHorizontalScrollIndicator = false
+        cv.dataSource = self
+        cv.delegate = self
+        cv.translatesAutoresizingMaskIntoConstraints = false
+        cv.register(PreviewCell.self, forCellWithReuseIdentifier: "PreviewCell")
+        cv.decelerationRate = .fast
+        
+        self.view.addSubview(cv)
+        self.previewCollectionView = cv
+        
+        NSLayoutConstraint.activate([
+            cv.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            cv.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            cv.bottomAnchor.constraint(equalTo: self.view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            cv.heightAnchor.constraint(equalToConstant: self.previewHeight)
+        ])
+    }
+
+    private func playVideo(at index: Int) {
+        guard self.isVideoGallery else { return }
+        
+        for cell in self.mainCollectionView.visibleCells {
+            (cell as? VideoGalleryCellNode)?.pause()
+        }
+        
+        let targetIndexPath = IndexPath(item: index, section: 0)
+        if let targetCell = self.mainCollectionView.cellForItem(at: targetIndexPath) as? VideoGalleryCellNode {
+            targetCell.play()
+        }
+    }
+    
+    
+    // MARK: - @objc
+    
+    @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
+        let translation = gesture.translation(in: self.view)
+        let velocity = gesture.velocity(in: self.view)
+        
+        switch gesture.state {
+        case .changed:
+            if translation.y > 0 {
+                self.backgroundColor = .black
+                self.mainCollectionView.transform = CGAffineTransform(translationX: 0, y: translation.y)
+                self.previewCollectionView.transform = CGAffineTransform(translationX: 0, y: translation.y)
+            }
+        case .ended, .cancelled:
+            if translation.y > 150 || velocity.y > 500 {
+                self.pauseAllVideos()
+                
+                if let nav = self.controller?.navigationController as? NavigationController {
+                    _ = nav.popViewController(animated: true)
+                } else {
+                    self.controller?.dismiss()
+                }
+            } else {
+                UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: .curveEaseOut) {
+                    self.mainCollectionView.transform = .identity
+                    self.previewCollectionView.transform = .identity
+                }
+            }
+        default:
+            break
+        }
+    }
+}
+
+
+// MARK: - UIGestureRecognizerDelegate
+
+extension ProfileGalleryControllerNode: UIGestureRecognizerDelegate {
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if let pan = gestureRecognizer as? UIPanGestureRecognizer {
+            let velocity = pan.velocity(in: self.view)
+            return velocity.y > abs(velocity.x)
+        }
+        return true
+    }
+}
+
+
+// MARK: - UICollectionViewDataSource
+
+extension ProfileGalleryControllerNode: UICollectionViewDataSource {
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return self.isVideoGallery ? self.videos.count : self.photos.count
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        if collectionView == self.mainCollectionView {
+            if self.isVideoGallery {
+                let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "VideoCell", for: indexPath) as! VideoGalleryCellNode
+                let video = self.videos[indexPath.item]
+                if let firstFile = video.files.first {
+                    cell.configure(with: firstFile)
+                }
+                return cell
+            } else {
+                let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PhotoCell", for: indexPath) as! PhotoGalleryCellNode
+                let photo = self.photos[indexPath.item]
+                cell.configure(with: photo.photo)
+                return cell
+            }
+        } else {
+            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PreviewCell", for: indexPath) as! PreviewCell
+            if self.isVideoGallery {
+                let video = self.videos[indexPath.item]
+                if let firstFile = video.files.first, let previewUrl = firstFile.fullUrl {
+                    cell.configure(with: previewUrl, isVideo: true)
+                }
+            } else {
+                let photo = self.photos[indexPath.item]
+                if let previewUrl = photo.preview?.fullUrl ?? photo.photo.fullUrl {
+                    cell.configure(with: previewUrl, isVideo: false)
+                }
+            }
+            DispatchQueue.main.async {[weak self] in
+                self?.updatePreviewCellsScale()
+            }
+            return cell
+        }
+    }
+}
+
+
+// MARK: - UICollectionViewDelegate
+
+extension ProfileGalleryControllerNode: UICollectionViewDelegate {
+    func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        if collectionView == self.mainCollectionView && self.isVideoGallery,
+        let videoCell = cell as? VideoGalleryCellNode {
+            
+            if indexPath.item == self.currentIndex {
+                videoCell.play()
+            } else {
+                videoCell.pause()
+            }
+        }
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        if collectionView == self.mainCollectionView && self.isVideoGallery, 
+        let videoCell = cell as? VideoGalleryCellNode {
+            videoCell.pause()
+        }
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        if collectionView == self.previewCollectionView {
+            self.currentIndex = indexPath.item
+            self.mainCollectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: true)
+        }
+    }
+    
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        guard !isSyncingScroll else { return }
+        
+        if scrollView == self.mainCollectionView {
+            isSyncingScroll = true
+            let mainWidth = self.mainCollectionView.bounds.width
+            guard mainWidth > 0 else { isSyncingScroll = false; return }
+        
+            let progress = self.mainCollectionView.contentOffset.x / mainWidth
+            
+            if let previewLayout = self.previewCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+                let itemTotalWidth = previewLayout.itemSize.width + previewLayout.minimumLineSpacing
+                let targetX = progress * itemTotalWidth
+                self.previewCollectionView.contentOffset = CGPoint(x: targetX, y: 0)
+            }
+            
+            updatePreviewCellsScale()
+            
+            let page = Int(round(progress))
+            let totalCount = self.isVideoGallery ? self.videos.count : self.photos.count
+            if page != self.currentIndex && page >= 0 && page < totalCount {
+                self.currentIndex = page
+                self.onIndexChanged?(page, totalCount)
+                if self.isVideoGallery {
+                    self.playVideo(at: page)
+                }
+            }
+            isSyncingScroll = false
+            
+        } else if scrollView == self.previewCollectionView {
+            isSyncingScroll = true
+            if let previewLayout = self.previewCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+                let itemTotalWidth = previewLayout.itemSize.width + previewLayout.minimumLineSpacing
+                let progress = scrollView.contentOffset.x / itemTotalWidth
+                
+                let targetX = progress * self.mainCollectionView.bounds.width
+                self.mainCollectionView.contentOffset = CGPoint(x: targetX, y: 0)
+                
+                let page = Int(round(progress))
+                let totalCount = self.isVideoGallery ? self.videos.count : self.photos.count
+                if page != self.currentIndex && page >= 0 && page < totalCount {
+                    self.currentIndex = page
+                    self.onIndexChanged?(page, totalCount)
+                    if self.isVideoGallery {
+                        self.playVideo(at: page)
+                    }
+                }
+            }
+            updatePreviewCellsScale()
+            isSyncingScroll = false
+        }
+    }
+
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        if scrollView == self.mainCollectionView && self.isVideoGallery {
+            for cell in self.mainCollectionView.visibleCells {
+                (cell as? VideoGalleryCellNode)?.pause()
+            }
+        }
+    }
+
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        if scrollView == self.mainCollectionView {
+            playCenteredVideo()
+        }
+    }
+
+    func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+        if scrollView == self.mainCollectionView {
+            playCenteredVideo()
+        }
+    }
+
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        if scrollView == self.mainCollectionView && !decelerate {
+            playCenteredVideo()
+        }
+    }
+    
+    func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint, targetContentOffset: UnsafeMutablePointer<CGPoint>) {
+        if scrollView == self.previewCollectionView {
+            if let previewLayout = self.previewCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+                let itemTotalWidth = previewLayout.itemSize.width + previewLayout.minimumLineSpacing
+                let estimatedX = targetContentOffset.pointee.x
+                let page = round(estimatedX / itemTotalWidth)
+                targetContentOffset.pointee.x = page * itemTotalWidth
+            }
+        }
+    }
+
+    private func playCenteredVideo() {
+        guard self.isVideoGallery else { return }
+        
+        let centerPoint = CGPoint(x: mainCollectionView.contentOffset.x + mainCollectionView.bounds.width / 2, 
+                                y: mainCollectionView.bounds.height / 2)
+        
+        guard let indexPath = mainCollectionView.indexPathForItem(at: centerPoint) else { return }
+        
+        for cell in mainCollectionView.visibleCells {
+            if let videoCell = cell as? VideoGalleryCellNode {
+                if mainCollectionView.indexPath(for: cell) == indexPath {
+                    videoCell.play()
+                } else {
+                    videoCell.pause()
+                }
+            }
+        }
+    }
+
+    private func updateVideoPlaybackState() {
+        guard self.isVideoGallery else { return }
+        
+        for cell in self.mainCollectionView.visibleCells {
+            if let videoCell = cell as? VideoGalleryCellNode,
+               let indexPath = self.mainCollectionView.indexPath(for: videoCell) {
+                if indexPath.item == self.currentIndex {
+                    videoCell.play()
+                } else {
+                    videoCell.pause()
+                }
+            }
+        }
+    }
+    
+    private func updatePreviewCellsScale() {
+        let centerX = previewCollectionView.contentOffset.x + previewCollectionView.bounds.width / 2.0
+        
+        for cell in previewCollectionView.visibleCells {
+            let cellCenterX = cell.center.x
+            let distance = abs(cellCenterX - centerX)
+            
+            let scale = max(1.0, 1.25 - (distance / 200.0))
+            let alpha = max(0.4, 1.0 - (distance / 150.0))
+            
+            cell.transform = CGAffineTransform(scaleX: scale, y: scale)
+            cell.alpha = alpha
+
+            if scale > 1.20 {
+                cell.layer.borderWidth = 2.0 / scale
+                cell.layer.borderColor = UIColor.white.cgColor
+            } else {
+                cell.layer.borderWidth = 0
+            }
+        }
+    }
+}

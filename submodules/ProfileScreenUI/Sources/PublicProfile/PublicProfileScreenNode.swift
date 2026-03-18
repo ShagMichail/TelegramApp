@@ -548,12 +548,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     
     // MARK: - Sheet View
-    
+
     var onLikesTapped: (() -> Void)?
     var onViewsTapped: (() -> Void)?
     var onSavesTapped: (() -> Void)?
-    
-    
+    var onGalleryItemTapped: ((Int, Int) -> Void)? // (tabIndex, itemIndex)
+
+
     // MARK: - Init
     
     init(controller: ViewController, context: AccountContext, presentationData: PresentationData, model: ProfileModel) {
@@ -1741,6 +1742,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
         galleryIsLoading = false
         galleryHasMore = true
         galleryInitialized = false
+        if let controller = self.controller as? PublicProfileScreenController {
+            controller.clearGalleryData()
+        }
         print("🔄 [PAGINATION] Reset gallery pagination state")
     }
     
@@ -1908,6 +1912,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoGalleryCurrentOffset = 0
         videoGalleryIsLoading = false
         videoGalleryHasMore = true
+        if let controller = self.controller as? PublicProfileScreenController {
+            controller.clearGalleryData()
+        }
         print("🔄 [VIDEO] Reset video gallery pagination state")
     }
     
@@ -2239,16 +2246,20 @@ extension PublicProfileScreenNode: UICollectionViewDelegate {
             print("👤 Selected similar profile: \(profile.name)")
             // TODO: Открыть профиль выбранного пользователя
             // handleSimilarProfileTap(profile)
+        } else if collectionView == galleryCollectionView {
+            onGalleryItemTapped?(0, indexPath.item)
+        } else if collectionView == videoGalleryCollectionView {
+            onGalleryItemTapped?(1, indexPath.item)
         }
     }
-    
+
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         if collectionView == videoGalleryCollectionView,
            let videoCell = cell as? VideoGalleryCell {
             videoCell.play()
         }
     }
-    
+
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         if collectionView == videoGalleryCollectionView,
            let videoCell = cell as? VideoGalleryCell {
