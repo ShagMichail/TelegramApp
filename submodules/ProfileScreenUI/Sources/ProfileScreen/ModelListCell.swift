@@ -1,12 +1,14 @@
 import UIKit
 import Display
 import AccountContext
+import TelegramCore
 
 struct ModelItem {
     let name: String
     let role: String
     let isPremium: Bool
     let customAvatarURL: String?
+    let localAvatarName: String?
 }
 
 final class ModelListCell: UICollectionViewCell {
@@ -87,7 +89,29 @@ final class ModelListCell: UICollectionViewCell {
         nameLabel.text = item.name
         roleLabel.text = item.role
         premiumBadge.isHidden = !item.isPremium
-        // TODO: integrate avatar loading if needed
+        let placeholderColor = UIColor(white: 0.92, alpha: 1.0)
+        if let avatarURLString = item.customAvatarURL,
+           let url = CDNURLHelper.convertToCDNURL(avatarURLString) {
+            avatarImageView.backgroundColor = placeholderColor
+            avatarImageView.loadImage(from: url) { [weak self] image in
+                self?.avatarImageView.applyAvatarTopCropIfNeeded(image: image)
+            }
+        } else if let localName = item.localAvatarName, let image = UIImage(named: localName) {
+            avatarImageView.image = image
+            avatarImageView.applyAvatarTopCropIfNeeded(image: image)
+        } else {
+            avatarImageView.image = nil
+            avatarImageView.backgroundColor = placeholderColor
+            avatarImageView.applyAvatarTopCropIfNeeded(image: nil)
+        }
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        avatarImageView.cancelImageLoad()
+        avatarImageView.layer.contentsRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+        avatarImageView.image = nil
+        avatarImageView.backgroundColor = UIColor(white: 0.2, alpha: 1.0)
     }
 }
 

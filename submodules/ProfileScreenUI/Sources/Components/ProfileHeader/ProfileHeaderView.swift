@@ -7,6 +7,7 @@
 
 import UIKit
 import Display
+import TelegramCore
 
 struct UserProfileViewModel {
     enum Job {
@@ -74,6 +75,13 @@ class ProfileHeaderView: UIView {
         iv.translatesAutoresizingMaskIntoConstraints = false
         return iv
     }()
+
+    /// В обычном `.scaleAspectFill` кроп центрируется. Для портретных фото это часто «съедает» верх (голову).
+    /// Поэтому для аватарки мы делаем квадратный кроп с приоритетом верхней части.
+    private func applyAvatarContentsRect(for image: UIImage?) {
+        // Держим реализацию в одном месте, чтобы поведение совпадало со списками.
+        avatarImageView.applyAvatarTopCropIfNeeded(image: image)
+    }
     
     private let avatarSpinner: UIActivityIndicatorView = {
         let spinner = UIActivityIndicatorView(style: .large)
@@ -238,9 +246,17 @@ class ProfileHeaderView: UIView {
     
     func configure(with viewModel: UserProfileViewModel) {
         let text = viewModel.name.uppercased()
+        let paragraphStyle = NSMutableParagraphStyle()
+        let lineHeight = Font.helveticaNeue(34).lineHeight * 0.95
+        paragraphStyle.minimumLineHeight = lineHeight
+        paragraphStyle.maximumLineHeight = lineHeight
+        paragraphStyle.alignment = .left
         let attributes: [NSAttributedString.Key: Any] = [
             .font: Font.helveticaNeue(34),
             .foregroundColor: UIColor.white,
+            .kern: 0.5,
+            .paragraphStyle: paragraphStyle,
+            .baselineOffset: -2.0
         ]
         nameLabel.attributedText = NSAttributedString(string: text, attributes: attributes)
         tagLabel.text = viewModel.jobTitle
@@ -273,7 +289,14 @@ class ProfileHeaderView: UIView {
         onlineStatusView.isHidden = !viewModel.isOnline
         crownIconView.isHidden = !viewModel.isPremium
         
+        // Важно: в текущей архитектуре аватар может приезжать отдельно через `changeAvatar(with:)`.
+        // В `configure` часто передают `avatarImage: nil`, и если здесь сбрасывать contentsRect,
+        // то после повторного открытия экрана можно снова получить «центральный» кроп и обрезание головы.
+        // Поэтому:
+        // - если image есть -> выставляем и применяем кроп
+        // - если image нет -> НЕ трогаем contentsRect (оставляем то, что было выставлено в changeAvatar)
         if let image = viewModel.avatarImage {
+            applyAvatarContentsRect(for: image)
             avatarImageView.image = image
         }
     }
@@ -281,8 +304,10 @@ class ProfileHeaderView: UIView {
     func changeAvatar(with image: UIImage?) {
         if let image = image {
             avatarImageView.image = image
+            applyAvatarContentsRect(for: image)
         } else {
             avatarImageView.image = UIImage(systemName: "person.crop.circle.fill")
+            applyAvatarContentsRect(for: nil)
         }
     }
     

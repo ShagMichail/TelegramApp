@@ -24,6 +24,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private var navigationBarTitleView: ProfileNavigationBarTitleView?
     private var navigationBarTitleHeightConstraint: NSLayoutConstraint!
     
+    // Управление моментом, когда начинаем анимировать title в навбаре
+    private var titleVisibilityActivated = false
+    
     private var headerHeightConstraint: NSLayoutConstraint!
     private var socialHeightConstraint: NSLayoutConstraint!
     private let iconPlaceholder = "HeartActionIcon"
@@ -130,6 +133,15 @@ final class PublicProfileScreenNode: ASDisplayNode {
         button.isHidden = true
         return button
     }()
+
+    private enum ActionViewTags {
+        static let dmIcon = 9_101
+        static let dmLabel = 9_102
+
+        static let counterIcon = 9_201
+        static let counterCountLabel = 9_202
+        static let counterNameLabel = 9_203
+    }
     
     private let likesView: UIControl = {
         let control = UIControl()
@@ -402,6 +414,11 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private var videoGalleryCurrentOffset: Int = 0
     private var videoGalleryIsLoading: Bool = false
     private var videoGalleryHasMore: Bool = true
+    /// Защита от повторного запроса одной и той же страницы (особенно offset=0)
+    private var videoGalleryRequestedOffsets: Set<Int> = []
+    /// Последний offset, который мы отправили в запросе. Нужен, чтобы корректно вычислять nextOffset
+    /// независимо от того, что означает `pagination.meta.currentOffset` (current vs next).
+    private var videoGalleryLastRequestedOffset: Int?
     
     private lazy var videoGalleryCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -1058,46 +1075,44 @@ final class PublicProfileScreenNode: ASDisplayNode {
     // Убираем шиммеры, после загрузки
     private func stopShimmers() {
         guard profileHeaderView.isHidden else { return }
-        
-        navigationBarTitleView?.alpha = 0
-        // если сделать тут, то из-за стека будет пролагивание вниз
-        profileHeaderView.isHidden = false
-        profileHeaderView.alpha = 0
-        
-        counterActionsStack.isHidden = false
-        counterActionsStack.alpha = 0
-        
-        profileInfoView.isHidden = false
-        profileInfoView.alpha = 0
-        
-        socialMediaStack.isHidden = false
-        socialMediaStack.alpha = 0
-        
-        currentAgencyView.isHidden = false
-        currentAgencyView.alpha = 0
-        
-        UIView.animate(withDuration: 0.3, delay: 0.1, options: .curveEaseInOut, animations: {
-            self.profileHeaderShimmerView.alpha = 0
-            self.actionsShimmerView.alpha = 0
-            self.profileInfoShimmerView.alpha = 0
-            self.socialShimmerView.alpha = 0
-            self.currentAgencyShimmerView.alpha = 0
-            
-            self.profileHeaderView.alpha = 1
-            self.profileHeaderView.isHidden = false
-            self.counterActionsStack.alpha = 1
-            self.profileInfoView.alpha = 1
-            self.socialMediaStack.alpha = 1
-            self.currentAgencyView.alpha = 1
-            
-        }) { (completed) in
-            if completed {
-                self.profileHeaderShimmerView.isHidden = true
-                self.actionsShimmerView.isHidden = true
-                self.profileInfoShimmerView.isHidden = true
-                self.socialShimmerView.isHidden = true
-                self.currentAgencyShimmerView.isHidden = true
-            }
+
+        // Важно: переключение шиммеров на контент должно быть без каких-либо анимаций,
+        // иначе некоторые блоки (например Current Agency) визуально «дергаются».
+        UIView.performWithoutAnimation {
+            // Полностью отключаем все implicit animations
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            CATransaction.setAnimationDuration(0.0)
+            CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
+
+            // Мгновенно переключаем шиммеры на контент
+            profileHeaderShimmerView.isHidden = true
+            profileHeaderView.alpha = 1.0
+            profileHeaderView.isHidden = false  // Убедимся, что view виден
+
+            actionsShimmerView.isHidden = true
+            counterActionsStack.alpha = 1.0
+            counterActionsStack.isHidden = false
+
+            profileInfoShimmerView.isHidden = true
+            profileInfoView.alpha = 1.0
+            profileInfoView.isHidden = false
+
+            socialShimmerView.isHidden = true
+            socialMediaStack.alpha = 1.0
+            socialMediaStack.isHidden = false
+
+            currentAgencyShimmerView.isHidden = true
+            currentAgencyView.alpha = 1.0
+            currentAgencyView.isHidden = false
+
+            CATransaction.commit()
+
+            // Принудительно обновляем layout
+            self.contentViewStack.setNeedsLayout()
+            self.contentViewStack.layoutIfNeeded()
+            self.view.setNeedsLayout()
+            self.view.layoutIfNeeded()
         }
     }
     
@@ -1147,14 +1162,22 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     // Настройка кнопки чата/загрузки фотографии
     private func setupDmButtonContent() {
-        dmButton.subviews.forEach { $0.removeFromSuperview() }
-        
         var iconImageName = "Chat/Context Menu/MessageBubble"
         var labelText = "Send DM"
         if model.isMyProfile {
             iconImageName = "Avatar/AddAvatarIconLarge"
             labelText = "Upload your photos"
         }
+
+        // Важно: не пересоздаем subviews каждый раз (иначе UI заметно дергается при обновлениях)
+        if let iconImageView = dmButton.viewWithTag(ActionViewTags.dmIcon) as? UIImageView,
+           let label = dmButton.viewWithTag(ActionViewTags.dmLabel) as? UILabel {
+            iconImageView.image = UIImage(bundleImageName: iconImageName)
+            label.text = labelText
+            return
+        }
+
+        dmButton.subviews.forEach { $0.removeFromSuperview() }
         
         let iconImageView: UIImageView = {
             let imageView = UIImageView()
@@ -1162,6 +1185,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             imageView.tintColor = .white
             imageView.contentMode = .scaleAspectFit
             imageView.translatesAutoresizingMaskIntoConstraints = false
+            imageView.tag = ActionViewTags.dmIcon
             return imageView
         }()
         
@@ -1171,6 +1195,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             label.textColor = .white
             label.font = Font.helveticaNeue(13)
             label.translatesAutoresizingMaskIntoConstraints = false
+            label.tag = ActionViewTags.dmLabel
             return label
         }()
         
@@ -1196,6 +1221,17 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     // Создание кнопок счетчиков (лайки, просмотры, сохраненки)
     private func setupCounterView(_ container: UIControl, count: String, name: String, iconName: String) {
+        // Важно: не пересоздаем subviews/constraints каждый раз.
+        // Иначе при повторных updateWithUserDetail / refresh будет заметный «рывок».
+        if let iconImageView = container.viewWithTag(ActionViewTags.counterIcon) as? UIImageView,
+           let countLabel = container.viewWithTag(ActionViewTags.counterCountLabel) as? UILabel,
+           let nameLabel = container.viewWithTag(ActionViewTags.counterNameLabel) as? UILabel {
+            iconImageView.image = UIImage(bundleImageName: iconName)
+            countLabel.text = count
+            nameLabel.text = name
+            return
+        }
+
         container.subviews.forEach { $0.removeFromSuperview() }
         
         let icon: UIImageView = {
@@ -1206,6 +1242,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             imageView.translatesAutoresizingMaskIntoConstraints = false
             imageView.widthAnchor.constraint(equalToConstant: 20).isActive = true
             imageView.heightAnchor.constraint(equalToConstant: 20).isActive = true
+            imageView.tag = ActionViewTags.counterIcon
             return imageView
         }()
         
@@ -1214,6 +1251,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             label.text = count
             label.font = UIFont.boldSystemFont(ofSize: 14)
             label.textColor = .white
+            label.tag = ActionViewTags.counterCountLabel
             return label
         }()
         
@@ -1222,6 +1260,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             label.text = name
             label.font = UIFont.systemFont(ofSize: 10)
             label.textColor = .white
+            label.tag = ActionViewTags.counterNameLabel
             return label
         }()
         
@@ -1345,7 +1384,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.similarProfilesOffset = self.similarProfiles.count
         self.similarProfilesHasMore = self.similarProfiles.count < totalCount
         
-        print("👥 [SIMILAR] Загружено \(profiles.count) профилей. Всего: \(self.similarProfiles.count) из \(totalCount)")
+        // debug: removed
         
         if previousCount == 0 {
             similarProfilesCollectionView.reloadData()
@@ -1466,21 +1505,42 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     // Первоначальная настройка титула NavigationBar
     private func setupNavigationBarTitle(name: String, info: String? = nil) {
-        let titleView = ProfileNavigationBarTitleView()
-        
-        titleView.configure(name: name, info: info)
-        
-        self.navigationBarTitleView = titleView
-        
-        if let controller = self.controller {
-            controller.navigationItem.titleView = titleView
+        // Проверяем, не создаем ли мы titleView повторно
+        if let existingTitleView = self.navigationBarTitleView {
+            existingTitleView.configure(name: name, info: info)
+        } else {
+            let titleView = ProfileNavigationBarTitleView()
+            
+            titleView.configure(name: name, info: info)
+            
+            self.navigationBarTitleView = titleView
+            
+            if let controller = self.controller {
+                controller.navigationItem.titleView = titleView
+            }
         }
+
+        // Важно: после загрузки titleView НЕ должен появляться мгновенно.
+        // Делаем состояние консистентным сразу после конфигурации.
+        if !titleVisibilityActivated {
+            navigationBarTitleView?.alpha = 0.0
+        }
+        updateNavigationBarTitleVisibility()
     }
     
     // Обновление титула NavigationBar
     private func updateNavigationBarTitleVisibility() {
         guard let titleView = navigationBarTitleView,
               let (_, navigationBarHeight) = self.containerLayout else { return }
+
+        // Пока мы не активировали механику появления заголовка (после загрузки данных),
+        // держим его скрытым — он должен появляться только при скролле.
+        guard titleVisibilityActivated else {
+            if titleView.alpha != 0.0 {
+                titleView.alpha = 0.0
+            }
+            return
+        }
         
         let offsetY = scrollView.contentOffset.y
         
@@ -1502,6 +1562,19 @@ final class PublicProfileScreenNode: ASDisplayNode {
         if titleView.alpha != alpha {
             titleView.alpha = alpha
         }
+    }
+    
+    // Активация анимации заголовка навбара
+    private func activateTitleVisibility() {
+        guard !titleVisibilityActivated else { return }
+        titleVisibilityActivated = true
+        
+        // Принудительно обновляем layout, чтобы анимация заголовка заработала
+        self.setNeedsLayout()
+        self.layoutIfNeeded()
+
+        // И сразу же пересчитываем видимость заголовка для текущего offset.
+        updateNavigationBarTitleVisibility()
     }
     
     
@@ -1563,17 +1636,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
             self.modelRole = "agency_employee"
             setupNavigationBarTitle(name: detail.agency?.title ?? "No name")
             
-            profileHeaderView.configure(with: UserProfileViewModel(
-                name: detail.agency?.title ?? "No name",
-                age: nil,
-                location: detail.agency?.address?.city?.name ?? "",
-                countryFlag: Self.flag(for: detail.agency?.address?.city?.countryCode),
-                jobTitle: detail.role?.lowercased() ?? "model",
-                avatarImage: nil,
-                isPremium: true,
-                isOnline: true
-            ))
-            
             if let photoURLString = detail.agency?.photo?.fullUrl, let photoURL = CDNURLHelper.convertToCDNURL(photoURLString) {
                 headerImageView.loadImage(from: photoURL)
             }
@@ -1589,16 +1651,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
             self.modelRole = "model"
             let age = detail.birthday.flatMap { calculateAge(from: $0) } ?? 0
             setupNavigationBarTitle(name: detail.fullName ?? "No name", info: "\(age) y.o • \(detail.city?.name ?? "")")
-            profileHeaderView.configure(with: UserProfileViewModel(
-                name: detail.fullName ?? "No name",
-                age: age,
-                location: detail.city?.name ?? "",
-                countryFlag: Self.flag(for: detail.city?.countryCode),
-                jobTitle: detail.role ?? "model",
-                avatarImage: nil,
-                isPremium: true,
-                isOnline: true
-            ))
             
             if let photoURLString = detail.photo?.fullUrl, let photoURL = CDNURLHelper.convertToCDNURL(photoURLString) {
                 headerImageView.loadImage(from: photoURL)
@@ -1632,9 +1684,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
         }
         
         let stats = detail.statistic
-        setupCounterView(likesView, count: "\(stats?.followersCount ?? 0)", name: "Like", iconName: "Instant View/Favorite")
-        setupCounterView(viewsView, count: "\(stats?.viewsCount ?? 0)", name: "Viewed", iconName: "Instant View/Visibility")
-        setupCounterView(savesView, count: "\(stats?.followingCount ?? 0)", name: "Save", iconName: "Instant View/Bookmark")
+        // Обновляем экшен-блок без пересоздания subviews, чтобы не было «дерганья» после загрузки
+        UIView.performWithoutAnimation {
+            setupCounterView(likesView, count: "\(stats?.followersCount ?? 0)", name: "Like", iconName: "Instant View/Favorite")
+            setupCounterView(viewsView, count: "\(stats?.viewsCount ?? 0)", name: "Viewed", iconName: "Instant View/Visibility")
+            setupCounterView(savesView, count: "\(stats?.followingCount ?? 0)", name: "Save", iconName: "Instant View/Bookmark")
+            self.counterActionsContainer.layoutIfNeeded()
+        }
         // что такое Save в модели?
         
 //        let socialIcons = ["Models/instaIcon", "Models/TikTokIcon", "Models/youtubeIcon", "Models/webIcon"]
@@ -1656,6 +1712,39 @@ final class PublicProfileScreenNode: ASDisplayNode {
         populateSocialMedia(handles: handles, icons: socialIcons)
         
         stopShimmers()
+        activateTitleVisibility()
+        
+        // Теперь устанавливаем информацию профиля после того, как шиммеры скрыты
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            if detail.role == "agency_employee" {
+                let viewModel = UserProfileViewModel(
+                    name: detail.agency?.title ?? "No name",
+                    age: nil,
+                    location: detail.agency?.address?.city?.name ?? "",
+                    countryFlag: Self.flag(for: detail.agency?.address?.city?.countryCode),
+                    jobTitle: detail.role?.lowercased() ?? "model",
+                    avatarImage: nil,
+                    isPremium: true,
+                    isOnline: true
+                )
+                self.profileHeaderView.configure(with: viewModel)
+            } else {
+                let age = detail.birthday.flatMap { self.calculateAge(from: $0) } ?? 0
+                let viewModel = UserProfileViewModel(
+                    name: detail.fullName ?? "No name",
+                    age: age,
+                    location: detail.city?.name ?? "",
+                    countryFlag: Self.flag(for: detail.city?.countryCode),
+                    jobTitle: detail.role ?? "model",
+                    avatarImage: nil,
+                    isPremium: true,
+                    isOnline: true
+                )
+                self.profileHeaderView.configure(with: viewModel)
+            }
+        }
     }
     
     // Добавление фотографий в галерею пагинацией
@@ -1663,12 +1752,11 @@ final class PublicProfileScreenNode: ASDisplayNode {
         let newPhotos = photos.items
         let totalCount = photos.pagination.meta.totalCount
         let serverOffset = photos.pagination.meta.currentOffset
-        let serverLimit = photos.pagination.meta.limit
         
         if !galleryInitialized {
             self.galleryPhotos = []
             galleryInitialized = true
-            print("🧹 [PAGINATION] Cleared galleryPhotos array (first load)")
+            // debug: pagination logs removed
         }
         
         let previousCount = self.galleryPhotos.count
@@ -1678,10 +1766,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.galleryHasMore = self.galleryPhotos.count < totalCount
         self.galleryIsLoading = false
         
-        print("🖼️ [PAGINATION] Загружено \(newPhotos.count) фото")
-        print("  - Server: offset=\(serverOffset), limit=\(serverLimit), total=\(totalCount)")
-        print("  - Before: \(previousCount), After: \(self.galleryPhotos.count), Next offset: \(self.galleryCurrentOffset)")
-        print("  - HasMore: \(self.galleryHasMore)")
+        // debug: pagination logs removed
         
         if previousCount == 0 {
             let hasPhotos = !self.galleryPhotos.isEmpty
@@ -1741,15 +1826,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
         galleryIsLoading = false
         galleryHasMore = true
         galleryInitialized = false
-        print("🔄 [PAGINATION] Reset gallery pagination state")
+        // debug: removed
     }
     
     // Флаг загрузки галереи
     func setGalleryLoading(_ loading: Bool) {
         galleryIsLoading = loading
-        if loading {
-            print("⏳ [PAGINATION] Set galleryIsLoading = true")
-        }
+        // debug: removed
     }
     
     // Проверка, есть ли еще фотографии на бэке для загрузки в галереи
@@ -1780,6 +1863,12 @@ final class PublicProfileScreenNode: ASDisplayNode {
     // Загрузка видео галереи
     func loadVideoGallery() {
         guard let userId = model.userId else { return }
+
+        // Первый запрос всегда offset=0. Ставим флаг загрузки и фиксируем offset,
+        // чтобы быстрый скролл не инициировал второй параллельный запрос.
+        videoGalleryIsLoading = true
+        videoGalleryRequestedOffsets.insert(0)
+        videoGalleryLastRequestedOffset = 0
         
         if let controller = self.controller as? PublicProfileScreenController {
             controller.loadVideoGalleryPage(userId: userId, offset: 0)
@@ -1787,16 +1876,34 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     // Добавление элементов видео галереи из API
-    func appendVideoGalleryItems(_ items: [UserVideoItem], totalCount: Int, isMyProfile: Bool) {
+    func appendVideoGalleryItems(_ items: [UserVideoItem], pagination: Meta, isMyProfile: Bool) {
         let previousCount = videoGalleryItems.count
-        
+
         let validVideoExtensions: Set<String> = ["mp4", "mov", "avi", "mkv", "webm"]
-        
+        let validPreviewExtensions: Set<String> = ["jpg", "jpeg", "png", "webp", "heic"]
+
         let photoItems: [UserPhoto] = items.compactMap { item in
-            guard let videoFile = item.files.first,
-                  let ext = videoFile.fileExtension?.lowercased(),
-                  validVideoExtensions.contains(ext) else {
-                return nil
+            // Ищем именно видео-файл, а не "первый попавшийся".
+            let videoFile = item.files.first(where: { file in
+                guard let ext = file.fileExtension?.lowercased() else { return false }
+                return validVideoExtensions.contains(ext)
+            })
+
+            guard let videoFile else { return nil }
+
+            // Превью может быть отдельным файлом в item.files
+            let previewFile = item.files.first(where: { file in
+                guard let ext = file.fileExtension?.lowercased() else { return false }
+                return validPreviewExtensions.contains(ext)
+            })
+
+            let previewUserFile: UserFile? = previewFile.map {
+                UserFile(
+                    fileName: $0.fileName,
+                    fullUrl: $0.fullUrl,
+                    fileExtension: $0.fileExtension,
+                    fileUuid: $0.fileUuid
+                )
             }
 
             return UserPhoto(
@@ -1809,19 +1916,38 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 ),
                 likesCount: item.likesCount,
                 isLikedByUser: item.isLikedByUser,
-                preview: nil
+                preview: previewUserFile
             )
         }
-        
-        videoGalleryItems.append(contentsOf: photoItems)
-        
-        videoGalleryTotalCount = totalCount
-        videoGalleryCurrentOffset += items.count
-        
-        videoGalleryHasMore = videoGalleryCurrentOffset < totalCount
+
+        // 1) Дедуп входящих элементов (API иногда может вернуть пересекающиеся страницы,
+        // а также мы должны быть устойчивы к повторному запросу одного offset)
+        let existingIds = Set(videoGalleryItems.map { $0.id })
+        let uniquePhotoItems = photoItems.filter { !existingIds.contains($0.id) }
+
+        videoGalleryItems.append(contentsOf: uniquePhotoItems)
+
+        // 2) Offset: у API может быть два варианта:
+        // - currentOffset == offset из запроса (классический offset)
+        // - currentOffset == nextOffset (курсор-подобное поведение)
+        // Чтобы не гадать, ориентируемся на то, совпадает ли currentOffset с тем, что мы запрашивали.
+        videoGalleryTotalCount = pagination.totalCount
+        let nextOffset: Int
+        if let lastRequested = videoGalleryLastRequestedOffset, pagination.currentOffset == lastRequested {
+            // Классический offset: следующий = offset + количество элементов, которое вернул сервер.
+            // Используем items.count (а не uniquePhotoItems.count), чтобы pagination не ломалась
+            // из-за фильтрации по расширению / дедупликации.
+            nextOffset = pagination.currentOffset + items.count
+        } else {
+            // Если сервер уже вернул nextOffset — используем его напрямую.
+            nextOffset = pagination.currentOffset
+        }
+        videoGalleryCurrentOffset = nextOffset
+
+        videoGalleryHasMore = videoGalleryItems.count < pagination.totalCount
         videoGalleryIsLoading = false
-        
-        print("🎬 [VIDEO] Пришло с сервера: \(items.count), Из них видео: \(photoItems.count). Всего в UI: \(videoGalleryItems.count) из \(totalCount)")
+
+        // debug: pagination logs removed
                 
         if previousCount == 0 {
             let hasVideos = !self.videoGalleryItems.isEmpty
@@ -1838,22 +1964,22 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 self.updateAllCollectionViewHeights(layout: layout)
                 if self.currentTabIndex == 1 { self.updateCollectionsContainerHeight(animated: true) }
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                self?.checkAndLoadMoreVideoGallery()
-            }
-        } else if !photoItems.isEmpty {
-            let newIndices = (previousCount..<(previousCount + photoItems.count)).map { IndexPath(item: $0, section: 0) }
+            // Важно: не инициируем автоматическую цепочку подгрузки страниц здесь.
+            // Иначе при большом контенте можно быстро выкачать все страницы,
+            // что приводит к большому количеству ячеек/AVPlayer и фризам.
+        } else if !uniquePhotoItems.isEmpty {
+            let newIndices = (previousCount..<(previousCount + uniquePhotoItems.count)).map { IndexPath(item: $0, section: 0) }
             self.videoGalleryCollectionView.performBatchUpdates({
                 self.videoGalleryCollectionView.insertItems(at: newIndices)
                 if let layout = self.containerLayout?.0 {
                     self.updateAllCollectionViewHeights(layout: layout)
                     if self.currentTabIndex == 1 { self.updateCollectionsContainerHeight(animated: true) }
                 }
-            }, completion: { [weak self] _ in
-                self?.checkAndLoadMoreVideoGallery()
+            }, completion: { _ in
+                // Пагинацию триггерим только через основной scrollViewDidScroll threshold.
             })
         } else {
-            self.checkAndLoadMoreVideoGallery()
+            // Пагинацию триггерим только через основной scrollViewDidScroll threshold.
         }
     }
     
@@ -1876,29 +2002,30 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoGalleryCollectionView.layoutIfNeeded()
     }
     
-    // Проверка загрузки следующих видео
-    func checkAndLoadMoreVideoGallery() {
-        guard videoGalleryHasMore && !videoGalleryIsLoading else { return }
-        
-        videoGalleryCollectionView.layoutIfNeeded()
-        
-        let contentHeight = videoGalleryCollectionView.contentSize.height
-        let frameHeight = videoGalleryCollectionView.frame.size.height
-        
-        if contentHeight <= frameHeight {
-            loadNextVideoGalleryPage()
-        }
-    }
+    // NOTE: checkAndLoadMoreVideoGallery() intentionally removed.
     
     // Загрузка следующей страницы видео
     func loadNextVideoGalleryPage() {
         guard !videoGalleryIsLoading && videoGalleryHasMore, let userId = model.userId else { return }
-        
+
+        // Гейт от повторного запроса той же страницы.
+        // Это защищает от ситуаций, когда несколько scroll событий подряд вызывают пагинацию.
+        let offset = videoGalleryCurrentOffset
+        guard !videoGalleryRequestedOffsets.contains(offset) else { return }
+        videoGalleryRequestedOffsets.insert(offset)
+        videoGalleryLastRequestedOffset = offset
+
         videoGalleryIsLoading = true
         
         if let controller = self.controller as? PublicProfileScreenController {
-            controller.loadVideoGalleryPage(userId: userId, offset: videoGalleryCurrentOffset)
+            controller.loadVideoGalleryPage(userId: userId, offset: offset)
         }
+    }
+
+    /// Вызвать при ошибке запроса, чтобы разрешить повторную попытку загрузки этой страницы.
+    func videoGalleryRequestDidFail(offset: Int) {
+        videoGalleryIsLoading = false
+        videoGalleryRequestedOffsets.remove(offset)
     }
     
     // Сброс пагинации видео галереи
@@ -1908,15 +2035,15 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoGalleryCurrentOffset = 0
         videoGalleryIsLoading = false
         videoGalleryHasMore = true
-        print("🔄 [VIDEO] Reset video gallery pagination state")
+        videoGalleryRequestedOffsets.removeAll()
+        videoGalleryLastRequestedOffset = nil
+        // debug: pagination logs removed
     }
     
     // Флаг загрузки галереи видео
     func setVideoGalleryLoading(_ loading: Bool) {
         videoGalleryIsLoading = loading
-        if loading {
-            print("⏳ [PAGINATION] Set videoGalleryIsLoading = true")
-        }
+        // debug: removed
     }
     
     
@@ -1956,7 +2083,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         channelGalleryCollectionView.heightAnchor.constraint(equalToConstant: max(channelsHeight, 1.0)).isActive = true
         channelGalleryCollectionView.layoutIfNeeded()
         
-        print("📏 [CHANNELS] Updated height to \(channelsHeight) for \(channelGalleryItems.count) items")
+        // debug: removed
     }
     
     
@@ -1994,7 +2121,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         modelGalleryCollectionView.heightAnchor.constraint(equalToConstant: max(modelsHeight, 1.0)).isActive = true
         modelGalleryCollectionView.layoutIfNeeded()
         
-        print("📏 [MODELS] Updated height to \(modelsHeight) for \(modelGalleryItems.count) items")
+        // debug: removed
     }
     
     
@@ -2032,7 +2159,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         eventGalleryCollectionView.heightAnchor.constraint(equalToConstant: max(eventsHeight, 1.0)).isActive = true
         eventGalleryCollectionView.layoutIfNeeded()
         
-        print("📏 [EVENTS] Updated height to \(eventsHeight) for \(eventGalleryItems.count) items")
+        // debug: removed
     }
     
     
@@ -2235,8 +2362,8 @@ extension PublicProfileScreenNode: UICollectionViewDataSource {
 extension PublicProfileScreenNode: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         if collectionView == similarProfilesCollectionView {
-            let profile = similarProfiles[indexPath.item]
-            print("👤 Selected similar profile: \(profile.name)")
+            _ = similarProfiles[indexPath.item]
+            // debug: removed
             // TODO: Открыть профиль выбранного пользователя
             // handleSimilarProfileTap(profile)
         }
@@ -2245,6 +2372,8 @@ extension PublicProfileScreenNode: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         if collectionView == videoGalleryCollectionView,
            let videoCell = cell as? VideoGalleryCell {
+            // Тяжёлый fallback (first-frame) запускаем только для реально видимых ячеек.
+            videoCell.willDisplay()
             videoCell.play()
         }
     }
@@ -2252,7 +2381,7 @@ extension PublicProfileScreenNode: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
         if collectionView == videoGalleryCollectionView,
            let videoCell = cell as? VideoGalleryCell {
-            videoCell.stop()
+            videoCell.stopAndReleasePlayer()
         }
     }
 }
@@ -2425,7 +2554,7 @@ extension PublicProfileScreenNode: ProfileSegmentedBarDelegate {
     
     func segmentedBar(_ segmentedBar: ProfileSegmentedBar, didSelectIndex index: Int) {
         guard index != currentTabIndex else { return }
-        print("📍 Swiping to index: \(index)")
+        // debug: removed
         
         let isSlidingLeft = index > currentTabIndex
         let screenWidth = self.view.bounds.width
