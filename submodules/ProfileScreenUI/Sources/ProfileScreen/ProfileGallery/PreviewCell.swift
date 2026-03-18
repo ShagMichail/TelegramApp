@@ -9,7 +9,7 @@ import AccountContext
 import PhotoResources
 
 final class PreviewCell: UICollectionViewCell {
-    
+
     private let imageView: UIImageView = {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFill
@@ -25,8 +25,9 @@ final class PreviewCell: UICollectionViewCell {
         indicator.translatesAutoresizingMaskIntoConstraints = false
         return indicator
     }()
-    
+
     private var imageLoadingTask: Task<Void, Never>?
+    private var configurationId: Int = 0
 
 
     // MARK: - Init
@@ -58,6 +59,7 @@ final class PreviewCell: UICollectionViewCell {
 
     override func prepareForReuse() {
         super.prepareForReuse()
+        configurationId &+= 1
         self.imageLoadingTask?.cancel()
         self.imageLoadingTask = nil
         self.imageView.image = nil
@@ -72,68 +74,73 @@ final class PreviewCell: UICollectionViewCell {
     // MARK: - Internal
 
     func configure(with urlString: String, isVideo: Bool = false) {
+        configurationId &+= 1
+        let currentConfigurationId = configurationId
+
         self.imageLoadingTask?.cancel()
+        self.imageLoadingTask = nil
         self.spinner.startAnimating()
-        
+
         guard let url = URL(string: urlString) else {
             self.spinner.stopAnimating()
             return
         }
-        
+
         if isVideo {
-            self.imageLoadingTask = Task { @MainActor in
-                do {
-                    let image = try await self.generateVideoThumbnail(from: url, at: 0.1)
-                    if !Task.isCancelled {
+            // Проверяем общий кеш с VideoGalleryCell — если сетка профиля уже сгенерировала
+            // миниатюру для этого URL, берём готовый кадр без повторной загрузки видео.
+            if let cached = VideoGalleryCell.cachedFirstFrame(for: url.absoluteString) {
+                self.imageView.image = cached
+                self.spinner.stopAnimating()
+            } else {
+                self.imageLoadingTask = Task { @MainActor in
+                    do {
+                        let image = try await self.generateVideoThumbnail(from: url, at: 0.1)
+                        guard !Task.isCancelled, self.configurationId == currentConfigurationId else { return }
                         self.imageView.image = image
-                    }
-                } catch {
-                    if !Task.isCancelled {
+                        // Намеренно НЕ пишем в VideoGalleryCell.firstFrameCache:
+                        // PreviewCell может поймать чёрный кадр (0.1 сек — ещё fade-in),
+                        // а VideoGalleryCell генерирует с ретраями и watchdog'ом —
+                        // пусть он сам кеширует надёжный результат.
+                    } catch {
+                        guard !Task.isCancelled else { return }
                         print("Failed to generate video thumbnail: \(error)")
                     }
-                }
-                if !Task.isCancelled {
+                    guard !Task.isCancelled, self.configurationId == currentConfigurationId else { return }
                     self.spinner.stopAnimating()
                 }
             }
         } else {
-            self.imageLoadingTask = Task { @MainActor in
-                do {
-                    let (data, _) = try await URLSession.shared.data(from: url)
-                    if let image = UIImage(data: data) {
-                        if !Task.isCancelled {
-                            self.imageView.image = image
-                        }
-                    }
-                } catch {
-                    if !Task.isCancelled {
-                        print("Failed to load preview: \(error)")
-                    }
-                }
-                if !Task.isCancelled {
+            // Используем ImageLoader (с кешем) вместо сырого URLSession —
+            // так при повторном показе ячейки картинка не качается заново.
+            ImageLoader.shared.load(url: url) { [weak self] image in
+                DispatchQueue.main.async {
+                    guard let self = self, self.configurationId == currentConfigurationId else { return }
                     self.spinner.stopAnimating()
+                    if let image = image {
+                        self.imageView.image = image
+                    }
                 }
             }
         }
     }
 
-    
+
     // MARK: - Private
-    
+
     private func generateVideoThumbnail(from url: URL, at time: Double) async throws -> UIImage {
-        let asset = AVAsset(url: url)
+        // AVURLAsset с отключённой точной длительностью быстрее для remote URL
+        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
         let imageGenerator = AVAssetImageGenerator(asset: asset)
         imageGenerator.appliesPreferredTrackTransform = true
-        imageGenerator.maximumSize = CGSize(width: 150, height: 150) // Маленький размер для превью
-        
+        imageGenerator.maximumSize = CGSize(width: 150, height: 150)
+
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
-        
-        // Используем старый API для iOS 13+
+
         return try await withCheckedThrowingContinuation { continuation in
             imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: cmTime)]) { _, cgImage, _, _, _ in
                 if let cgImage = cgImage {
-                    let image = UIImage(cgImage: cgImage)
-                    continuation.resume(returning: image)
+                    continuation.resume(returning: UIImage(cgImage: cgImage))
                 } else {
                     continuation.resume(throwing: NSError(domain: "ThumbnailGeneration", code: -1, userInfo: nil))
                 }

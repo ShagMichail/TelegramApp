@@ -334,8 +334,6 @@ extension ProfileGalleryControllerNode: UICollectionViewDataSource {
             if self.isVideoGallery {
                 let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "VideoCell", for: indexPath) as! VideoGalleryCellNode
                 let video = self.videos[indexPath.item]
-                
-                // 🚀 ИСПРАВЛЕНИЕ: Берем именно ВИДЕО файл, а не первую попавшуюся картинку-превью
                 if let videoFile = video.files.first(where: { MediaFormatValidator.isVideo($0.fileExtension) }) {
                     cell.configure(with: videoFile)
                 }
@@ -350,12 +348,20 @@ extension ProfileGalleryControllerNode: UICollectionViewDataSource {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PreviewCell", for: indexPath) as! PreviewCell
             if self.isVideoGallery {
                 let video = self.videos[indexPath.item]
-                if let previewFile = video.files.first(where: { MediaFormatValidator.isImage($0.fileExtension) }), let previewUrl = previewFile.fullUrl {
+                if let previewFile = video.files.first(where: { MediaFormatValidator.isImage($0.fileExtension) }),
+                   let previewUrl = CDNURLHelper.convertToCDN(previewFile.fullUrl) {
+                    // Используем CDN URL — тот же ключ кеша, что и в VideoGalleryCell профиля.
+                    // Благодаря этому ImageLoader отдаёт картинку из кеша при возврате на профиль.
                     cell.configure(with: previewUrl, isVideo: false)
+                } else if let videoFile = video.files.first(where: { MediaFormatValidator.isVideo($0.fileExtension) }),
+                          let videoUrl = CDNURLHelper.convertToCDN(videoFile.fullUrl) {
+                    // Превью нет — генерируем первый кадр из видео
+                    cell.configure(with: videoUrl, isVideo: true)
                 }
             } else {
                 let photo = self.photos[indexPath.item]
-                if let previewUrl = photo.preview?.fullUrl ?? photo.photo.fullUrl {
+                let rawUrl = photo.preview?.fullUrl ?? photo.photo.fullUrl
+                if let previewUrl = CDNURLHelper.convertToCDN(rawUrl) {
                     cell.configure(with: previewUrl, isVideo: false)
                 }
             }
