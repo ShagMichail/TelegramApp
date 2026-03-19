@@ -69,7 +69,7 @@ open -a Simulator
 xcrun simctl install booted bazel-bin/Telegram/Telegram.ipa
 
 # Запустить приложение
-xcrun simctl launch booted ph.telegra.Telegraph
+xcrun simctl launch booted app.divo.fashion
 ```
 
 ### 5. Сборка для физического девайса
@@ -167,7 +167,7 @@ TELEGRAM_ROOT="$HOME/Projects/TelegramApp"  # <-- укажите свой пут
 
 alias tg-build='cd $TELEGRAM_ROOT && bazel build //Telegram:Telegram --define=disableProvisioningProfiles=true --cpu=ios_sim_arm64 --define=buildNumber=100001 --define=telegramVersion=11.8.1'
 alias tg-install='xcrun simctl install booted $TELEGRAM_ROOT/bazel-bin/Telegram/Telegram.ipa'
-alias tg-run='xcrun simctl launch booted ph.telegra.Telegraph'
+alias tg-run='xcrun simctl launch booted app.divo.fashion'
 alias tg-boot='xcrun simctl boot "iPhone 16" 2>/dev/null || true && open -a Simulator'
 alias tg-go='tg-boot && tg-build && tg-install && tg-run'
 alias tg-clean='cd $TELEGRAM_ROOT && bazel clean --expunge'
