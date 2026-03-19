@@ -17,7 +17,7 @@ final class VideoGalleryCell: UICollectionViewCell {
         // Поэтому:
         // - ограничиваем параллелизм
         // - кешируем результат в памяти на время сессии
-        static let thumbnailGenerationParallelism: Int = 2
+        static let thumbnailGenerationParallelism: Int = 3
         static let thumbnailMaximumSize = CGSize(width: 480.0, height: 480.0)
     }
 
@@ -159,9 +159,13 @@ final class VideoGalleryCell: UICollectionViewCell {
 
     private func setupViews() {
         contentView.clipsToBounds = true
+        contentView.backgroundColor = .black
 
-        contentView.layer.addSublayer(playerLayer)
+        // Z-порядок (снизу вверх): thumbnail → playerLayer → shimmer → UI.
+        // playerLayer НАД thumbnail — при воспроизведении плеер закрывает превью,
+        // а при удалении плеера thumbnail виден без каких-либо манипуляций с alpha.
         contentView.addSubview(thumbnailImageView)
+        contentView.layer.insertSublayer(playerLayer, above: thumbnailImageView.layer)
         contentView.addSubview(shimmerContainer)
         contentView.addSubview(fallbackContainer)
         contentView.addSubview(titleLabel)
@@ -303,13 +307,19 @@ final class VideoGalleryCell: UICollectionViewCell {
         scheduleShimmerTimeout()
     }
 
-    /// Вызываем из `willDisplay`. Идея: тяжелый fallback (first-frame из видео)
-    /// запускаем только для реально видимых ячеек, иначе prefetch/reuse
-    /// может сильно замедлять первичную загрузку и скролл.
+    /// Вызываем из `willDisplay`. Если контент уже загружен — ничего не делаем.
+    /// Иначе принудительно запускаем генерацию thumbnail из видео как fallback,
+    /// даже если previewUrl ещё грузится (ImageLoader и thumbnail работают параллельно —
+    /// кто первый, тот и покажет картинку).
     func willDisplay() {
         guard let url = currentVideoUrl else { return }
-        // Если есть previewUrl — first-frame не нужен.
-        loadThumbnail(for: url, fallbackPreviewUrl: previewUrlString, attempt: 1, configurationId: configurationId)
+        guard !hasVisualContent else { return }
+
+        // Ячейка могла уехать с экрана и вернуться без prepareForReuse.
+        // Сбрасываем флаг, чтобы loadThumbnail не был заблокирован
+        // предыдущей незавершённой попыткой.
+        isGeneratingThumbnail = false
+        loadThumbnail(for: url, fallbackPreviewUrl: nil, attempt: 1, configurationId: configurationId)
     }
 
     private func scheduleShimmerTimeout() {
@@ -389,13 +399,8 @@ final class VideoGalleryCell: UICollectionViewCell {
                     self.hasVisualContent = true
                     self.hideFallback()
 
-                    // Плавно скрываем превью-картинку, чтобы проявился playerLayer.
-                    // Это убирает эффект «чёрного экрана» между шиммером и видео.
-                    UIView.animate(withDuration: 0.2) {
-                        self.thumbnailImageView.alpha = 0
-                    }
-
-                    // durationContainer уже показан, обновим текст таймера позже (если сможем посчитать duration).
+                    // playerLayer теперь НАД thumbnailImageView — плеер закроет превью
+                    // автоматически при воспроизведении. Анимировать alpha не нужно.
 
                     // Автопроигрывание (рандомно canAutoPlay) — запускаем когда player готов.
                     if self.canAutoPlay, self.shouldAutoPlayWhenReady {
@@ -538,30 +543,31 @@ final class VideoGalleryCell: UICollectionViewCell {
             }
         }
         thumbnailGenerationWatchdogWorkItem = watchdog
-        DispatchQueue.main.asyncAfter(deadline: .now() + 12.0, execute: watchdog)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8.0, execute: watchdog)
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             // Ограничиваем параллельную генерацию, чтобы быстрый скролл не создавал
             // десятки тяжелых операций одновременно.
             Self.thumbnailGenerationSemaphore.wait()
 
-            // Семафор мы захватили — сигналим строго один раз через замыкание,
-            // и делаем это на main, чтобы не было гонок с prepareForReuse.
+            // Семафор мы захватили — сигналим строго один раз через замыкание.
+            // Используем os_unfair_lock, чтобы не задерживать signal() диспатчем на main.
+            let signalLock = NSLock()
             var didSignal = false
-            let signalOnceOnMain: () -> Void = {
-                DispatchQueue.main.async {
-                    guard !didSignal else { return }
-                    didSignal = true
-                    Self.thumbnailGenerationSemaphore.signal()
-                }
+            let signalOnce: () -> Void = {
+                signalLock.lock()
+                defer { signalLock.unlock() }
+                guard !didSignal else { return }
+                didSignal = true
+                Self.thumbnailGenerationSemaphore.signal()
             }
 
             guard let self = self else {
-                signalOnceOnMain()
+                signalOnce()
                 return
             }
             guard self.configurationId == configurationId, self.currentVideoUrl == videoUrl else {
-                signalOnceOnMain()
+                signalOnce()
                 DispatchQueue.main.async { [weak self] in
                     self?.isGeneratingThumbnail = false
                 }
@@ -588,7 +594,7 @@ final class VideoGalleryCell: UICollectionViewCell {
             }
             let time = CMTime(seconds: seekSeconds, preferredTimescale: 600)
             imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { [weak self] _, cgImage, _, result, _ in
-                signalOnceOnMain()
+                signalOnce()
 
                 DispatchQueue.main.async {
                     guard let self = self else {
@@ -605,7 +611,7 @@ final class VideoGalleryCell: UICollectionViewCell {
                         // Если кадр почти чёрный (fade-in / тёмное начало) — повторяем
                         // с более поздней меткой, чтобы не кешировать чёрное превью.
                         if self.isEssentiallyBlack(cgImage), attempt < self.maxRetries {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                                 self?.loadThumbnail(for: videoUrl, fallbackPreviewUrl: fallbackPreviewUrl, attempt: attempt + 1, configurationId: configurationId)
                             }
                             return
@@ -622,7 +628,7 @@ final class VideoGalleryCell: UICollectionViewCell {
                         }
                     } else {
                         if attempt < self.maxRetries {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                                 self?.loadThumbnail(for: videoUrl, fallbackPreviewUrl: fallbackPreviewUrl, attempt: attempt + 1, configurationId: configurationId)
                             }
                         }
@@ -755,7 +761,6 @@ final class VideoGalleryCell: UICollectionViewCell {
         titleLabel.text = nil
         thumbnailImageView.cancelImageLoad()
         thumbnailImageView.image = nil
-        thumbnailImageView.alpha = 1.0
         canAutoPlay = false
         shouldAutoPlayWhenReady = false
         configurationId &+= 1
