@@ -63,11 +63,11 @@ final class EditSocialLinksNode: ASDisplayNode, UITextFieldDelegate {
         
         self.scrollNode = ASScrollNode()
         
-        let tiktok = linksData.tiktokUrl
-        let youtube = linksData.youtubeUrl 
-        let telegram = linksData.telegramUrl 
-        let instagram = linksData.instagramUrl 
-        let website = linksData.websiteUrl
+        let tiktok = linksData.tiktokUrl ?? ""
+        let youtube = linksData.youtubeUrl ?? ""
+        let telegram = linksData.telegramUrl ?? ""
+        let instagram = linksData.instagramUrl ?? ""
+        let website = linksData.websiteUrl ?? ""
 
         self.instagramTextField = DivoTextField(title: instagram, prefix: "instagram.com/")
         self.tiktokTextField = DivoTextField(title: tiktok, prefix: "tiktok.com/")
@@ -110,32 +110,19 @@ final class EditSocialLinksNode: ASDisplayNode, UITextFieldDelegate {
         self.applyButton.addTarget(self, action: #selector(self.applyButtonTapped), forControlEvents: .touchUpInside)
     }
 
-    @objc private func applyButtonTapped() {
-        let instagramHandle = self.instagramTextField.textField.text ?? ""
-            let tiktokHandle = self.tiktokTextField.textField.text ?? ""
-            let youtubeHandle = self.youtubeTextField.textField.text ?? ""
-            let telegramHandle = self.telegramTextField.textField.text ?? ""
-            let websiteHandle = self.websiteTextField.textField.text ?? ""
-
-        let linksData = LinksData(
-                tiktokUrl: constructFullURL(from: tiktokHandle, with: "tiktok.com/"),
-                youtubeUrl: constructFullURL(from: youtubeHandle, with: "youtube.com/"),
-                telegramUrl: constructFullURL(from: telegramHandle, with: "t.me/"),
-                instagramUrl: constructFullURL(from: instagramHandle, with: "instagram.com/"),
-                websiteUrl: constructFullURL(from: websiteHandle, with: "")
-            )
-
-        self.toggleSpinner(active: true)
-        self.saveSocialLinks?(linksData)
-    }
-
     func toggleSpinner(active: Bool) {
+        self.applyButton.isUserInteractionEnabled = !active
+        
         if active {
             self.applyButtonSpinner.startAnimating()
-            self.applyButton.alpha = 0.7
+            UIView.animate(withDuration: 0.2) {
+                self.applyButton.subnodes?.forEach { $0.alpha = 0.0 }
+            }
         } else {
             self.applyButtonSpinner.stopAnimating()
-            self.applyButton.alpha = 1.0
+            UIView.animate(withDuration: 0.2) {
+                self.applyButton.subnodes?.forEach { $0.alpha = 1.0 }
+            }
         }
     }
 
@@ -174,38 +161,50 @@ final class EditSocialLinksNode: ASDisplayNode, UITextFieldDelegate {
         self.readyValue = true
     }
 
-    private func constructFullURL(from handle: String, with prefix: String) -> String {
-        let trimmedHandle = handle.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func constructFullURL(from handle: String, with prefix: String) -> String? {
+        let trimmed = handle.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        guard !trimmedHandle.isEmpty else {
-            return ""
+        if trimmed.isEmpty { return nil }
+        
+        let plainHandle = trimmed
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+            .replacingOccurrences(of: "www.", with: "")
+        
+        var userPath = plainHandle
+        if !prefix.isEmpty {
+            let cleanPrefix = prefix.replacingOccurrences(of: "/", with: "")
+            userPath = plainHandle.replacingOccurrences(of: cleanPrefix, with: "")
         }
         
-        if trimmedHandle.hasPrefix("https://") || trimmedHandle.hasPrefix("http://") {
-            return trimmedHandle
+        let cleanedPath = userPath.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+        if cleanedPath.isEmpty {
+            return nil
         }
         
-        return "https://\(trimmedHandle)"
+        if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://") {
+            return trimmed
+        }
+        
+        return "https://\(trimmed)"
     }
 
-    private func getTextFiel(title: String, isMultiline: Bool = false) -> TextFieldNode {
-        let field = TextFieldNode()
-        field.textField.font = Font.regular(16.0)
-        field.textField.textColor = .white.withAlphaComponent(0.6)
-        field.textField.textAlignment = .natural
-        field.textField.attributedPlaceholder = NSAttributedString(string: title, font: field.textField.font, textColor: UIColor(red: 1, green: 1, blue: 1, alpha: 0.4))
-        field.textField.autocapitalizationType = .none
-        field.textField.autocorrectionType = .no
-        field.borderWidth = 1.0
-        field.borderColor = UIColor(red: 1, green: 1, blue: 1, alpha: 0.4).cgColor
-        field.cornerRadius = 11.0
-        field.clipsToBounds = true
-        if isMultiline {
-            field.padding = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
-        } else {
-            field.padding = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
-        }
+    @objc private func applyButtonTapped() {
+        let instagramHandle = self.instagramTextField.textField.text ?? ""
+        let tiktokHandle = self.tiktokTextField.textField.text ?? ""
+        let youtubeHandle = self.youtubeTextField.textField.text ?? ""
+        let telegramHandle = self.telegramTextField.textField.text ?? ""
+        let websiteHandle = self.websiteTextField.textField.text ?? ""
         
-        return field
+        let linksData = LinksData(
+            tiktokUrl: constructFullURL(from: tiktokHandle, with: "tiktok.com/"),
+            youtubeUrl: constructFullURL(from: youtubeHandle, with: "youtube.com/"),
+            telegramUrl: constructFullURL(from: telegramHandle, with: "t.me/"),
+            instagramUrl: constructFullURL(from: instagramHandle, with: "instagram.com/"),
+            websiteUrl: constructFullURL(from: websiteHandle, with: "")
+        )
+        
+        self.toggleSpinner(active: true)
+        self.saveSocialLinks?(linksData)
     }
 }

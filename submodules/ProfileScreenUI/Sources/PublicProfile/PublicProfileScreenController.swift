@@ -140,6 +140,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
         let editProfileController = EditProfileController(context: self.context, presentationData: self.presentationData, userDetailData: userDetailModel, updatePhoto: { [weak self] image in
             self?.controllerNode.currentPhoto = image
         })
+        editProfileController.delegate = self
         self.push(editProfileController)
     }
     
@@ -192,6 +193,10 @@ public final class PublicProfileScreenController: TelegramBaseController {
         self.controllerNode.onSavesTapped = {[weak self] in
             self?.presentInteractionSheet(type: .saves)
         }
+
+        self.controllerNode.onSocialLinkTapped = { [weak self] url in
+            self?.openSocialLink(url)
+        }
         
         self.displayNodeDidLoad()
     }
@@ -209,6 +214,19 @@ public final class PublicProfileScreenController: TelegramBaseController {
             getUserProfile()
         }
         getUserGalleryProfile()
+    }
+
+
+    private func openSocialLink(_ urlString: String) {
+        var finalUrlString = urlString
+        
+        if !finalUrlString.lowercased().hasPrefix("http://") && !finalUrlString.lowercased().hasPrefix("https://") {
+            finalUrlString = "https://" + finalUrlString
+        }
+        
+        if let url = URL(string: finalUrlString) {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
+        }
     }
     
     private func getUserProfile() {
@@ -731,7 +749,14 @@ extension PublicProfileScreenController {
     }
 }
 
-extension PublicProfileScreenController: EditSocialLinksDelegat {
+extension PublicProfileScreenController: EditSocialLinksDelegate {
+    func didUpdateSocialLinksData() {
+        self.profileLoaded = false
+        self.getUserProfile()
+    }
+}
+
+extension PublicProfileScreenController: EditProfileDelegate {
     func didUpdateProfileData() {
         self.profileLoaded = false
         self.getUserProfile()

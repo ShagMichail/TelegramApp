@@ -103,7 +103,7 @@ public struct Appearance: Codable {
     public let hips: Double
     public let shoesSize: Double
     public let hairColor: Int
-    public let hairLength: Double
+    public let hairLength: Int
     public let eyeColor: Int
     public let skinColor: Int
 
@@ -116,7 +116,7 @@ public struct Appearance: Codable {
         hips: Double,
         shoesSize: Double,
         hairColor: Int,
-        hairLength: Double,
+        hairLength: Int,
         eyeColor: Int,
         skinColor: Int
     ) {

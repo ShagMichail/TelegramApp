@@ -570,23 +570,22 @@ final class PublicProfileScreenNode: ASDisplayNode {
     var onViewsTapped: (() -> Void)?
     var onSavesTapped: (() -> Void)?
 
-    // В PublicProfileScreenNode.swift (снаружи класса или внутри)
+    var onSocialLinkTapped: ((String) -> Void)?
+    private var socialLinksMap: [UIButton: String] = [:]
 
     private enum SocialIcon: String {
         case instagram = "Models/instaIcon"
         case tiktok = "Models/TikTokIcon"
         case youtube = "Models/youtubeIcon"
-        case telegram = "Models/telegramIcon" // Предполагаемое имя
+        case telegram = "Models/telegramIcon"
         case website = "Models/webIcon"
         
-        // Хелпер для получения иконки по URL
         static func icon(for urlString: String) -> String {
             let lowercased = urlString.lowercased()
             if lowercased.contains("instagram.com") { return self.instagram.rawValue }
             if lowercased.contains("tiktok.com") { return self.tiktok.rawValue }
             if lowercased.contains("youtube.com") { return self.youtube.rawValue }
             if lowercased.contains("t.me") || lowercased.contains("telegram.me") { return self.telegram.rawValue }
-            // Если это не одна из соцсетей, считаем, что это персональный сайт
             return self.website.rawValue
         }
     }
@@ -1327,10 +1326,12 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     // Создание кнопок социальных сетей
-    private func createSocialMediaButton(handle: String, iconName: String) -> UIView {
+    private func createSocialMediaButton(handle: String, iconName: String, url: String) -> UIView {
         let button = UIButton(type: .system)
         button.backgroundColor = .black.withAlphaComponent(0.12)
         button.layer.cornerRadius = 6
+
+        socialLinksMap[button] = url
         
         let icon = UIImageView()
         icon.image = UIImage(bundleImageName: iconName)
@@ -1350,6 +1351,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         stack.spacing = 5
         stack.alignment = .center
         stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.isUserInteractionEnabled = false
         
         button.addSubview(stack)
         
@@ -1359,15 +1361,19 @@ final class PublicProfileScreenNode: ASDisplayNode {
             stack.leadingAnchor.constraint(equalTo: button.leadingAnchor, constant: 4),
             stack.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -4),
         ])
+
+        button.addTarget(self, action: #selector(socialButtonTapped(_:)), for: .touchUpInside)
         
         return button
     }
     
     // Создание кнопоки социально сети, если она одна
-    private func createSocialOneMediaButton(handle: String, iconName: String) -> UIView {
+    private func createSocialOneMediaButton(handle: String, iconName: String, url: String) -> UIView {
         let button = UIButton(type: .system)
         button.backgroundColor = .black.withAlphaComponent(0.12)
         button.layer.cornerRadius = 6
+
+        socialLinksMap[button] = url
         
         let icon = UIImageView()
         icon.image = UIImage(bundleImageName: iconName)
@@ -1387,7 +1393,8 @@ final class PublicProfileScreenNode: ASDisplayNode {
         stack.spacing = 5
         stack.alignment = .center
         stack.translatesAutoresizingMaskIntoConstraints = false
-        
+        stack.isUserInteractionEnabled = false
+
         button.addSubview(stack)
         
         NSLayoutConstraint.activate([
@@ -1395,6 +1402,8 @@ final class PublicProfileScreenNode: ASDisplayNode {
             stack.trailingAnchor.constraint(equalTo: button.trailingAnchor, constant: -16),
             stack.centerYAnchor.constraint(equalTo: button.centerYAnchor)
         ])
+
+        button.addTarget(self, action: #selector(socialButtonTapped(_:)), for: .touchUpInside)
         
         return button
     }
@@ -1479,17 +1488,17 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private func populateSocialMedia(links: [String]) {
         
         socialMediaStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        socialLinksMap.removeAll()
         
         if !links.isEmpty {
             for link in links {
                 let iconName = SocialIcon.icon(for: link)
-                
                 let handle = extractHandle(from: link)
                 
                 if links.count == 1 {
-                    socialMediaStack.addArrangedSubview(createSocialOneMediaButton(handle: handle, iconName: iconName))
+                    socialMediaStack.addArrangedSubview(createSocialOneMediaButton(handle: handle, iconName: iconName, url: link))
                 } else {
-                    socialMediaStack.addArrangedSubview(createSocialMediaButton(handle: handle, iconName: iconName))
+                    socialMediaStack.addArrangedSubview(createSocialMediaButton(handle: handle, iconName: iconName, url: link))
                 }
             }
         }
@@ -1685,8 +1694,8 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 headerImageView.loadImage(from: photoURL)
             }
             
-            bio = (detail.model?.additionalInformation?.isEmpty == false)
-            ? (detail.model?.additionalInformation ?? "")
+            bio = (detail.model?.description?.isEmpty == false)
+            ? (detail.model?.description ?? "")
             :  (isMyProfile ? Self.mockBiographyMyProfileText : Self.mockBiographyText)
             
             appearance = buildAppearanceList(from: detail.model?.appearance, gender: detail.gender)
@@ -2292,6 +2301,12 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     @objc private func savesViewDidTap() {
         onSavesTapped?()
+    }
+
+    @objc private func socialButtonTapped(_ sender: UIButton) {
+        if let url = socialLinksMap[sender] {
+            onSocialLinkTapped?(url)
+        }
     }
 }
 

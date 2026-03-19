@@ -67,13 +67,13 @@ public struct UserFile: Decodable {
 }
 
 public struct LinksData {
-    public let tiktokUrl: String
-    public let youtubeUrl: String
-    public let telegramUrl: String
-    public let instagramUrl: String
-    public let websiteUrl: String
+    public let tiktokUrl: String?
+    public let youtubeUrl: String?
+    public let telegramUrl: String?
+    public let instagramUrl: String?
+    public let websiteUrl: String?
 
-    public init(tiktokUrl: String, youtubeUrl: String, telegramUrl: String, instagramUrl: String, websiteUrl: String) {
+    public init(tiktokUrl: String?, youtubeUrl: String?, telegramUrl: String?, instagramUrl: String?, websiteUrl: String?) {
         self.tiktokUrl = tiktokUrl
         self.youtubeUrl = youtubeUrl
         self.telegramUrl = telegramUrl
@@ -211,4 +211,62 @@ public extension Double {
     var clean: String {
         return self.truncatingRemainder(dividingBy: 1) == 0 ? String(format: "%.0f", self) : String(self)
     }
+}
+
+public struct UpdateBiographyPageRequest: Encodable {
+    public let fullName: String?
+    public let gender: String?
+    public let model: ModelData
+
+    public struct ModelData: Encodable {
+        public let description: String?
+        public let appearance: Appearance?
+        public init(description: String?, appearance: Appearance?) {
+            self.description = description
+            self.appearance = appearance
+        }
+    }
+
+    public init(fullName: String?, gender: String?, model: ModelData) {
+        self.fullName = fullName
+        self.gender = gender
+        self.model = model
+    }
+}
+
+public struct UpdateBiographyPageResponse: Decodable {
+    public let message: String?
+    public let data: UserDetail?
+    public let errors: [String]?
+
+    public init(message: String?, data: UserDetail?, errors: [String]?) {
+        self.message = message
+        self.data = data
+        self.errors = errors
+    }
+}
+
+public struct GenderResponse: Codable {
+    public let data: [GenderOption]
+}
+
+public struct GenderOption: Codable {
+    public let id: String
+    public let title: String
+}
+
+public struct AppearanceDictionaryResponse: Codable {
+    public let data: AppearanceDictionaryData
+}
+
+public struct AppearanceDictionaryData: Codable {
+    public let hairLength: [AppearanceOption]
+    public let hairColor:[AppearanceOption]
+    public let eyeColor: [AppearanceOption]
+    public let skinColor:[AppearanceOption]
+}
+
+public struct AppearanceOption: Codable {
+    public let id: Int
+    public let title: String
 }

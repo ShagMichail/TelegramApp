@@ -15,8 +15,8 @@ import LegacyMediaPickerUI
 import CountrySelectionUI
 import ChatScheduleTimeController
 
-protocol EditSocialLinksDelegat: AnyObject {
-    func didUpdateProfileData()
+protocol EditSocialLinksDelegate: AnyObject {
+    func didUpdateSocialLinksData()
 }
 
 public class EditSocialLinksController: ViewController, UINavigationControllerDelegate {
@@ -30,7 +30,7 @@ public class EditSocialLinksController: ViewController, UINavigationControllerDe
     private var presentationDataDisposable: Any?
     private var linksData: LinksData
 
-    weak var delegate: EditSocialLinksDelegat?
+    weak var delegate: EditSocialLinksDelegate?
 
     public init(context: AccountContext, presentationData: PresentationData, linksData: LinksData) {
         self.context = context
@@ -151,27 +151,27 @@ public class EditSocialLinksController: ViewController, UINavigationControllerDe
             do {
                 let request = UpdateSocialLinksRequest(
                     model: UpdateSocialLinksRequest.ModelData(
-                        tiktokUrl: linksData.tiktokUrl.isEmpty ? nil : linksData.tiktokUrl,
-                        youtubeUrl: linksData.youtubeUrl.isEmpty ? nil : linksData.youtubeUrl,
-                        telegramUrl: linksData.telegramUrl.isEmpty ? nil : linksData.telegramUrl,
-                        instagramUrl: linksData.instagramUrl.isEmpty ? nil : linksData.instagramUrl,
-                        websiteUrl: linksData.websiteUrl.isEmpty ? nil : linksData.websiteUrl
+                        tiktokUrl: linksData.tiktokUrl != nil ? linksData.tiktokUrl : "",
+                        youtubeUrl: linksData.youtubeUrl != nil ? linksData.youtubeUrl : "",
+                        telegramUrl: linksData.telegramUrl != nil ? linksData.telegramUrl : "",
+                        instagramUrl: linksData.instagramUrl != nil ? linksData.instagramUrl : "",
+                        websiteUrl: linksData.websiteUrl != nil ? linksData.websiteUrl : ""
                     )
                 )
-
+                
                 let response: UpdateSocialLinksResponse = try await DivoAPIClient.shared.request(
                     path: "/user/update-profile",
                     method: "POST",
                     body: request
                 )
-
+                
                 print("✅ Social links successfully saved: \(response.message ?? "OK")")
-                self.delegate?.didUpdateProfileData()
+                self.delegate?.didUpdateSocialLinksData()
                 self.createEventNode.toggleSpinner(active: false)
                 self.showAlert(text: "Social links updated")
-
+                
                 self.navigationController?.popViewController(animated: true)
-
+                
             } catch {
                 print("❌ Error saving social links: \(error)")
                 self.createEventNode.toggleSpinner(active: false)
@@ -179,6 +179,7 @@ public class EditSocialLinksController: ViewController, UINavigationControllerDe
             }
         }
     }
+    
 
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
