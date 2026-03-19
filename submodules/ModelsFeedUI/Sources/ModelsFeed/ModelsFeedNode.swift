@@ -75,6 +75,24 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
     private let context: AccountContext
     private var presentationData: PresentationData
 
+    private let navBackgroundView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .white
+        return view
+    }()
+
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.font = Font.helveticaNeue(34)
+        label.textColor = .black
+        return label
+    }()
+
+    private var floatingAvatars: [UIImageView] = []
+    private var floatingNames: [UILabel] = []
+    private var wasFullyCollapsed = false
+    private var wasFullyExpanded = true
+
     private var containerLayout: (ContainerViewLayout, CGFloat)?
 
     private let _ready = ValuePromise<Bool>()
@@ -109,7 +127,7 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
     private let tabsStackView: UIStackView = {
         let stack = UIStackView()
         stack.axis = .horizontal
-        stack.spacing = 20
+        stack.spacing = 40
         stack.alignment = .center
         return stack
     }()
@@ -118,18 +136,14 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         let view = UIView()
         view.backgroundColor = .black
         view.layer.cornerRadius = 4
+        view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         view.layer.masksToBounds = true
-        return view
-    }()
-
-    private let tabSeparatorView: UIView = {
-        let view = UIView()
-        view.backgroundColor = UIColor(white: 0.85, alpha: 1.0)
         return view
     }()
 
     private var loadingPlaceholderView: UIView?
     private var errorView: UIView?
+    private var emptyStateView: UIView?
 
     var showNetworkError: Bool = false {
         didSet {
@@ -160,12 +174,30 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
 
     var showProfile: ((CardModel) -> Void)?
     var loadMore: (() -> Void)?
+    var onTabSelected: ((Int) -> Void)?
 
-    func updateCards(_ newCards: [CardModel]) {
+    func updateCards(_ newCards: [CardModel], animated: Bool = false) {
         self.cards = newCards
-        self.mainCollectionView.reloadData()
+        if animated {
+            mainCollectionView.alpha = 0
+            mainCollectionView.reloadData()
+            UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut]) {
+                self.mainCollectionView.alpha = 1
+            }
+        } else {
+            mainCollectionView.reloadData()
+        }
         if !newCards.isEmpty {
             hideLoadingPlaceholder()
+            hideEmptyState()
+        }
+    }
+
+    func showEmptyStateIfNeeded() {
+        if cards.isEmpty && !isLoading && !showNetworkError {
+            showEmptyState()
+        } else {
+            hideEmptyState()
         }
     }
 
@@ -196,7 +228,7 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         storiesFlowLayout.estimatedItemSize = CGSize(width: 70, height: 90)
 
         self.storiesCollectionView = UICollectionView(frame: .zero, collectionViewLayout: storiesFlowLayout)
-        self.storiesCollectionView.backgroundColor = .clear
+        self.storiesCollectionView.backgroundColor = .white
         self.storiesCollectionView.dataSource = self
         self.storiesCollectionView.delegate = self
         self.storiesCollectionView.showsHorizontalScrollIndicator = false
@@ -220,17 +252,51 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         self.mainCollectionView.register(CardCollectionViewCell.self, forCellWithReuseIdentifier: "CardCell")
         self.mainCollectionView.register(PaginationShimmerCell.self, forCellWithReuseIdentifier: "PaginationShimmerCell")
 
+        self.titleLabel.text = presentationData.strings.ModelsFeed_TabTitle.uppercased()
+
+        // Create floating avatars + names for ALL stories (animate 5→3→navbar)
+        for i in 0..<stories.count {
+            let story = stories[i]
+
+            let iv = UIImageView()
+            iv.contentMode = .scaleAspectFill
+            iv.layer.masksToBounds = true
+            iv.layer.borderColor = UIColor.white.cgColor
+            iv.layer.borderWidth = 0
+            iv.backgroundColor = UIColor(red: 0.91, green: 0.91, blue: 0.91, alpha: 1.00)
+            iv.alpha = 0
+            if let isAdd = story.isAdd, isAdd {
+                if let img = UIImage(named: story.avatarName) {
+                    iv.image = img.resized(to: CGSize(width: 30, height: 30))
+                    iv.contentMode = .center
+                }
+            } else if let img = UIImage(named: story.avatarName) {
+                iv.image = img
+            }
+            floatingAvatars.append(iv)
+
+            let label = UILabel()
+            label.text = story.name
+            label.font = .systemFont(ofSize: 12)
+            label.textAlignment = .center
+            label.alpha = 0
+            floatingNames.append(label)
+        }
+
         self.view.addSubview(self.mainCollectionView)
-        self.mainCollectionView.addSubview(self.storiesCollectionView)
-        self.mainCollectionView.addSubview(self.tabsScrollView)
+        self.view.addSubview(self.navBackgroundView)
+        self.view.addSubview(self.storiesCollectionView)
+        self.view.addSubview(self.tabsScrollView)
+        for av in floatingAvatars { self.view.addSubview(av) }
+        for lbl in floatingNames { self.view.addSubview(lbl) }
+        self.navBackgroundView.addSubview(self.titleLabel)
         self.tabsScrollView.addSubview(self.tabsStackView)
         self.tabsScrollView.addSubview(self.tabIndicatorView)
-        self.tabsScrollView.addSubview(self.tabSeparatorView)
 
         for (index, title) in tabTitles.enumerated() {
             let button = UIButton(type: .system)
             button.setTitle(title, for: .normal)
-            button.titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: index == 0 ? .bold : .regular)
+            button.titleLabel?.font = Font.helveticaNeue(12)
             button.setTitleColor(index == 0 ? .black : UIColor(white: 0.5, alpha: 1.0), for: .normal)
             button.tag = index
             button.addTarget(self, action: #selector(tabButtonTapped(_:)), for: .touchUpInside)
@@ -248,25 +314,54 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         let index = sender.tag
         guard index != selectedTabIndex else { return }
         selectedTabIndex = index
-        for case let button as UIButton in tabsStackView.arrangedSubviews {
-            let isSelected = button.tag == index
-            button.titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: isSelected ? .bold : .regular)
-            button.setTitleColor(isSelected ? .black : UIColor(white: 0.5, alpha: 1.0), for: .normal)
+
+        UIView.animate(withDuration: 0.35, delay: 0, options: [.curveEaseOut]) {
+            for case let button as UIButton in self.tabsStackView.arrangedSubviews {
+                let isSelected = button.tag == index
+                button.setTitleColor(isSelected ? .black : UIColor(white: 0.5, alpha: 1.0), for: .normal)
+            }
         }
-        UIView.animate(withDuration: 0.25) {
+        UIView.animate(withDuration: 0.45, delay: 0, usingSpringWithDamping: 0.65, initialSpringVelocity: 0.3, options: []) {
             self.layoutTabIndicator()
+            self.scrollTabToVisible(index: index)
         }
+        hideEmptyState()
+        onTabSelected?(index)
+    }
+
+    private func scrollTabToVisible(index: Int) {
+        guard index < tabsStackView.arrangedSubviews.count else { return }
+        let button = tabsStackView.arrangedSubviews[index]
+        let buttonFrame = button.convert(button.bounds, to: tabsScrollView)
+        let scrollWidth = tabsScrollView.bounds.width
+        let targetX = buttonFrame.midX - scrollWidth / 2.0
+        let maxOffsetX = max(tabsScrollView.contentSize.width - scrollWidth, 0)
+        let clampedX = min(max(targetX, 0), maxOffsetX)
+        tabsScrollView.contentOffset = CGPoint(x: clampedX, y: 0)
     }
 
     private func layoutTabIndicator() {
-        guard selectedTabIndex < tabsStackView.arrangedSubviews.count else { return }
-        let selectedButton = tabsStackView.arrangedSubviews[selectedTabIndex]
-        let frame = selectedButton.convert(selectedButton.bounds, to: tabsScrollView)
+        guard selectedTabIndex < tabsStackView.arrangedSubviews.count,
+              let selectedButton = tabsStackView.arrangedSubviews[selectedTabIndex] as? UIButton else { return }
+
         let indicatorHeight: CGFloat = 2
+        let gap: CGFloat = 10
+        let textSize: CGSize
+        if let title = selectedButton.titleLabel?.text, let font = selectedButton.titleLabel?.font {
+            textSize = (title as NSString).size(withAttributes: [.font: font])
+        } else {
+            textSize = selectedButton.bounds.size
+        }
+
+        let buttonFrame = selectedButton.convert(selectedButton.bounds, to: tabsScrollView)
+        let textY = buttonFrame.midY - textSize.height / 2.0
+        let textX = buttonFrame.midX - textSize.width / 2.0
+
+        let padding: CGFloat = 2
         tabIndicatorView.frame = CGRect(
-            x: floor(frame.minX),
-            y: floor(tabsScrollView.bounds.height - indicatorHeight),
-            width: ceil(frame.width),
+            x: floor(textX) - padding,
+            y: floor(textY + textSize.height + gap),
+            width: ceil(textSize.width) + padding * 2,
             height: indicatorHeight
         )
         tabsScrollView.bringSubviewToFront(tabIndicatorView)
@@ -279,6 +374,9 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         }
     }
 
+    private let storiesHeight: CGFloat = 90
+    private let tabsHeight: CGFloat = 36
+
     func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
         self.containerLayout = (layout, navigationBarHeight)
 
@@ -287,22 +385,12 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
 
         self.mainCollectionView.frame = CGRect(origin: .zero, size: layout.size)
 
-        let storiesHeight: CGFloat = 90
-        self.storiesCollectionView.frame = CGRect(x: 0,
-                                                  y: navigationBarHeight,
-                                                  width: layout.size.width,
-                                                  height: storiesHeight)
         if #available(iOS 11.0, *) {
             self.storiesCollectionView.contentInsetAdjustmentBehavior = .never
         }
         self.storiesCollectionView.contentInset = .zero
         self.storiesCollectionView.scrollIndicatorInsets = .zero
 
-        let tabsHeight: CGFloat = 36
-        self.tabsScrollView.frame = CGRect(x: 0,
-                                           y: self.storiesCollectionView.frame.maxY,
-                                           width: layout.size.width,
-                                           height: tabsHeight)
         let stackSize = tabsStackView.systemLayoutSizeFitting(
             CGSize(width: CGFloat.greatestFiniteMagnitude, height: tabsHeight),
             withHorizontalFittingPriority: .fittingSizeLevel,
@@ -310,24 +398,156 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         let stackWidth = max(stackSize.width + 30, layout.size.width)
         tabsStackView.frame = CGRect(x: 15, y: 0, width: stackWidth, height: tabsHeight - 2)
         tabsScrollView.contentSize = CGSize(width: stackWidth + 30, height: tabsHeight)
-        tabSeparatorView.frame = CGRect(x: 0, y: tabsHeight - 1, width: max(stackWidth + 30, layout.size.width), height: 1)
-        layoutTabIndicator()
+
+        let headerHeight = navigationBarHeight + storiesHeight + tabsHeight
+        let collapsedHeaderHeight = navigationBarHeight + tabsHeight
 
         if let mainFlowLayout = self.mainCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
-            mainFlowLayout.sectionInset = UIEdgeInsets(top: self.tabsScrollView.frame.maxY,
+            mainFlowLayout.sectionInset = UIEdgeInsets(top: headerHeight,
                                                        left: safeAreaInsets.left,
                                                        bottom: insets.bottom,
                                                        right: safeAreaInsets.right)
 
             let cardWidth = layout.size.width - safeAreaInsets.left - safeAreaInsets.right
-            let cardHeight = layout.size.height - mainFlowLayout.sectionInset.top - insets.bottom
+            let cardHeight = layout.size.height - collapsedHeaderHeight - insets.bottom
             mainFlowLayout.itemSize = CGSize(width: cardWidth, height: cardHeight)
             mainFlowLayout.minimumLineSpacing = 0
         }
 
-        self.mainCollectionView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        self.mainCollectionView.contentInset = .zero
 
+        updateHeaderLayout()
         layoutLoadingPlaceholder()
+    }
+
+    private func updateHeaderLayout() {
+        guard let (layout, navigationBarHeight) = containerLayout else { return }
+
+        // White background behind navbar area
+        navBackgroundView.frame = CGRect(x: 0, y: 0, width: layout.size.width, height: navigationBarHeight)
+
+        titleLabel.sizeToFit()
+        let titleX: CGFloat = 16 + layout.safeInsets.left
+        let titleY: CGFloat = navigationBarHeight - titleLabel.frame.height - 10
+        titleLabel.frame = CGRect(x: titleX, y: titleY, width: ceil(titleLabel.frame.width), height: ceil(titleLabel.frame.height) + 2)
+
+        let scrollOffset = max(mainCollectionView.contentOffset.y, 0)
+        let p = min(scrollOffset / storiesHeight, 1.0)
+
+        // --- Stories collection: fade out, floating avatars replace ---
+        storiesCollectionView.transform = .identity
+        storiesCollectionView.frame = CGRect(
+            x: 0,
+            y: navigationBarHeight - scrollOffset,
+            width: layout.size.width,
+            height: storiesHeight
+        )
+        storiesCollectionView.alpha = max(1 - p * 10, 0)  // gone by 10%
+
+        // --- Two-phase floating avatar animation ---
+        // Phase 1 (p 0→0.5): all 5 shrink to ~82%, spacing 10→0, names fade, cluster together
+        // Phase 2 (p 0.5→1.0): avatars 0,4 fade out, remaining 3 fly to navbar
+
+        let phase1 = min(p / 0.5, 1.0)          // 0→1 during first half
+        let phase2 = max((p - 0.5) / 0.5, 0.0)  // 0→1 during second half
+
+        let cellWidth: CGFloat = 70
+        let origSpacing: CGFloat = 10
+        let leftInset: CGFloat = 15
+        let fullSize: CGFloat = 60
+        let count = CGFloat(floatingAvatars.count)
+
+        // Phase 1: shrink and cluster
+        let phase1Size = fullSize * (1 - phase1 * 0.18)          // 60 → ~49
+        let phase1Spacing = origSpacing * (1 - phase1)            // 10 → 0
+        let phase1CellW = phase1Size + phase1Spacing
+        let phase1TotalW = count * phase1Size + (count - 1) * phase1Spacing
+
+        // Keep centered around original center
+        let origTotalW = count * (cellWidth + origSpacing) - origSpacing
+        let origCenterX = leftInset + origTotalW / 2
+        let phase1StartX = origCenterX - phase1TotalW / 2
+        let phase1Y = navigationBarHeight  // top of stories area
+
+        // Phase 2 endpoints: 3 avatars in navbar
+        let navSize: CGFloat = 28
+        let navOverlap: CGFloat = 8
+        let navBaseX = titleLabel.frame.maxX + 12
+        let navY = navigationBarHeight - navSize - 17
+
+        // Indices that survive to navbar: 1, 2, 3 (Jack D., Joshua, waggles)
+        let survivors: Set<Int> = [1, 2, 3]
+
+        let floatingVisible = min(p * 10, 1.0)  // visible by 10%
+
+        var survivorIdx = 0
+        for (i, av) in floatingAvatars.enumerated() {
+            let isSurvivor = survivors.contains(i)
+
+            // Phase 1 position (all 5 clustered)
+            let p1X = phase1StartX + CGFloat(i) * phase1CellW
+            let p1Y = phase1Y
+            let p1Size = phase1Size
+
+            if phase2 <= 0 {
+                // Pure phase 1
+                av.frame = CGRect(x: p1X, y: p1Y, width: p1Size, height: p1Size)
+                av.layer.cornerRadius = p1Size / 2
+                av.alpha = floatingVisible
+                av.layer.borderWidth = 0
+            } else if isSurvivor {
+                // Phase 2: interpolate from clustered position to navbar
+                let endX = navBaseX + CGFloat(survivorIdx) * (navSize - navOverlap)
+                let curX = p1X + (endX - p1X) * phase2
+                let curY = p1Y + (navY - p1Y) * phase2
+                let curSize = p1Size + (navSize - p1Size) * phase2
+
+                av.frame = CGRect(x: curX, y: curY, width: curSize, height: curSize)
+                av.layer.cornerRadius = curSize / 2
+                av.alpha = 1
+                av.layer.borderWidth = min(phase2 * 3, 1.5)
+                survivorIdx += 1
+            } else {
+                // Phase 2: non-survivors fade out in place
+                av.frame = CGRect(x: p1X, y: p1Y, width: p1Size, height: p1Size)
+                av.layer.cornerRadius = p1Size / 2
+                av.alpha = max(1 - phase2 * 3, 0)  // fade out quickly
+                av.layer.borderWidth = 0
+            }
+        }
+
+        // Names: fade out during phase 1
+        for (i, lbl) in floatingNames.enumerated() {
+            let p1X = phase1StartX + CGFloat(i) * phase1CellW
+            let avatarBottom = floatingAvatars[i].frame.maxY
+            lbl.frame = CGRect(x: p1X - 5, y: avatarBottom + 4, width: phase1Size + 10, height: 14)
+            lbl.alpha = floatingVisible * max(1 - phase1 * 2.5, 0)  // gone by 40% of phase1 (~20% total)
+        }
+
+        // --- Haptic feedback at endpoints ---
+        if p >= 1.0 && !wasFullyCollapsed {
+            wasFullyCollapsed = true
+            wasFullyExpanded = false
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } else if p <= 0.0 && !wasFullyExpanded {
+            wasFullyExpanded = true
+            wasFullyCollapsed = false
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        } else if p > 0.0 && p < 1.0 {
+            wasFullyCollapsed = false
+            wasFullyExpanded = false
+        }
+
+        // --- Tabs: stick to navbar bottom ---
+        let tabsY = max(navigationBarHeight, navigationBarHeight + storiesHeight - scrollOffset)
+        tabsScrollView.frame = CGRect(
+            x: 0,
+            y: tabsY,
+            width: layout.size.width,
+            height: tabsHeight
+        )
+
+        layoutTabIndicator()
     }
 
     func numberOfSections(in collectionView: UICollectionView) -> Int {
@@ -402,13 +622,18 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
     }
 
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        guard scrollView === mainCollectionView, !cards.isEmpty else { return }
-        let threshold: CGFloat = 500
-        let contentOffsetY = scrollView.contentOffset.y
-        let contentHeight = scrollView.contentSize.height
-        let frameHeight = scrollView.frame.height
-        if contentOffsetY + frameHeight + threshold > contentHeight {
-            loadMore?()
+        guard scrollView === mainCollectionView else { return }
+
+        updateHeaderLayout()
+
+        if !cards.isEmpty {
+            let threshold: CGFloat = 500
+            let contentOffsetY = scrollView.contentOffset.y
+            let contentHeight = scrollView.contentSize.height
+            let frameHeight = scrollView.frame.height
+            if contentOffsetY + frameHeight + threshold > contentHeight {
+                loadMore?()
+            }
         }
     }
 
@@ -576,5 +801,113 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         if let action = placeholder.viewWithTag(104) {
             action.frame = CGRect(x: 15, y: h - 110, width: 100, height: 36)
         }
+    }
+
+    // MARK: - Empty State
+
+    private func showEmptyState() {
+        guard emptyStateView == nil else { return }
+
+        let container = UIView()
+        container.backgroundColor = .white
+        container.alpha = 0
+
+        let circleView = UIView()
+        circleView.backgroundColor = UIColor(white: 0.95, alpha: 1.0)
+        circleView.layer.cornerRadius = 40
+        circleView.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(circleView)
+
+        let iconLabel = UILabel()
+        iconLabel.text = tabTitles[selectedTabIndex] == "SUBSCRIBED MODELS" ? "♡" : "☰"
+        iconLabel.font = .systemFont(ofSize: 32)
+        iconLabel.textColor = UIColor(white: 0.4, alpha: 1.0)
+        iconLabel.textAlignment = .center
+        iconLabel.translatesAutoresizingMaskIntoConstraints = false
+        circleView.addSubview(iconLabel)
+
+        let titleLabel = UILabel()
+        titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        titleLabel.textColor = UIColor(white: 0.1, alpha: 1)
+        titleLabel.textAlignment = .center
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(titleLabel)
+
+        let subtitleLabel = UILabel()
+        subtitleLabel.font = .systemFont(ofSize: 14)
+        subtitleLabel.textColor = UIColor(white: 0.5, alpha: 1)
+        subtitleLabel.textAlignment = .center
+        subtitleLabel.numberOfLines = 0
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(subtitleLabel)
+
+        switch selectedTabIndex {
+        case 0:
+            titleLabel.text = "No Subscriptions Yet"
+            subtitleLabel.text = "Subscribe to models to see\nthem here."
+        case 2:
+            titleLabel.text = "No Results"
+            subtitleLabel.text = "No agencies or pro members\nfound at the moment."
+        default:
+            titleLabel.text = "No Users Found"
+            subtitleLabel.text = "There are no users\nto display right now."
+        }
+
+        NSLayoutConstraint.activate([
+            circleView.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            circleView.centerYAnchor.constraint(equalTo: container.centerYAnchor, constant: -50),
+            circleView.widthAnchor.constraint(equalToConstant: 80),
+            circleView.heightAnchor.constraint(equalToConstant: 80),
+
+            iconLabel.centerXAnchor.constraint(equalTo: circleView.centerXAnchor),
+            iconLabel.centerYAnchor.constraint(equalTo: circleView.centerYAnchor),
+
+            titleLabel.topAnchor.constraint(equalTo: circleView.bottomAnchor, constant: 20),
+            titleLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            titleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 32),
+            titleLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -32),
+
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            subtitleLabel.centerXAnchor.constraint(equalTo: container.centerXAnchor),
+            subtitleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 32),
+            subtitleLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -32),
+        ])
+
+        self.view.addSubview(container)
+        emptyStateView = container
+
+        if let (layout, navigationBarHeight) = containerLayout {
+            let topOffset = navigationBarHeight + 90 + 36
+            container.frame = CGRect(x: 0, y: topOffset, width: layout.size.width, height: layout.size.height - topOffset)
+        }
+
+        circleView.transform = CGAffineTransform(scaleX: 0.6, y: 0.6)
+        titleLabel.transform = CGAffineTransform(translationX: 0, y: 15)
+        subtitleLabel.transform = CGAffineTransform(translationX: 0, y: 15)
+        titleLabel.alpha = 0
+        subtitleLabel.alpha = 0
+
+        UIView.animate(withDuration: 0.4, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5, options: []) {
+            container.alpha = 1
+            circleView.transform = .identity
+        }
+        UIView.animate(withDuration: 0.35, delay: 0.1, options: [.curveEaseOut]) {
+            titleLabel.alpha = 1
+            titleLabel.transform = .identity
+        }
+        UIView.animate(withDuration: 0.35, delay: 0.15, options: [.curveEaseOut]) {
+            subtitleLabel.alpha = 1
+            subtitleLabel.transform = .identity
+        }
+    }
+
+    private func hideEmptyState() {
+        guard let empty = emptyStateView else { return }
+        emptyStateView = nil
+        UIView.animate(withDuration: 0.2, animations: {
+            empty.alpha = 0
+        }, completion: { _ in
+            empty.removeFromSuperview()
+        })
     }
 }
