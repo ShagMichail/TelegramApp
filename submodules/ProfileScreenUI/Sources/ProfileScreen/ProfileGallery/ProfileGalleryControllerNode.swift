@@ -29,6 +29,9 @@ final class ProfileGalleryControllerNode: ASDisplayNode {
     
     // 🚀 Флаг для блокировки спама запросов
     private var isLoadingMore = false
+
+    /// Дебаунс автозапуска видео после смены страницы.
+    private var autoPlayWorkItem: DispatchWorkItem?
     
     var onIndexChanged: ((Int, Int) -> Void)?
     var requestMoreData: (() -> Void)?
@@ -375,14 +378,11 @@ extension ProfileGalleryControllerNode: UICollectionViewDataSource {
 
 extension ProfileGalleryControllerNode: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        // Не создаём AVPlayer во время скролла — это вызывает заикание.
+        // Воспроизведение запускается в playCenteredVideo() после остановки скролла.
         if collectionView == self.mainCollectionView && self.isVideoGallery,
         let videoCell = cell as? VideoGalleryCellNode {
-            
-            if indexPath.item == self.currentIndex {
-                videoCell.play()
-            } else {
-                videoCell.pause()
-            }
+            videoCell.pause()
         }
     }
 
@@ -430,6 +430,9 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
             if page != self.currentIndex && page >= 0 && page < totalCount {
                 self._currentIndex = page
                 self.onIndexChanged?(page, totalCount)
+                // Дебаунс: при смене страницы планируем автозапуск.
+                // Если скролл продолжится — workItem отменится и перезапустится.
+                self.scheduleAutoPlay()
             }
             isSyncingScroll = false
 
@@ -454,6 +457,7 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
                 if page != self.currentIndex && page >= 0 && page < totalCount {
                     self._currentIndex = page
                     self.onIndexChanged?(page, totalCount)
+                    self.scheduleAutoPlay()
                 }
             }
             updatePreviewCellsScale()
@@ -462,6 +466,7 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
     }
 
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        autoPlayWorkItem?.cancel()
         if scrollView == self.mainCollectionView && self.isVideoGallery {
             for cell in self.mainCollectionView.visibleCells {
                 (cell as? VideoGalleryCellNode)?.pause()
@@ -496,6 +501,17 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
                 targetContentOffset.pointee.x = page * itemTotalWidth
             }
         }
+    }
+
+    /// Дебаунсированный автозапуск: если через 0.3 с скролл не продолжился — запускаем видео.
+    /// Страховка на случай, когда scrollViewDidEndDecelerating/DidEndDragging не срабатывает.
+    private func scheduleAutoPlay() {
+        autoPlayWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.playCenteredVideo()
+        }
+        autoPlayWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
     }
 
     private func playCenteredVideo() {
