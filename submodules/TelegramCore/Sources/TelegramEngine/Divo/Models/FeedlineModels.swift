@@ -3,10 +3,14 @@ import Foundation
 public struct FeedlineListRequest: Encodable {
     public let offset: Int
     public let limit: Int
+    public let subscribedOnly: Bool?
+    public let modelsOnly: Bool?
 
-    public init(offset: Int, limit: Int) {
+    public init(offset: Int, limit: Int, subscribedOnly: Bool? = nil, modelsOnly: Bool? = nil) {
         self.offset = offset
         self.limit = limit
+        self.subscribedOnly = subscribedOnly
+        self.modelsOnly = modelsOnly
     }
 }
 

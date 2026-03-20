@@ -34,9 +34,16 @@ public final class ModelsFeedController: TelegramBaseController {
 
     private var isEmpty: Bool?
 
-    private var feedlineOffset = 0
-    private var isLoadingFeedline = false
-    private var hasMoreFeedline = true
+    private struct TabState {
+        var cards: [CardModel] = []
+        var offset: Int = 0
+        var isLoading: Bool = false
+        var hasMore: Bool = true
+        var isLoaded: Bool = false
+    }
+
+    private var tabStates: [TabState] = [TabState(), TabState(), TabState()]
+    private var selectedTabIndex: Int = 0
     private let feedlinePageSize = 10
 
     private let createActionDisposable = MetaDisposable()
@@ -68,23 +75,13 @@ public final class ModelsFeedController: TelegramBaseController {
     private func updateNavigation() {
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
 
-        let searchButton = UIBarButtonItem(image: PresentationResourcesRootController.navigationSearchIcon(self.presentationData.theme), style: .plain, target: self, action: #selector(self.searchPressed))
-
+        let copperColor = UIColor(rgb: 0xBF7A54)
+        let originalIcon = PresentationResourcesRootController.navigationSearchIcon(self.presentationData.theme)
+        let tintedIcon = generateTintedImage(image: originalIcon, color: copperColor)
+        let searchButton = UIBarButtonItem(image: tintedIcon?.withRenderingMode(.alwaysOriginal), style: .plain, target: self, action: #selector(self.searchPressed))
         self.navigationItem.rightBarButtonItems = [searchButton]
 
-        let titleLabel = UILabel()
-        titleLabel.text = self.presentationData.strings.ModelsFeed_TabTitle.uppercased()
-        titleLabel.font = Font.helveticaNeue(34)
-        titleLabel.textColor = self.presentationData.theme.rootController.navigationBar.primaryTextColor
-        titleLabel.sizeToFit()
-
-        let containerView = UIView(frame: CGRect(x: 0, y: 0, width: 200, height: 40))
-        containerView.addSubview(titleLabel)
-        titleLabel.frame.origin.x = -10
-        titleLabel.frame.origin.y = 10
-
-        self.navigationItem.titleView = containerView
-        self.navigationController?.hidesBarsOnSwipe = true
+        self.navigationItem.titleView = UIView()
     }
 
     private var lastContentOffset: CGPoint = .zero
@@ -146,63 +143,114 @@ public final class ModelsFeedController: TelegramBaseController {
         self.controllerNode.loadMore = { [weak self] in
             self?.loadNextPage()
         }
+        self.controllerNode.onTabSelected = { [weak self] index in
+            self?.switchToTab(index)
+        }
 
         self.displayNodeDidLoad()
-        loadFeedline(reset: true)
+        loadFeedline(tabIndex: 0, reset: true)
+    }
+
+    private func switchToTab(_ index: Int) {
+        guard index != selectedTabIndex else { return }
+        selectedTabIndex = index
+        let state = tabStates[index]
+        controllerNode.updateCards(state.cards, animated: true)
+        controllerNode.showNetworkError = false
+        controllerNode.isPaginating = false
+
+        if state.isLoading {
+            controllerNode.isLoading = true
+        } else if !state.isLoaded {
+            loadFeedline(tabIndex: index, reset: true)
+        } else {
+            controllerNode.isLoading = false
+            controllerNode.showEmptyStateIfNeeded()
+        }
     }
 
     private func loadNextPage() {
-        guard !isLoadingFeedline, hasMoreFeedline else { return }
-        loadFeedline(reset: false)
+        let index = selectedTabIndex
+        let state = tabStates[index]
+        guard !state.isLoading, state.hasMore else { return }
+        loadFeedline(tabIndex: index, reset: false)
     }
 
-    private func loadFeedline(reset: Bool) {
-        guard !isLoadingFeedline else { return }
-        isLoadingFeedline = true
-        if reset {
-            controllerNode.isLoading = true
-            controllerNode.isPaginating = false
-        } else {
-            controllerNode.isPaginating = true
+    private func requestBody(tabIndex: Int, offset: Int, limit: Int) -> FeedlineListRequest {
+        switch tabIndex {
+        case 0:
+            return FeedlineListRequest(offset: offset, limit: limit, subscribedOnly: true)
+        case 2:
+            return FeedlineListRequest(offset: offset, limit: limit, modelsOnly: true)
+        default:
+            return FeedlineListRequest(offset: offset, limit: limit)
+        }
+    }
+
+    private func loadFeedline(tabIndex: Int, reset: Bool) {
+        guard !tabStates[tabIndex].isLoading else { return }
+        tabStates[tabIndex].isLoading = true
+
+        let isCurrentTab = tabIndex == selectedTabIndex
+        if isCurrentTab {
+            if reset {
+                controllerNode.isLoading = true
+                controllerNode.isPaginating = false
+            } else {
+                controllerNode.isPaginating = true
+            }
         }
 
         if reset {
-            feedlineOffset = 0
-            hasMoreFeedline = true
+            tabStates[tabIndex].offset = 0
+            tabStates[tabIndex].hasMore = true
         }
 
-        let offset = feedlineOffset
+        let offset = tabStates[tabIndex].offset
         let limit = feedlinePageSize
+        let body = requestBody(tabIndex: tabIndex, offset: offset, limit: limit)
 
         Task {
             do {
                 let response: FeedlineResponse = try await DivoAPIClient.shared.request(
                     path: "/feedline/list",
                     method: "POST",
-                    body: FeedlineListRequest(offset: offset, limit: limit)
+                    body: body
                 )
                 let cards = response.data.items.map { Self.mapCard($0) }
                 await MainActor.run {
                     if reset {
-                        self.controllerNode.updateCards(cards)
+                        self.tabStates[tabIndex].cards = cards
                     } else {
-                        self.controllerNode.appendCards(cards)
+                        self.tabStates[tabIndex].cards.append(contentsOf: cards)
                     }
-                    self.feedlineOffset = offset + cards.count
-                    self.hasMoreFeedline = cards.count >= limit
-                    self.isLoadingFeedline = false
-                    self.controllerNode.isLoading = false
-                    self.controllerNode.isPaginating = false
-                    self.controllerNode.showNetworkError = false
+                    self.tabStates[tabIndex].offset = offset + cards.count
+                    self.tabStates[tabIndex].hasMore = cards.count >= limit
+                    self.tabStates[tabIndex].isLoading = false
+                    self.tabStates[tabIndex].isLoaded = true
+
+                    if tabIndex == self.selectedTabIndex {
+                        if reset {
+                            self.controllerNode.updateCards(self.tabStates[tabIndex].cards, animated: true)
+                        } else {
+                            self.controllerNode.appendCards(cards)
+                        }
+                        self.controllerNode.isLoading = false
+                        self.controllerNode.isPaginating = false
+                        self.controllerNode.showNetworkError = false
+                        self.controllerNode.showEmptyStateIfNeeded()
+                    }
                 }
             } catch {
-                print("[DivoAPI] feedline/list error: \(error)")
+                print("[DivoAPI] feedline/list error (tab \(tabIndex)): \(error)")
                 await MainActor.run {
-                    self.isLoadingFeedline = false
-                    self.controllerNode.isLoading = false
-                    self.controllerNode.isPaginating = false
-                    if reset {
-                        self.controllerNode.showNetworkError = true
+                    self.tabStates[tabIndex].isLoading = false
+                    if tabIndex == self.selectedTabIndex {
+                        self.controllerNode.isLoading = false
+                        self.controllerNode.isPaginating = false
+                        if reset {
+                            self.controllerNode.showNetworkError = true
+                        }
                     }
                 }
             }
