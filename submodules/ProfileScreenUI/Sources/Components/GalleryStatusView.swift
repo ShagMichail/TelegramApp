@@ -8,13 +8,14 @@
 import UIKit
 import Display
 
-final class GalleryStatusView: UIView {
+final class GalleryStatusView: UIControl {
     
     private let containerView: UIView = {
         let view = UIView()
         view.backgroundColor = .black.withAlphaComponent(0.12)
         view.layer.cornerRadius = 6
         view.translatesAutoresizingMaskIntoConstraints = false
+        view.isUserInteractionEnabled = false
         return view
     }()
     
@@ -22,6 +23,7 @@ final class GalleryStatusView: UIView {
         let spinner = UIActivityIndicatorView(style: .medium)
         spinner.color = .white
         spinner.translatesAutoresizingMaskIntoConstraints = false
+        spinner.isUserInteractionEnabled = false
         return spinner
     }()
     
@@ -31,6 +33,7 @@ final class GalleryStatusView: UIView {
         imageView.tintColor = .white
         imageView.image = UIImage(bundleImageName: "Profile/AddPhotoIcon")
         imageView.translatesAutoresizingMaskIntoConstraints = false
+        imageView.isUserInteractionEnabled = false
         return imageView
     }()
     
@@ -40,6 +43,7 @@ final class GalleryStatusView: UIView {
         label.font = Font.helveticaNeue(10)
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.isUserInteractionEnabled = false
         return label
     }()
     
@@ -49,11 +53,13 @@ final class GalleryStatusView: UIView {
         stack.spacing = 8
         stack.alignment = .center
         stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.isUserInteractionEnabled = false
         return stack
     }()
     
     override init(frame: CGRect) {
         super.init(frame: frame)
+        self.isUserInteractionEnabled = true
         setupViews()
     }
     
@@ -83,11 +89,38 @@ final class GalleryStatusView: UIView {
         }
         statusLabel.text = text
         if isLoading {
+            statusImageView.isHidden = true
             spinner.isHidden = false
             spinner.startAnimating()
+            self.isEnabled = false
         } else {
             spinner.isHidden = true
             spinner.stopAnimating()
+            statusImageView.isHidden = !isMyProfile
+            self.isEnabled = isMyProfile
+        }
+    }
+    
+    func loadingSpinner(isLoading: Bool) {
+        if isLoading {
+            statusImageView.isHidden = true
+            spinner.isHidden = false
+            spinner.startAnimating()
+            self.isEnabled = false
+        } else {
+            spinner.isHidden = true
+            spinner.stopAnimating()
+            statusImageView.isHidden = false
+            self.isEnabled = true
+        }
+    }
+    
+    override var isHighlighted: Bool {
+        didSet {
+            UIView.animate(withDuration: 0.15) {
+                self.containerView.alpha = self.isHighlighted ? 0.7 : 1.0
+                self.containerView.transform = self.isHighlighted ? CGAffineTransform(scaleX: 0.95, y: 0.95) : .identity
+            }
         }
     }
 }

@@ -28,7 +28,36 @@ final class InteractionListViewController: UIViewController {
     private var users: [InteractionUser] = []
     private var filteredUsers: [InteractionUser] = []
 
-    var requestData: (() -> Void)?
+    var requestData: ((Int, @escaping ([InteractionUser], Bool) -> Void) -> Void)?
+    
+    private var currentOffset: Int = 0
+    private let limit: Int = 20
+    private var isLoadingMore: Bool = false
+    private var hasMorePages: Bool = true
+    
+    private let emptyContainer: UIView = {
+        let view = UIView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let emptyTitleLabel: UILabel = {
+        let label = UILabel()
+        label.font = Font.helveticaNeue(26)
+        label.textColor = UIColor(hexString: "#000000")
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let emptySubTitleLabel: UILabel = {
+        let label = UILabel()
+        label.font = Font.helveticaNeue(16)
+        label.textColor = UIColor(hexString: "#222222")
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
 
     private let titleLabel: UILabel = {
         let label = UILabel()
@@ -44,6 +73,7 @@ final class InteractionListViewController: UIViewController {
         searchBar.placeholder = "Search"
         searchBar.searchBarStyle = .minimal
         searchBar.translatesAutoresizingMaskIntoConstraints = false
+        searchBar.isHidden = true
         return searchBar
     }()
 
@@ -52,7 +82,16 @@ final class InteractionListViewController: UIViewController {
         tv.separatorStyle = .none
         tv.register(InteractionUserCell.self, forCellReuseIdentifier: InteractionUserCell.reuseIdentifier)
         tv.translatesAutoresizingMaskIntoConstraints = false
+        tv.isHidden = true
+        tv.showsVerticalScrollIndicator = false
         return tv
+    }()
+
+    private let footerSpinner: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.hidesWhenStopped = true
+        indicator.frame = CGRect(x: 0, y: 0, width: UIScreen.main.bounds.width, height: 50)
+        return indicator
     }()
 
     private let loadingIndicator: UIActivityIndicatorView = {
@@ -75,13 +114,17 @@ final class InteractionListViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
 
-        loadingIndicator.startAnimating()
-        requestData?()
+        tableView.tableFooterView = footerSpinner
+        loadInitialData()
     }
 
     private func setupUI() {
         view.backgroundColor = .white
         titleLabel.text = listType.title
+
+        view.addSubview(emptyContainer)
+        emptyContainer.addSubview(emptyTitleLabel)
+        emptyContainer.addSubview(emptySubTitleLabel)
 
         view.addSubview(titleLabel)
         view.addSubview(searchBar)
@@ -100,23 +143,117 @@ final class InteractionListViewController: UIViewController {
             searchBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
             searchBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
 
-            tableView.topAnchor.constraint(equalTo: searchBar.bottomAnchor, constant: 10),
+            tableView.topAnchor.constraint(equalTo: searchBar.bottomAnchor),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            loadingIndicator.centerXAnchor.constraint(equalTo: tableView.centerXAnchor),
-            loadingIndicator.centerYAnchor.constraint(equalTo: tableView.centerYAnchor)
+            loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            
+            emptyContainer.topAnchor.constraint(equalTo: view.topAnchor),
+            emptyContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            emptyContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            emptyContainer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            emptyTitleLabel.centerXAnchor.constraint(equalTo: emptyContainer.centerXAnchor),
+            emptyTitleLabel.centerYAnchor.constraint(equalTo: emptyContainer.centerYAnchor),
+            emptyTitleLabel.leadingAnchor.constraint(equalTo: emptyContainer.leadingAnchor, constant: 8),
+            emptyTitleLabel.trailingAnchor.constraint(equalTo: emptyContainer.trailingAnchor, constant: -8),
+            
+            emptySubTitleLabel.topAnchor.constraint(equalTo: emptyTitleLabel.bottomAnchor, constant: 10),
+            emptySubTitleLabel.leadingAnchor.constraint(equalTo: emptyContainer.leadingAnchor, constant: 8),
+            emptySubTitleLabel.trailingAnchor.constraint(equalTo: emptyContainer.trailingAnchor, constant: -8),
+            emptySubTitleLabel.bottomAnchor.constraint(lessThanOrEqualTo: emptyContainer.bottomAnchor),
         ])
     }
 
-    func updateData(_ newUsers: [InteractionUser]) {
-        self.users = newUsers
-        self.filteredUsers = newUsers
-
-        DispatchQueue.main.async { [weak self] in
-            self?.loadingIndicator.stopAnimating()
-            self?.tableView.reloadData()
+    private func configure(with isEmptyTable: Bool, emptyTitle: String? = nil, emptySubTitle: String? = nil) {
+        if isEmptyTable {
+            emptyContainer.isHidden = false
+            searchBar.isHidden = true
+            tableView.isHidden = true
+            
+            emptyTitleLabel.text = emptyTitle
+            emptySubTitleLabel.text = emptySubTitle
+        } else {
+            emptyContainer.isHidden = true
+            searchBar.isHidden = false
+            tableView.isHidden = false
+        }
+    }
+    
+    private func loadInitialData() {
+        loadingIndicator.startAnimating()
+        currentOffset = 0
+        isLoadingMore = true
+        
+        requestData?(0) { [weak self] newUsers, hasMore in
+            guard let self = self else { return }
+            self.isLoadingMore = false
+            self.hasMorePages = hasMore
+            
+            self.currentOffset = self.limit
+            
+            self.users = newUsers
+            self.filteredUsers = newUsers
+            
+            DispatchQueue.main.async {
+                self.loadingIndicator.stopAnimating()
+                self.updateEmptyState()
+                self.tableView.reloadData()
+            }
+        }
+    }
+    
+    private func loadNextPage() {
+        guard !isLoadingMore, hasMorePages, searchBar.text?.isEmpty ?? true else { return }
+        
+        isLoadingMore = true
+        footerSpinner.startAnimating()
+        
+        let startIndex = self.filteredUsers.count
+        
+        requestData?(currentOffset) { [weak self] newUsers, hasMore in
+            guard let self = self else { return }
+            
+            self.currentOffset += self.limit
+            self.isLoadingMore = false
+            self.hasMorePages = hasMore
+            
+            self.users.append(contentsOf: newUsers)
+            self.filteredUsers = self.users
+            
+            DispatchQueue.main.async {
+                self.footerSpinner.stopAnimating()
+                
+                if !newUsers.isEmpty {
+                    let indexPaths = (0..<newUsers.count).map {
+                        IndexPath(row: startIndex + $0, section: 0)
+                    }
+                    
+                    self.tableView.performBatchUpdates({
+                        self.tableView.insertRows(at: indexPaths, with: .fade)
+                    }, completion: nil)
+                    
+                } else {
+                    self.hasMorePages = false
+                }
+            }
+        }
+    }
+    
+    private func updateEmptyState() {
+        if filteredUsers.isEmpty {
+            if self.listType == .likes {
+                configure(with: true, emptyTitle: "No likes yet.", emptySubTitle: "Tap the heart icon to like model you enjoy.")
+            } else if self.listType == .saves {
+                configure(with: true, emptyTitle: "Nothing saved yet.", emptySubTitle: "Save model to easily find them later.")
+            } else if self.listType == .views {
+                configure(with: true, emptyTitle: "No profile viewed yet.", emptySubTitle: "Profiles that have been here will be displayed here.")
+            }
+        } else {
+            configure(with: false)
         }
     }
 }
@@ -142,6 +279,17 @@ extension InteractionListViewController: UITableViewDelegate {
         tableView.deselectRow(at: indexPath, animated: true)
         let user = filteredUsers[indexPath.row]
         print("Open profile: \(user.name)")
+    }
+
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        let offsetY = scrollView.contentOffset.y
+        let contentHeight = scrollView.contentSize.height
+        let height = scrollView.frame.size.height
+        
+        // Подгружаем данные за 200 поинтов до конца списка
+        if offsetY > contentHeight - height - 200 {
+            loadNextPage()
+        }
     }
 }
 

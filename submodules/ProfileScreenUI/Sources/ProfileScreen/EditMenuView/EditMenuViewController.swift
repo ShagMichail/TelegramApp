@@ -123,11 +123,16 @@ final class EditMenuViewController: UIViewController {
         control.addTarget(self, action: #selector(rowTouchUp(_:)), for:[.touchDragExit, .touchCancel, .touchUpOutside])
         
         let actionClosure = ActionClosureWrapper(closure: { [weak self] in
-            self?.dismissMenu()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                item.action()
+            UIView.animate(withDuration: 0.2, animations: {
+                self?.shadowContainer.transform = CGAffineTransform(scaleX: 0.01, y: 0.01)
+                self?.shadowContainer.alpha = 0
+            }) { _ in
+                self?.dismiss(animated: false) {
+                    item.action()
+                }
             }
         })
+
         control.addTarget(actionClosure, action: #selector(ActionClosureWrapper.invoke), for: .touchUpInside)
         objc_setAssociatedObject(control, UUID().uuidString, actionClosure, .OBJC_ASSOCIATION_RETAIN)
         
