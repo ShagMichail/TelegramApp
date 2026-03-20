@@ -34,6 +34,7 @@ final class DivoTextField: ASDisplayNode, UITextFieldDelegate {
         fieldNode.textField.textColor = .white
         fieldNode.textField.autocapitalizationType = .none
         fieldNode.textField.autocorrectionType = .no
+        fieldNode.textField.returnKeyType = .done
         
         fieldNode.borderWidth = 1.0
         fieldNode.borderColor = UIColor(white: 1.0, alpha: 0.4).cgColor
@@ -51,7 +52,7 @@ final class DivoTextField: ASDisplayNode, UITextFieldDelegate {
         
         let prefixAttr: [NSAttributedString.Key: Any] = [
             .font: Font.bold(16.0),
-            .foregroundColor: UIColor(white: 1.0, alpha: 0.4)
+            .foregroundColor: UIColor(white: 1.0, alpha: 1.0)
         ]
         fullString.append(NSAttributedString(string: prefix, attributes: prefixAttr))
         
@@ -65,6 +66,11 @@ final class DivoTextField: ASDisplayNode, UITextFieldDelegate {
     }
     
     func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+        if string.contains("\n") {
+            textField.resignFirstResponder()
+            return false
+        }
+        
         guard let prefix = prefix, !prefix.isEmpty else { return true }
         
         let currentText = textField.text ?? ""
@@ -82,6 +88,11 @@ final class DivoTextField: ASDisplayNode, UITextFieldDelegate {
             return false
         }
         
+        return false
+    }
+    
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        textField.resignFirstResponder()
         return false
     }
     

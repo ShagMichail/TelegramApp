@@ -66,7 +66,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
     private weak var activeGalleryController: ProfileGalleryController?
 
     // для разработки
-    private var isMyProfile: Bool = false
+    private var isMyProfile: Bool = true
     
     internal var currentGalleryPhotos: [UserPhoto] = []
     internal var currentGalleryVideos: [UserVideoItem] = []
@@ -163,10 +163,11 @@ public final class PublicProfileScreenController: TelegramBaseController {
 
     private func navigateToEditProfile() {
         // debug: removed
-        let socialLinksController = EditProfileController(context: self.context, presentationData: self.presentationData, userDetailData: userDetailModel, updatePhoto: { [weak self] image in
+        let editProfileController = EditProfileController(context: self.context, presentationData: self.presentationData, userDetailData: userDetailModel, updatePhoto: { [weak self] image in
             self?.controllerNode.currentPhoto = image
         })
-        self.push(socialLinksController)
+        editProfileController.delegate = self
+        self.push(editProfileController)
     }
     
     private func navigateToChangeBackground() {
@@ -175,7 +176,22 @@ public final class PublicProfileScreenController: TelegramBaseController {
     }
     
     private func navigateToEditSocialLinks() {
-        let socialLinksController = EditSocialLinksController(context: self.context, presentationData: self.presentationData, userDetailData: userDetailModel)
+        
+        let tiktok = userDetailModel?.model?.tiktokUrl ?? ""
+        let youtube = userDetailModel?.model?.youtubeUrl ?? ""
+        let telegram = userDetailModel?.model?.telegramUrl ?? ""
+        let instagram = userDetailModel?.model?.instagramUrl ?? ""
+        let website = userDetailModel?.model?.websiteUrl ?? ""
+        
+        let linksData = LinksData(
+            tiktokUrl: self.controllerNode.extractHandle(from: tiktok),
+            youtubeUrl: self.controllerNode.extractHandle(from: youtube),
+            telegramUrl: self.controllerNode.extractHandle(from: telegram),
+            instagramUrl: self.controllerNode.extractHandle(from: instagram),
+            websiteUrl: self.controllerNode.extractHandle(from: website)
+        )
+        let socialLinksController = EditSocialLinksController(context: self.context, presentationData: self.presentationData, linksData: linksData)
+        socialLinksController.delegate = self
         self.push(socialLinksController)
     }
     
@@ -208,6 +224,11 @@ public final class PublicProfileScreenController: TelegramBaseController {
             self?.openFullScreenGallery(tabIndex: tabIndex, itemIndex: itemIndex)
         }
 
+
+        self.controllerNode.onSocialLinkTapped = { [weak self] url in
+            self?.openSocialLink(url)
+        }
+        
         self.displayNodeDidLoad()
     }
     
@@ -220,8 +241,23 @@ public final class PublicProfileScreenController: TelegramBaseController {
     
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        getUserProfile()
+        if !profileLoaded {
+            getUserProfile()
+        }
         getUserGalleryProfile()
+    }
+
+
+    private func openSocialLink(_ urlString: String) {
+        var finalUrlString = urlString
+        
+        if !finalUrlString.lowercased().hasPrefix("http://") && !finalUrlString.lowercased().hasPrefix("https://") {
+            finalUrlString = "https://" + finalUrlString
+        }
+        
+        if let url = URL(string: finalUrlString) {
+            UIApplication.shared.open(url, options: [:], completionHandler: nil)
+        }
     }
     
     private func getUserProfile() {
@@ -795,5 +831,19 @@ extension PublicProfileScreenController {
                 completion(mockData)
             }
         }
+    }
+}
+
+extension PublicProfileScreenController: EditSocialLinksDelegate {
+    func didUpdateSocialLinksData() {
+        self.profileLoaded = false
+        self.getUserProfile()
+    }
+}
+
+extension PublicProfileScreenController: EditProfileDelegate {
+    func didUpdateProfileData() {
+        self.profileLoaded = false
+        self.getUserProfile()
     }
 }

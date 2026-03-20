@@ -17,6 +17,10 @@ import ChatScheduleTimeController
 import MapResourceToAvatarSizes
 import PhotosUI
 
+protocol EditProfileDelegate: AnyObject {
+    func didUpdateProfileData()
+}
+
 public class EditProfileController: ViewController, UINavigationControllerDelegate, PHPickerViewControllerDelegate {
     private let context: AccountContext
 
@@ -28,6 +32,8 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
     private var presentationDataDisposable: Any?
     private let userDetailData: UserDetail?
     private let updatePhoto: (UIImage?) -> Void
+
+    weak var delegate: EditProfileDelegate?
     
     public init(context: AccountContext, presentationData: PresentationData, userDetailData: UserDetail?, updatePhoto: @escaping (UIImage?) -> Void) {
         self.context = context
@@ -123,6 +129,51 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
         }
 
         self.displayNodeDidLoad()
+
+        self.loadAppearanceDictionary()
+        self.loadGenderDictionary()
+    }
+
+    private func loadAppearanceDictionary() {
+        self.createEventNode.toggleSpinner(active: true)
+        
+        Task { @MainActor in
+            do {
+                let response: AppearanceDictionaryResponse = try await DivoAPIClient.shared.request(
+                    path: "/dictionary/appearances",
+                    method: "GET"
+                )
+                
+                self.createEventNode.configureAppearanceDictionaries(response.data)
+                self.createEventNode.toggleSpinner(active: false)
+                
+            } catch {
+                print("❌ Error loading appearance dictionary: \(error)")
+                self.createEventNode.toggleSpinner(active: false)
+                self.showAlert(text: "Failed to load appearance options.")
+            }
+        }
+    }
+    
+    private func loadGenderDictionary() {
+        self.createEventNode.toggleSpinner(active: true)
+        
+        Task { @MainActor in
+            do {
+                let response: GenderResponse = try await DivoAPIClient.shared.request(
+                    path: "/dictionary/gender",
+                    method: "GET"
+                )
+                
+                self.createEventNode.configureGenderDictionaries(response)
+                self.createEventNode.toggleSpinner(active: false)
+                
+            } catch {
+                print("❌ Error loading appearance dictionary: \(error)")
+                self.createEventNode.toggleSpinner(active: false)
+                self.showAlert(text: "Failed to load appearance options.")
+            }
+        }
     }
     
     private func showAlert(text: String) {
@@ -168,82 +219,28 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
         // Пока просто показываем алерт
     }
 
-    private func handleSave(with rawData: ProfileRawData) {
-        print("▶️ Controller получил сырые данные. Начинаем сборку модели для API...")
-
-        Task {
+    private func handleSave(with rawData: UpdateBiographyPageRequest) {
+        Task { @MainActor in
             do {
-                await MainActor.run { self.createEventNode.toggleSpinner(active: true) }
-
-                let request = UpdateProfileRequest(
-                    fullName: rawData.fullName,
-                    phone: rawData.phone,
-                    timezone: rawData.timezone,
-                    gender: rawData.gender,
-                    birthday: rawData.birthday,
-                    geoCityId: rawData.geoCityId,
-                    measuringSystem: rawData.measuringSystem,
-                    subrole: rawData.subrole,
-                    pushNotifications: rawData.pushNotifications,
-                    isRegistrationFinished: rawData.isRegistrationFinished,
-                    photo: rawData.photo.flatMap { FileRequest($0) },
-                    avatar: rawData.avatar.flatMap { FileRequest($0) },
-                    model: rawData.model.map { model in
-                        ModelRequest(
-                            agencyId: model.agencyId,
-                            profileUrl: model.profileUrl,
-                            education: model.education,
-                            workExperience: model.workExperience,
-                            languages: model.languages,
-                            hasInternationalPassport: model.hasInternationalPassport,
-                            hasTattoo: model.hasTattoo,
-                            hasPiercing: model.hasPiercing,
-                            hasActingEducation: model.hasActingEducation,
-                            appearance: AppearanceRequest(
-                                measuringSystem: model.appearance.measuringSystem,
-                                height: model.appearance.height,
-                                weight: model.appearance.weight,
-                                breastSize: model.appearance.breastSize,
-                                waist: model.appearance.waist,
-                                hips: model.appearance.hips,
-                                shoesSize: model.appearance.shoesSize,
-                                hairColor: model.appearance.hairColor,
-                                hairLength: model.appearance.hairLength,
-                                eyeColor: model.appearance.eyeColor,
-                                skinColor: model.appearance.skinColor
-                            )
-                        )
-                    },
-                    customer: rawData.customer.map { customer in
-                        CustomerRequest(
-                            site: nil,
-                            description: nil,
-                            background: nil
-                        )
-                    }
-                )
-
-                let response: UpdateProfileResponse = try await DivoAPIClient.shared.request(
+                let request = rawData
+                
+                let response: UpdateBiographyPageResponse = try await DivoAPIClient.shared.request(
                     path: "/user/update-profile",
                     method: "POST",
                     body: request
                 )
-
-                print("✅ Профиль успешно сохранен на сервере: \(response.message ?? "OK")")
-
-                await MainActor.run {
-                    self.createEventNode.toggleSpinner(active: false)
-                    self.showAlert(text: "Профиль успешно обновлен")
-
-                    self.navigationController?.popViewController(animated: true)
-                }
-
+                
+                print("✅ Social links successfully saved: \(response.message ?? "OK")")
+                self.delegate?.didUpdateProfileData()
+                self.createEventNode.toggleSpinner(active: false)
+                self.showAlert(text: "Social links updated")
+                
+                self.navigationController?.popViewController(animated: true)
+                
             } catch {
-                print("❌ Ошибка при сохранении профиля: \(error)")
-                await MainActor.run {
-                    self.createEventNode.toggleSpinner(active: false)
-                    self.showAlert(text: error.localizedDescription)
-                }
+                print("❌ Error saving social links: \(error)")
+                self.createEventNode.toggleSpinner(active: false)
+                self.showAlert(text: error.localizedDescription)
             }
         }
     }

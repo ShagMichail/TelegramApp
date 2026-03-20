@@ -24,6 +24,9 @@ final class EditProfileNode: ASDisplayNode {
     
     private var presentationData: PresentationData
     private let presentationDataPromise: Promise<PresentationData>
+
+    private var appearanceDictionaries: AppearanceDictionaryData?
+    private var genderDictionaries: GenderResponse?
     
     private let _ready = Promise<Bool>()
     private var readyValue = false {
@@ -37,7 +40,7 @@ final class EditProfileNode: ASDisplayNode {
         return self._ready.get()
     }
     
-    var saveProfile: ((ProfileRawData) -> Void)?
+    var saveProfile: ((UpdateBiographyPageRequest) -> Void)?
     var onAvatarTap: (() -> Void)?
     
     
@@ -184,7 +187,6 @@ final class EditProfileNode: ASDisplayNode {
     }()
     
     private let nameEventTextField: TextFieldNode
-    private let lastNameEventTextField: TextFieldNode
     private let aboutEventTextField: DivoTextView
     
     
@@ -193,16 +195,25 @@ final class EditProfileNode: ASDisplayNode {
     private let genderDropdown: DropdownNode
     private var ageSlider: AgeSliderNode<Int>
     private let heightSlider: AgeSliderNode<Double>
+    private let weightSlider: AgeSliderNode<Double>
     private let waistSlider: AgeSliderNode<Double>
     private let hipsSlider: AgeSliderNode<Double>
     private let shoeSizeSlider: AgeSliderNode<Double>
-    private let hairLengthSlider: AgeSliderNode<Double>
+    private let hairLengthDropdown: DropdownNode
     private let hairColorDropdown: DropdownNode
+    private let eyeColorDropdown: DropdownNode
+    private let skinColorDropdown: DropdownNode
     
     
     // MARK: - Footer UI
     
     private let applyButton: ASControlNode
+    private let applyButtonSpinner: UIActivityIndicatorView = {
+        let spinner = UIActivityIndicatorView(style: .large)
+        spinner.color = .white
+        spinner.hidesWhenStopped = true
+        return spinner
+    }()
     
     var currentPhoto: UIImage? = nil {
         didSet {
@@ -225,20 +236,34 @@ final class EditProfileNode: ASDisplayNode {
         if let fullName = model?.fullName {
             self.nameEventTextField.textField.text = fullName
         }
-        self.lastNameEventTextField = getTextFiel(title: model?.fullName ?? "Last Name")
-        if let fullName = model?.fullName {
-            self.lastNameEventTextField.textField.text = fullName
-        }
-        self.aboutEventTextField = DivoTextView(title: "Biography", initialText: model?.model?.additionalInformation ?? "Fill in the information about you")
         
-        self.genderDropdown = DropdownNode(placeholder: "Select a Gender", options:["Female", "Male"])
+        self.aboutEventTextField = DivoTextView(title: "Biography", initialText: model?.model?.description ?? "Fill in the information about you")
+
+        let currentGender = model?.gender?.title ?? "Loading..."
+        self.genderDropdown = DropdownNode(title: "Gender", placeholder: "Select a Gender", options: [currentGender])
+        self.genderDropdown.selectedValue = self.model?.gender?.title
+        
         self.ageSlider = AgeSliderNode(title: "Age (y.o)", type: "y.o", defaultValue: 17, minimumValue: 14, maximumValue: 45)
         self.heightSlider = AgeSliderNode(title: "Height (cm)", type: "cm", defaultValue: model?.model?.appearance?.height ?? 1.68, minimumValue: 1.68, maximumValue: 2.50)
+        self.weightSlider = AgeSliderNode(title: "Weight (kg)", type: "kg", defaultValue: model?.model?.appearance?.weight ?? 50, minimumValue: 48, maximumValue: 90)
         self.waistSlider = AgeSliderNode(title: "Waist (cm)", type: "cm", defaultValue: model?.model?.appearance?.waist ?? 60, minimumValue: 48, maximumValue: 90)
         self.hipsSlider = AgeSliderNode(title: "Hips (cm)", type: "cm", defaultValue: model?.model?.appearance?.hips ?? 91, minimumValue: 80, maximumValue: 110)
         self.shoeSizeSlider = AgeSliderNode(title: "Shoe size (EU)", type: "", defaultValue: model?.model?.appearance?.shoesSize ?? 37, minimumValue: 36, maximumValue: 42)
-        self.hairLengthSlider = AgeSliderNode(title: "Hair length (cm)", type: "", defaultValue: 46, minimumValue: 0, maximumValue: 200)
-        self.hairColorDropdown = DropdownNode(placeholder: "Choose your hair color", options:["Blonde", "Brunette", "Brown", "Black", "Red", "Other"])
+        
+        let currentHairLength = model?.model?.appearance?.hairLength?.title ?? "Loading..."
+        let currentHairColor = model?.model?.appearance?.hairColor?.title ?? "Loading..."
+        let currentEyeColor = model?.model?.appearance?.eyeColor?.title ?? "Loading..."
+        let currentSkinColor = model?.model?.appearance?.skinColor?.title ?? "Loading..."
+        
+        self.hairLengthDropdown = DropdownNode(title: "Length hair", placeholder: "Choose your length hair", options: [currentHairLength])
+        self.hairColorDropdown = DropdownNode(title: "Hair color", placeholder: "Choose your hair color", options: [currentHairColor])
+        self.eyeColorDropdown = DropdownNode(title: "Eye color", placeholder: "Choose your eye color", options: [currentEyeColor])
+        self.skinColorDropdown = DropdownNode(title: "Skin color", placeholder: "Choose your skin color", options: [currentSkinColor])
+        
+        self.hairLengthDropdown.selectedValue = model?.model?.appearance?.hairLength?.title
+        self.hairColorDropdown.selectedValue = model?.model?.appearance?.hairColor?.title
+        self.eyeColorDropdown.selectedValue = model?.model?.appearance?.eyeColor?.title
+        self.skinColorDropdown.selectedValue = model?.model?.appearance?.skinColor?.title
         
         self.applyButton = ButtonWithIconNode(title: "Save", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
         self.applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
@@ -254,7 +279,6 @@ final class EditProfileNode: ASDisplayNode {
                 ImageLoader.shared.load(url: avatarURL) { [weak self] image in
                     if let image = image {
                         self?.avatarImageView.image = image
-                        self?.avatarImageView.applyAvatarTopCropIfNeeded(image: image)
                     }
                 }
             }
@@ -293,6 +317,39 @@ final class EditProfileNode: ASDisplayNode {
             self.updateIndicatorPosition(progress: CGFloat(self.selectedIndex), animated: false)
         }
 //        self.layoutIfNeeded()
+    }
+
+    func configureAppearanceDictionaries(_ dict: AppearanceDictionaryData) {
+        self.appearanceDictionaries = dict
+        
+        self.hairLengthDropdown.options = dict.hairLength.map { $0.title }
+        self.hairColorDropdown.options = dict.hairColor.map { $0.title }
+        self.eyeColorDropdown.options = dict.eyeColor.map { $0.title }
+        self.skinColorDropdown.options = dict.skinColor.map { $0.title }
+        
+        self.hairLengthDropdown.selectedValue = self.model?.model?.appearance?.hairLength?.title
+        self.hairColorDropdown.selectedValue = self.model?.model?.appearance?.hairColor?.title
+        self.eyeColorDropdown.selectedValue = self.model?.model?.appearance?.eyeColor?.title
+        self.skinColorDropdown.selectedValue = self.model?.model?.appearance?.skinColor?.title
+    }
+    
+    
+    func configureGenderDictionaries(_ dict: GenderResponse) {
+        self.genderDictionaries = dict
+        
+        self.genderDropdown.options = dict.data.map { $0.title }
+        
+        self.genderDropdown.selectedValue = self.model?.gender?.title
+    }
+    
+    private func getAppearanceId(for title: String?, in list: [AppearanceOption]?) -> Int {
+        guard let title = title, let list = list else { return 1 }
+        return list.first(where: { $0.title == title })?.id ?? 1
+    }
+    
+    private func getGenderId(for title: String?, in list: [GenderOption]?) -> String {
+        guard let title = title, let list = list else { return "other" }
+        return list.first(where: { $0.title == title })?.id ?? "other"
     }
     
     
@@ -338,13 +395,18 @@ final class EditProfileNode: ASDisplayNode {
         buttonContainer.translatesAutoresizingMaskIntoConstraints = false
         applyButton.view.translatesAutoresizingMaskIntoConstraints = false
         buttonContainer.addSubview(applyButton.view)
+        applyButtonSpinner.translatesAutoresizingMaskIntoConstraints = false
+        buttonContainer.addSubview(self.applyButtonSpinner)
         
         NSLayoutConstraint.activate([
             applyButton.view.topAnchor.constraint(equalTo: buttonContainer.topAnchor),
             applyButton.view.bottomAnchor.constraint(equalTo: buttonContainer.bottomAnchor),
             applyButton.view.leadingAnchor.constraint(equalTo: buttonContainer.leadingAnchor, constant: 16),
             applyButton.view.trailingAnchor.constraint(equalTo: buttonContainer.trailingAnchor, constant: -16),
-            applyButton.view.heightAnchor.constraint(equalToConstant: 50)
+            applyButton.view.heightAnchor.constraint(equalToConstant: 50),
+            
+            applyButtonSpinner.centerXAnchor.constraint(equalTo: buttonContainer.centerXAnchor),
+            applyButtonSpinner.centerYAnchor.constraint(equalTo: buttonContainer.centerYAnchor),
         ])
         
         mainStackView.addArrangedSubview(buttonContainer)
@@ -448,28 +510,23 @@ final class EditProfileNode: ASDisplayNode {
         avatarContainer.widthAnchor.constraint(equalTo: bioStackView.widthAnchor).isActive = true
         
         nameEventTextField.view.translatesAutoresizingMaskIntoConstraints = false
-        lastNameEventTextField.view.translatesAutoresizingMaskIntoConstraints = false
         aboutEventTextField.view.translatesAutoresizingMaskIntoConstraints = false
         
         bioStackView.addArrangedSubview(nameEventTextField.view)
-        bioStackView.addArrangedSubview(lastNameEventTextField.view)
         bioStackView.addArrangedSubview(aboutEventTextField.view)
         
         NSLayoutConstraint.activate([
             nameEventTextField.view.widthAnchor.constraint(equalTo: bioStackView.widthAnchor),
             nameEventTextField.view.heightAnchor.constraint(equalToConstant: 48),
-            
-            lastNameEventTextField.view.widthAnchor.constraint(equalTo: bioStackView.widthAnchor),
-            lastNameEventTextField.view.heightAnchor.constraint(equalToConstant: 48),
-            
+
             aboutEventTextField.view.widthAnchor.constraint(equalTo: bioStackView.widthAnchor),
             aboutEventTextField.view.heightAnchor.constraint(equalToConstant: 140)
         ])
     }
     
     private func setupAppearanceContent() {
-        let nodes: [ASDisplayNode] = [genderDropdown, ageSlider, heightSlider, waistSlider, hipsSlider, shoeSizeSlider, hairLengthSlider, hairColorDropdown]
-        
+        let nodes: [ASDisplayNode] = [genderDropdown, ageSlider, heightSlider, weightSlider, waistSlider, hipsSlider, shoeSizeSlider, hairLengthDropdown, hairColorDropdown, eyeColorDropdown, skinColorDropdown]
+
         for node in nodes {
             node.view.translatesAutoresizingMaskIntoConstraints = false
             appearanceStackView.addArrangedSubview(node.view)
@@ -507,79 +564,36 @@ final class EditProfileNode: ASDisplayNode {
     }
     
     @objc private func saveButtonPressed() {
-        print("Save button pressed in Node. Collecting data...")
+        let genderId = getGenderId(for: self.genderDropdown.selectedValue, in: genderDictionaries?.data)
         
-        let profileData = collectProfileData()
+        let hairLengthId = getAppearanceId(for: self.hairLengthDropdown.selectedValue, in: appearanceDictionaries?.hairLength)
+        let hairColorId = getAppearanceId(for: self.hairColorDropdown.selectedValue, in: appearanceDictionaries?.hairColor)
+        let eyeColorId = getAppearanceId(for: self.eyeColorDropdown.selectedValue, in: appearanceDictionaries?.eyeColor)
+        let skinColorId = getAppearanceId(for: self.skinColorDropdown.selectedValue, in: appearanceDictionaries?.skinColor)
         
-        // ВЫЗЫВАЕМ CALLBACK, передавая данные контроллеру
-        saveProfile?(profileData)
-    }
-    
-    private func collectProfileData() -> ProfileRawData {
-        // Собираем данные с полей
-        let fullName = nameEventTextField.textField.text
-        // let biography = aboutEventTextField.text
-        let gender = genderDropdown.selectedValue ?? "Female"
-        
-        // Вычисляем возраст из ageSlider
-        let age = Int(ageSlider.slider.value.rounded())
-        let birthday = calculateBirthdayString(from: age)
-        
-        // Собираем Appearance данные
-        let height = heightSlider.slider.value
-        let weight = waistSlider.slider.value  // Используем waist как weight для примера
-        let waist = waistSlider.slider.value
-        let hips = hipsSlider.slider.value
-        let shoesSize = shoeSizeSlider.slider.value
-        let hairLength = hairLengthSlider.slider.value
-        
-        // let hairColor = hairColorDropdown.selectedValue ?? "Black"
-        let eyeColor = 0
-        let skinColor = 0
-        
-        let appearance = Appearance(
-            measuringSystem: "metric",
-            height: Double(height),
-            weight: Double(weight),
-            breastSize: nil,
-            waist: Double(waist),
-            hips: Double(hips),
-            shoesSize: Double(shoesSize),
-            hairColor: 0,
-            hairLength: Double(hairLength),
-            eyeColor: eyeColor,
-            skinColor: skinColor
+        let data = UpdateBiographyPageRequest(
+            fullName: self.nameEventTextField.textField.text ?? "",
+            gender: genderId,
+            model: UpdateBiographyPageRequest.ModelData(
+                description: self.aboutEventTextField.text,
+                appearance: Appearance(
+                    measuringSystem: "metric",
+                    height: self.heightSlider.currentValue,
+                    weight: self.weightSlider.currentValue,
+                    breastSize: "",
+                    waist: self.waistSlider.currentValue,
+                    hips: self.hipsSlider.currentValue,
+                    shoesSize: self.shoeSizeSlider.currentValue,
+                    hairColor: hairColorId,
+                    hairLength: hairLengthId,
+                    eyeColor: eyeColorId,
+                    skinColor: skinColorId
+                )
+            )
         )
         
-        let modelData = Model(
-            agencyId: nil,
-            profileUrl: nil,
-            education: nil,
-            workExperience: nil,
-            languages: nil,
-            hasInternationalPassport: false,
-            hasTattoo: false,
-            hasPiercing: false,
-            hasActingEducation: false,
-            appearance: appearance
-        )
-        
-        return ProfileRawData(
-            fullName: fullName,
-            phone: nil,
-            timezone: TimeZone.current.identifier,
-            gender: gender.lowercased(),
-            birthday: birthday,
-            geoCityId: 0,
-            measuringSystem: "metric",
-            subrole: nil,
-            pushNotifications: true,
-            isRegistrationFinished: true,
-            photo: nil,
-            avatar: nil,
-            model: modelData,
-            customer: nil
-        )
+        self.toggleSpinner(active: true)
+        self.saveProfile?(data)
     }
     
     private func calculateBirthdayString(from age: Int) -> String {
@@ -591,11 +605,11 @@ final class EditProfileNode: ASDisplayNode {
 
     func toggleSpinner(active: Bool) {
         if active {
-            avatarSpinner.startAnimating()
-            avatarImageView.alpha = 0.5
+            self.applyButtonSpinner.startAnimating()
+            self.applyButton.alpha = 0.0
         } else {
-            avatarSpinner.stopAnimating()
-            avatarImageView.alpha = 1.0
+            self.applyButtonSpinner.stopAnimating()
+            self.applyButton.alpha = 1.0
         }
     }
 }
