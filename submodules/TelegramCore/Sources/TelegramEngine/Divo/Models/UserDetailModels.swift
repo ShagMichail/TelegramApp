@@ -270,3 +270,80 @@ public struct AppearanceOption: Codable {
     public let id: Int
     public let title: String
 }
+
+
+// MARK: - API Models for Engagement
+
+public struct UserEngagementResponse: Decodable {
+    public let data: UserEngagementData?
+}
+
+public struct UserEngagementData: Decodable {
+    public let liked: EngagementCategoryData?
+    public let viewed: EngagementCategoryData?
+    public let followed: EngagementCategoryData?
+}
+
+public struct EngagementCategoryData: Decodable {
+    public let items: [EngagementItem]?
+    public let pagination: EngagementPagination?
+}
+
+public struct EngagementPagination: Decodable {
+    public let meta: PaginationDetails?
+    public let total: Int?
+    public let offset: Int?
+    public let limit: Int?
+}
+
+public struct PaginationDetails: Decodable {
+    public let limit: Int?
+    public let currentOffset: Int?
+    public let totalCount: Int?
+}
+
+public struct EngagementItem: Decodable {
+    public let id: Int?
+    public let fullName: String?
+    public let role: String?
+    public let roleLabel: String?
+    public let avatar: UserFile?
+}
+
+public struct FileUploadRequest: Codable {
+    public let file: Data
+}
+
+public struct FileUploadResponse: Decodable {
+    public let message: String?
+    public let data: FileUploadData?
+    public let errors: String?
+}
+
+public struct FileUploadData: Decodable {
+    public let uuid: String?
+    public let status: String?
+    public let fileName: String?
+    public let fullUrl: String?
+    public let extensionFile: String?
+    public let type: String?
+    
+    private enum CodingKeys: String, CodingKey {
+        case uuid, status, fileName, fullUrl, type
+        case extensionFile = "extension"
+    }
+}
+
+public struct AddGalleryRequest: Codable {
+    public let uuid: String
+    
+    public init(uuid: String) {
+        self.uuid = uuid
+    }
+}
+
+public struct AddGalleryResponse: Decodable {
+    public let message: String?
+    public let data: UserPhoto?
+    public let errors: String?
+}

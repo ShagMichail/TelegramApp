@@ -1,5 +1,6 @@
 import UIKit
 import Display
+import TelegramCore
 
 final class InteractionUserCell: UITableViewCell {
     static let reuseIdentifier = "InteractionUserCell"
@@ -11,6 +12,7 @@ final class InteractionUserCell: UITableViewCell {
         iv.layer.cornerRadius = 30
         iv.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
         iv.translatesAutoresizingMaskIntoConstraints = false
+        iv.tintColor = .lightGray
         return iv
     }()
 
@@ -47,6 +49,14 @@ final class InteractionUserCell: UITableViewCell {
         fatalError("init(coder:) has not been implemented")
     }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        avatarImageView.image = nil
+        avatarImageView.stopShimmering()
+        avatarImageView.alpha = 1.0
+        avatarImageView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
+    }
+
     private func setupViews() {
         contentView.addSubview(avatarImageView)
         contentView.addSubview(nameLabel)
@@ -76,9 +86,38 @@ final class InteractionUserCell: UITableViewCell {
         nameLabel.text = user.name
         roleLabel.text = user.role
         premiumBadge.isHidden = !user.isPremium
+        
+        avatarImageView.startShimmering()
+        
+        if let avatarURLString = user.avatarUrl, let avatarURL = CDNURLHelper.convertToCDNURL(avatarURLString) {
+            ImageLoader.shared.load(url: avatarURL) { [weak self] image in
+                DispatchQueue.main.async {
+                    guard let self = self else { return }
+                    
+                    if let image = image {
+                        self.avatarImageView.alpha = 0
+                        self.avatarImageView.image = image
+                        self.avatarImageView.backgroundColor = .clear
+                        
+                        UIView.animate(withDuration: 0.3) {
+                            self.avatarImageView.alpha = 1.0
+                        }
+                    } else {
+                        self.setDefaultAvatar()
+                    }
+                    self.avatarImageView.stopShimmering()
+                }
+            }
+        } else {
+            self.avatarImageView.stopShimmering()
+            self.setDefaultAvatar()
+        }
+    }
 
+    private func setDefaultAvatar() {
         avatarImageView.image = UIImage(systemName: "person.crop.circle.fill")
         avatarImageView.tintColor = .lightGray
+        avatarImageView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
     }
 }
 

@@ -48,6 +48,51 @@ public final class DivoAPIClient {
 
         return try JSONDecoder().decode(T.self, from: data)
     }
+
+    public func upload<T: Decodable>(
+        path: String,
+        fileData: Data,
+        fileName: String = "photo.jpg",
+        mimeType: String = "image/jpeg"
+    ) async throws -> T {
+        let url = URL(string: baseURL.absoluteString + path)!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        
+        let boundary = "Boundary-\(UUID().uuidString)"
+        
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(DivoConfig.accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue(DivoConfig.appPlatform, forHTTPHeaderField: "app-platform")
+        request.setValue(DivoConfig.appVersion, forHTTPHeaderField: "app-version")
+        
+        var body = Data()
+        
+        let fieldName = "file"
+        
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        
+        body.append(fileData)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        let (data, response) = try await session.upload(for: request, from: body)
+        
+        guard let http = response as? HTTPURLResponse else {
+            throw DivoAPIError.unknown
+        }
+        
+        guard (200...299).contains(http.statusCode) else {
+            let errorMsg = String(data: data, encoding: .utf8) ?? ""
+            print("❌ Upload Error Data: \(errorMsg)")
+            throw DivoAPIError.httpError(statusCode: http.statusCode)
+        }
+        
+        return try JSONDecoder().decode(T.self, from: data)
+    }
 }
 
 public enum DivoAPIError: Error, LocalizedError {

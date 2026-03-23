@@ -1,4 +1,6 @@
 import UIKit
+import PhotosUI
+import UniformTypeIdentifiers
 import AsyncDisplayKit
 import Display
 import TelegramCore
@@ -147,6 +149,16 @@ public final class PublicProfileScreenController: TelegramBaseController {
             }),
             .init(title: "Manage Work Experience", action: { [weak self] in
                 self?.navigateToManageExperience()
+            }),
+            .init(title: "Add Photo", action: { [weak self] in
+                if #available(iOS 14, *) {
+                    self?.navigateToAddPhoto()
+                }
+            }),
+            .init(title: "Add Video", action: { [weak self] in
+                if #available(iOS 14, *) {
+                    self?.navigateToAddVideo()
+                }
             })
         ]
         
@@ -159,6 +171,44 @@ public final class PublicProfileScreenController: TelegramBaseController {
         let menuVC = EditMenuViewController(items: items, sourcePoint: sourcePoint)
         
         self.present(menuVC, animated: false, completion: nil)
+    }
+
+    @available(iOS 14, *)
+    private func navigateToAddPhoto() {
+        PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] status in
+            guard status == .authorized else {
+                return
+            }
+
+            DispatchQueue.main.async {
+                var configuration = PHPickerConfiguration()
+                configuration.filter = .images
+                configuration.selectionLimit = 1
+
+                let picker = PHPickerViewController(configuration: configuration)
+                picker.delegate = self
+                self?.present(picker, animated: true)
+            }
+        }
+    }
+
+    @available(iOS 14, *)
+    private func navigateToAddVideo() {
+        PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
+            guard status == .authorized else {
+                return
+            }
+
+            DispatchQueue.main.async {
+                var configuration = PHPickerConfiguration()
+                configuration.filter = .videos
+                configuration.selectionLimit = 1
+
+                let picker = PHPickerViewController(configuration: configuration)
+                picker.delegate = self
+                self.present(picker, animated: true)
+            }
+        }
     }
 
     private func navigateToEditProfile() {
@@ -224,6 +274,21 @@ public final class PublicProfileScreenController: TelegramBaseController {
             self?.openFullScreenGallery(tabIndex: tabIndex, itemIndex: itemIndex)
         }
 
+        self.controllerNode.onEditLinksTapped = { [weak self] in
+            self?.navigateToEditSocialLinks()
+        }
+        
+        self.controllerNode.onAddPhotoTapped = { [weak self] in
+            if #available(iOS 14, *) {
+                self?.navigateToAddPhoto()
+            }
+        }
+
+         self.controllerNode.onAddVideoTapped = { [weak self] in
+            if #available(iOS 14, *) {
+                self?.navigateToAddVideo()
+            }
+        }
 
         self.controllerNode.onSocialLinkTapped = { [weak self] url in
             self?.openSocialLink(url)
@@ -243,10 +308,35 @@ public final class PublicProfileScreenController: TelegramBaseController {
         super.viewWillAppear(animated)
         if !profileLoaded {
             getUserProfile()
+            getEngagementTotals()
         }
         getUserGalleryProfile()
     }
 
+    private func getEngagementTotals() {
+        guard let userId = model.userId else { return }
+        
+        Task {
+            do {
+                let path = isMyProfile ? "/user/engagement?offset=0&limit=1" : "/user/engagement?offset=0&limit=1&userId=\(userId)"
+                
+                let response: UserEngagementResponse = try await DivoAPIClient.shared.request(
+                    path: path,
+                    method: "GET"
+                )
+                
+                let likes = response.data?.liked?.pagination?.meta?.totalCount ?? response.data?.liked?.pagination?.total ?? 0
+                let views = response.data?.viewed?.pagination?.meta?.totalCount ?? response.data?.viewed?.pagination?.total ?? 0
+                let saves = response.data?.followed?.pagination?.meta?.totalCount ?? response.data?.followed?.pagination?.total ?? 0
+                
+                await MainActor.run {
+                    self.controllerNode.updateEngagementStats(likes: likes, views: views, saves: saves)
+                }
+            } catch {
+                print("❌ [ENGAGEMENT TOTALS] Error: \(error)")
+            }
+        }
+    }
 
     private func openSocialLink(_ urlString: String) {
         var finalUrlString = urlString
@@ -781,11 +871,8 @@ extension PublicProfileScreenController {
     private func presentInteractionSheet(type: InteractionListType) {
         let sheetVC = InteractionListViewController(type: type)
         
-        // Настраиваем, откуда шторка будет брать данные
-        sheetVC.requestData = { [weak self, weak sheetVC] in
-            self?.loadInteractionData(type: type) { users in
-                sheetVC?.updateData(users)
-            }
+        sheetVC.requestData = { [weak self] offset, completion in
+            self?.loadInteractionData(type: type, offset: offset, completion: completion)
         }
         
         if #available(iOS 15.0, *) {
@@ -801,34 +888,56 @@ extension PublicProfileScreenController {
         self.present(sheetVC, animated: true, completion: nil)
     }
     
-    private func loadInteractionData(type: InteractionListType, completion: @escaping ([InteractionUser]) -> Void) {
+    private func loadInteractionData(type: InteractionListType, offset: Int, completion: @escaping ([InteractionUser], Bool) -> Void) {
         guard let userId = model.userId else { return }
-
-        debugLog("📡 [INTERACTIONS] Requesting data for \(type.title), userId: \(userId)")
         
-        // TODO: Здесь будет сетевой запрос. Например:
-        // let path = (type == .likes) ? "/user/likes" : "/user/views"
-        // let response = try await DivoAPIClient.shared.request(...)
-        
-        // Имитация сетевой задержки в 1 секунду
-        DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
-            
-            // Мок-данные. Вы можете сделать разные массивы для лайков и просмотров.
-            let mockData = [
-                InteractionUser(id: 1, name: "Kristina Reach", role: "Model", avatarUrl: nil, isPremium: true),
-                InteractionUser(id: 2, name: "Vogue Inside", role: "Agency", avatarUrl: nil, isPremium: false),
-                InteractionUser(id: 3, name: "Capsule Wardrobe", role: "Fan", avatarUrl: nil, isPremium: true),
-                InteractionUser(id: 4, name: "Mode & Mood", role: "Model", avatarUrl: nil, isPremium: true),
-                InteractionUser(id: 5, name: "Street Luxe", role: "New Talent", avatarUrl: nil, isPremium: false),
-                InteractionUser(id: 6, name: "Trend Lab", role: "Model", avatarUrl: nil, isPremium: false),
-                InteractionUser(id: 7, name: "Haute Daily", role: "Agency", avatarUrl: nil, isPremium: false)
-            ]
-            
-            self.debugLog("📥 [INTERACTIONS] Loaded \(mockData.count) users for \(type.title)")
-            
-            // Возвращаем данные в контроллер шторки на главный поток
-            DispatchQueue.main.async {
-                completion(mockData)
+        let limit = 20
+        Task {
+            do {
+                let path = isMyProfile ? "/user/engagement?offset=\(offset)&limit=\(limit)" : "/user/engagement?offset=\(offset)&limit=\(limit)&userId=\(userId)"
+                let response: UserEngagementResponse = try await DivoAPIClient.shared.request(path: path, method: "GET")
+                
+                var apiItems: [EngagementItem] = []
+                var totalCount = 0
+                
+                // ИСПРАВЛЕНИЕ: Гибкое получение total
+                switch type {
+                case .likes:
+                    apiItems = response.data?.liked?.items ?? []
+                    totalCount = response.data?.liked?.pagination?.meta?.totalCount ?? response.data?.liked?.pagination?.total ?? 0
+                case .views:
+                    apiItems = response.data?.viewed?.items ?? []
+                    totalCount = response.data?.viewed?.pagination?.meta?.totalCount ?? response.data?.viewed?.pagination?.total ?? 0
+                case .saves:
+                    apiItems = response.data?.followed?.items ?? []
+                    totalCount = response.data?.followed?.pagination?.meta?.totalCount ?? response.data?.followed?.pagination?.total ?? 0
+                }
+                
+                let mappedUsers = apiItems.compactMap { item -> InteractionUser? in
+                    guard let id = item.id else { return nil }
+                    let avatarUrl = item.avatar?.fullUrl
+                    var finalAvatarUrl: String? = nil
+                    if let url = avatarUrl {
+                        finalAvatarUrl = CDNURLHelper.convertToCDNURL(url)?.absoluteString ?? url
+                    }
+                    return InteractionUser(
+                        id: id,
+                        name: item.fullName ?? "Unknown",
+                        role: item.roleLabel ?? item.role ?? "User",
+                        avatarUrl: finalAvatarUrl,
+                        isPremium: false
+                    )
+                }
+                
+                let hasMore = (offset + apiItems.count) < totalCount
+                
+                await MainActor.run {
+                    completion(mappedUsers, hasMore)
+                }
+                
+            } catch {
+                print("❌ [INTERACTIONS] Error loading data for \(type.title): \(error)")
+                await MainActor.run { completion([], false) }
             }
         }
     }
@@ -845,5 +954,168 @@ extension PublicProfileScreenController: EditProfileDelegate {
     func didUpdateProfileData() {
         self.profileLoaded = false
         self.getUserProfile()
+    }
+}
+
+
+// MARK: - Image Picker & Upload Logic
+@available(iOS 14, *)
+extension PublicProfileScreenController: PHPickerViewControllerDelegate {
+
+    public func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true, completion: nil)
+
+        guard let result = results.first else {
+            return
+        }
+
+        if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
+            result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
+                guard let self = self, let uiImage = image as? UIImage else {
+                    return
+                }
+                self.uploadAndAddPhoto(uiImage)
+            }
+        } else if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+            result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { [weak self] url, error in
+                guard let self = self, let url = url else {
+                    return
+                }
+                
+                let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("temp_video_\(Date().timeIntervalSince1970).mov")
+                do {
+                    try FileManager.default.copyItem(at: url, to: tempURL)
+                    self.uploadAndAddVideo(tempURL)
+                } catch {
+                    print("❌ [PHPICKER DELEGATE] Failed to copy video: \(error)")
+                }
+            }
+        }
+    }
+
+    private func uploadAndAddPhoto(_ image: UIImage) {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
+
+        Task {
+            await MainActor.run {
+                self.controllerNode.setGalleryLoading(true)
+            }
+            
+            do {
+                let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
+                    path: "/file/upload-file",
+                    fileData: imageData,
+                    fileName: "photo.jpg",
+                    mimeType: "image/jpeg"
+                )
+
+                guard let fileUuid = uploadResponse.data?.uuid else {
+                    throw DivoAPIError.unknown
+                }
+
+                let body = AddGalleryRequest(uuid: fileUuid)
+
+                let addResponse: AddGalleryResponse = try await DivoAPIClient.shared.request(
+                    path: "/user-gallery/add",
+                    method: "POST",
+                    body: body
+                )
+
+                await MainActor.run {
+                    self.controllerNode.setGalleryLoading(false)
+
+                    if let newPhoto = addResponse.data {
+                        self.controllerNode.insertNewPhoto(newPhoto)
+                    } else {
+                        self.galleryLoaded = false
+                        self.getUserGalleryProfile()
+                    }
+                }
+
+            } catch {
+                print("❌ [UPLOAD PHOTO] Ошибка: \(error)")
+                await MainActor.run {
+                    self.controllerNode.setGalleryLoading(false)
+                }
+            }
+        }
+    }
+
+    private func uploadAndAddVideo(_ videoURL: URL) {
+        print("🎬 [UPLOAD VIDEO] Starting upload for: \(videoURL)")
+        
+        guard let videoData = try? Data(contentsOf: videoURL) else {
+            print("❌ [UPLOAD VIDEO] Failed to read video data")
+            return
+        }
+        
+        print("🎬 [UPLOAD VIDEO] Video size: \(videoData.count) bytes")
+
+        Task {
+            await MainActor.run {
+                self.controllerNode.setVideoGalleryLoading(true)
+            }
+
+            do {
+                let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
+                    path: "/file/upload-file",
+                    fileData: videoData,
+                    fileName: "video.mov",
+                    mimeType: "video/quicktime"
+                )
+
+                guard let fileUuid = uploadResponse.data?.uuid else {
+                    throw DivoAPIError.unknown
+                }
+
+                print("🎬 [UPLOAD VIDEO] File uploaded successfully, uuid: \(fileUuid)")
+
+                let body = AddPublicationRequest(
+                    title: "My Video",
+                    description: "Video description",
+                    type: "educational",
+                    files: [
+                        VideoFileData(order: 0, fileUuid: fileUuid)
+                    ]
+                )
+
+                let addResponse: AddPublicationResponse = try await DivoAPIClient.shared.request(
+                    path: "/publication/create",
+                    method: "POST",
+                    body: body
+                )
+                
+                await MainActor.run {
+                    self.controllerNode.setVideoGalleryLoading(false)
+
+                    if let newVideo = addResponse.data {
+                        let video = UserPhoto(
+                            id: newVideo.id ?? 0,
+                            photo: UserFile(
+                                fileName: newVideo.files?.first?.fileName ?? "",
+                                fullUrl: newVideo.files?.first?.fullUrl ?? "",
+                                fileExtension: newVideo.files?.first?.extensionType ?? "",
+                                fileUuid: newVideo.files?.first?.fileUuid ?? ""
+                            ),
+                            likesCount: newVideo.likesCount,
+                            isLikedByUser: false,
+                            preview: nil
+                        )
+                        self.controllerNode.insertNewVideo(video)
+                    }
+                }
+
+                print("🎬 [UPLOAD VIDEO] Publication added successfully")
+
+                try? FileManager.default.removeItem(at: videoURL)
+
+            } catch {
+                print("❌ [UPLOAD VIDEO] Ошибка: \(error)")
+                await MainActor.run {
+                    self.controllerNode.setVideoGalleryLoading(false)
+                }
+                try? FileManager.default.removeItem(at: videoURL)
+            }
+        }
     }
 }

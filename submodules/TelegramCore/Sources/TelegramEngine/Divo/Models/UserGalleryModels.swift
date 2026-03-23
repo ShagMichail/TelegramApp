@@ -31,11 +31,11 @@ public struct UserPhotos: Decodable {
 public struct UserPhoto: Decodable {
     public let id: Int
     public let photo: UserFile
-    public let likesCount: Int
+    public let likesCount: Int?
     public let isLikedByUser: Bool
     public let preview: UserFile?
 
-    public init(id: Int, photo: UserFile, likesCount: Int, isLikedByUser: Bool, preview: UserFile?) {
+    public init(id: Int, photo: UserFile, likesCount: Int?, isLikedByUser: Bool, preview: UserFile?) {
         self.id = id
         self.photo = photo
         self.likesCount = likesCount
@@ -89,4 +89,58 @@ public struct Meta: Decodable {
     public let limit: Int
     public let currentOffset: Int
     public let totalCount: Int
+}
+
+public struct AddPublicationRequest: Codable {
+    public let title: String
+    public let description: String
+    public let type: String
+    public let files: [VideoFileData]
+
+    public init(title: String, description: String, type: String, files: [VideoFileData]) {
+        self.title = title
+        self.description = description
+        self.type = type
+        self.files = files
+    }
+}
+            
+public struct VideoFileData: Codable {
+    public let order: Int
+    public let fileUuid: String
+
+    public init(order: Int, fileUuid: String) {
+        self.order = order
+        self.fileUuid = fileUuid
+    }
+}
+            
+public struct AddPublicationResponse: Decodable {
+    public let message: String?
+    public let data: UserPublication?
+    public let errors: String?
+}
+
+public struct UserPublication: Decodable {
+    public let id: Int?
+    public let title: String?
+    public let description: String?
+    public let type: String?
+    public let likesCount: Int?
+    public let status: String?
+    public let files: [UserPublicationFiles]?
+}
+
+public struct UserPublicationFiles: Decodable {
+    public let order: Int?
+    public let fileName: String?
+    public let fullUrl: String?
+    public let fileUuid: String?
+    public let extensionType: String?
+    public let description: String?
+    
+    private enum CodingKeys: String, CodingKey {
+        case order, fileName, fullUrl, fileUuid, description
+        case extensionType = "extension"
+    }
 }

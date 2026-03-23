@@ -569,11 +569,12 @@ final class PublicProfileScreenNode: ASDisplayNode {
     var onLikesTapped: (() -> Void)?
     var onViewsTapped: (() -> Void)?
     var onSavesTapped: (() -> Void)?
-    var onGalleryItemTapped: ((Int, Int) -> Void)? // (tabIndex, itemIndex)
-
-
-
+    var onEditLinksTapped: (() -> Void)?
+    var onAddPhotoTapped: (() -> Void)?
+    var onAddVideoTapped: (() -> Void)?
+    var onGalleryItemTapped: ((Int, Int) -> Void)? 
     var onSocialLinkTapped: ((String) -> Void)?
+
     private var socialLinksMap: [UIButton: String] = [:]
 
     private enum SocialIcon: String {
@@ -869,6 +870,8 @@ final class PublicProfileScreenNode: ASDisplayNode {
         titleEditStack.addArrangedSubview(editLinksLabel)
         titleEditStack.addArrangedSubview(UIView())
         titleEditStack.addArrangedSubview(editLinksButton)
+
+        editLinksButton.addTarget(self, action: #selector(editLinksButtonTapped), for: .touchUpInside)
         
         contentViewStack.addArrangedSubview(socialMediaContainer)
         socialMediaContainer.addSubview(socialMediaStack)
@@ -955,7 +958,8 @@ final class PublicProfileScreenNode: ASDisplayNode {
         galleryCollectionView.isHidden = true
         galleryStatusView.isHidden = false
         galleryStatusView.configure(isLoading: true, text: "Uploading Photos...", isMyProfile: false)
-        
+        galleryStatusView.addTarget(self, action: #selector(galleryStatusTapped), for: .touchUpInside)
+
         // --- VIDEO ---
         // ЗАМЕНА: Сохраняем констрейнт высоты
         videoHeightConstraint = videoGalleryCollectionView.heightAnchor.constraint(equalToConstant: 1)
@@ -976,7 +980,8 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoGalleryCollectionView.isHidden = true
         videoGalleryStatusView.isHidden = false
         videoGalleryStatusView.configure(isLoading: true, text: "Uploading Videos...", isMyProfile: false)
-        
+        videoGalleryStatusView.addTarget(self, action: #selector(videoGalleryStatusTapped), for: .touchUpInside)
+
         // --- CHANNELS ---
         // ЗАМЕНА: Сохраняем констрейнт высоты
         channelHeightConstraint = channelGalleryCollectionView.heightAnchor.constraint(equalToConstant: 1)
@@ -1664,15 +1669,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
         var bio: String
         var appearance: [AppearanceAttribute]
         
-        if !isMyProfile {
-            similarProfilesCollectionContainer.isHidden = false
-            dmButton.isHidden = false
-            setupDmButtonContent()
-            titleEditContainer.removeFromSuperview()
-        } else {
-            titleEditContainer.isHidden = false
-        }
-        
         if detail.role == "agency_employee" {
             self.modelRole = "agency_employee"
             setupNavigationBarTitle(name: detail.agency?.title ?? "No name")
@@ -1744,6 +1740,15 @@ final class PublicProfileScreenNode: ASDisplayNode {
         if let website = detail.model?.websiteUrl, !website.isEmpty { socialLinks.append(website) }
         
         populateSocialMedia(links: socialLinks)
+
+        if !isMyProfile {
+            similarProfilesCollectionContainer.isHidden = false
+            dmButton.isHidden = false
+            setupDmButtonContent()
+            titleEditContainer.removeFromSuperview()
+        } else {
+            titleEditContainer.isHidden = !socialLinks.isEmpty ? false : true
+        }
         
         stopShimmers()
         activateTitleVisibility()
@@ -1779,6 +1784,12 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 self.profileHeaderView.configure(with: viewModel)
             }
         }
+    }
+
+    func updateEngagementStats(likes: Int, views: Int, saves: Int) {
+        setupCounterView(likesView, count: "\(likes)", name: "Like", iconName: "Instant View/Favorite")
+        setupCounterView(viewsView, count: "\(views)", name: "Viewed", iconName: "Instant View/Visibility")
+        setupCounterView(savesView, count: "\(saves)", name: "Save", iconName: "Instant View/Bookmark")
     }
     
     // Добавление фотографий в галерею пагинацией
@@ -1852,6 +1863,38 @@ final class PublicProfileScreenNode: ASDisplayNode {
         
         galleryCollectionView.layoutIfNeeded()
     }
+
+    // Добавление одной новой фотографии в начало (после успешной загрузки)
+    func insertNewPhoto(_ photo: UserPhoto) {
+        let wasEmpty = galleryPhotos.isEmpty
+        
+        galleryPhotos.insert(photo, at: 0)
+        
+        galleryCurrentOffset += 1
+        
+        if wasEmpty {
+            galleryStatusView.isHidden = true
+            galleryCollectionView.isHidden = false
+            galleryCollectionView.reloadData()
+            
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
+            }
+        } else {
+            galleryCollectionView.performBatchUpdates({
+                let indexPath = IndexPath(item: 0, section: 0)
+                galleryCollectionView.insertItems(at: [indexPath])
+                
+                if let layout = self.containerLayout?.0 {
+                    updateAllCollectionViewHeights(layout: layout)
+                    if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
+                }
+            }, completion: { _ in
+                self.galleryCollectionView.scrollToItem(at: IndexPath(item: 0, section: 0), at: .left, animated: true)
+            })
+        }
+    }
     
     // Сброс пагинации галереи
     func resetGalleryPagination() {
@@ -1869,7 +1912,8 @@ final class PublicProfileScreenNode: ASDisplayNode {
     // Флаг загрузки галереи
     func setGalleryLoading(_ loading: Bool) {
         galleryIsLoading = loading
-        // debug: removed
+        galleryStatusView.isHidden = !loading
+        galleryStatusView.loadingSpinner(isLoading: loading)
     }
     
     // Проверка, есть ли еще фотографии на бэке для загрузки в галереи
@@ -2007,7 +2051,37 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoGalleryCollectionView.layoutIfNeeded()
     }
     
-    // NOTE: checkAndLoadMoreVideoGallery() intentionally removed.
+    // Добавление одной новой фотографии в начало (после успешной загрузки)
+    func insertNewVideo(_ video: UserPhoto) {
+        let wasEmpty = videoGalleryItems.isEmpty
+        
+        videoGalleryItems.insert(video, at: 0)
+        
+        videoGalleryCurrentOffset += 1
+        
+        if wasEmpty {
+            videoGalleryStatusView.isHidden = true
+            videoGalleryCollectionView.isHidden = false
+            videoGalleryCollectionView.reloadData()
+            
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
+            }
+        } else {
+            videoGalleryCollectionView.performBatchUpdates({
+                let indexPath = IndexPath(item: 0, section: 0)
+                videoGalleryCollectionView.insertItems(at: [indexPath])
+                
+                if let layout = self.containerLayout?.0 {
+                    updateAllCollectionViewHeights(layout: layout)
+                    if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
+                }
+            }, completion: { _ in
+                self.videoGalleryCollectionView.scrollToItem(at: IndexPath(item: 0, section: 0), at: .left, animated: true)
+            })
+        }
+    }
     
     // Загрузка следующей страницы видео
     func loadNextVideoGalleryPage() {
@@ -2052,7 +2126,8 @@ final class PublicProfileScreenNode: ASDisplayNode {
     // Флаг загрузки галереи видео
     func setVideoGalleryLoading(_ loading: Bool) {
         videoGalleryIsLoading = loading
-        // debug: removed
+        videoGalleryStatusView.isHidden = !loading
+        videoGalleryStatusView.loadingSpinner(isLoading: loading)
     }
     
     
@@ -2285,6 +2360,18 @@ final class PublicProfileScreenNode: ASDisplayNode {
         if let url = socialLinksMap[sender] {
             onSocialLinkTapped?(url)
         }
+    }
+    
+    @objc private func editLinksButtonTapped() {
+        onEditLinksTapped?()
+    }
+    
+    @objc private func galleryStatusTapped() {
+        onAddPhotoTapped?()
+    }
+
+    @objc private func videoGalleryStatusTapped() {
+        onAddVideoTapped?()
     }
 }
 
