@@ -108,6 +108,65 @@ final class EditSocialLinksNode: ASDisplayNode, UITextFieldDelegate {
     override func didLoad() {
         super.didLoad()
         self.applyButton.addTarget(self, action: #selector(self.applyButtonTapped), forControlEvents: .touchUpInside)
+
+        let dismissTap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        dismissTap.cancelsTouchesInView = false
+        scrollNode.view.addGestureRecognizer(dismissTap)
+
+        scrollNode.view.keyboardDismissMode = .interactive
+
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(_:)), name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
+
+        let fields = [instagramTextField, tiktokTextField, youtubeTextField, telegramTextField, websiteTextField]
+        for (index, field) in fields.enumerated() {
+            let isLast = index == fields.count - 1
+            field.textField.returnKeyType = isLast ? .done : .next
+            if !isLast {
+                let nextField = fields[index + 1]
+                field.onReturn = { [weak nextField] in
+                    nextField?.textField.becomeFirstResponder()
+                }
+            }
+            field.onBeginEditing = { [weak self, weak field] in
+                guard let self, let field else { return }
+                self.scrollToField(field)
+            }
+        }
+    }
+
+    @objc private func dismissKeyboard() {
+        view.endEditing(true)
+    }
+
+    @objc private func keyboardWillShow(_ notification: Notification) {
+        guard let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+              let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double else { return }
+
+        let keyboardHeight = keyboardFrame.height
+        scrollNode.view.contentInset.bottom = keyboardHeight
+        scrollNode.view.verticalScrollIndicatorInsets.bottom = keyboardHeight
+
+        UIView.animate(withDuration: duration) {
+            let fields = [self.instagramTextField, self.tiktokTextField, self.youtubeTextField, self.telegramTextField, self.websiteTextField]
+            if let active = fields.first(where: { $0.textField.isFirstResponder }) {
+                self.scrollToField(active)
+            }
+        }
+    }
+
+    @objc private func keyboardWillHide(_ notification: Notification) {
+        guard let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double else { return }
+
+        UIView.animate(withDuration: duration) {
+            self.scrollNode.view.contentInset.bottom = 0
+            self.scrollNode.view.verticalScrollIndicatorInsets.bottom = 0
+        }
+    }
+
+    private func scrollToField(_ field: DivoTextField) {
+        let frame = field.frame.insetBy(dx: 0, dy: -16)
+        scrollNode.view.scrollRectToVisible(frame, animated: true)
     }
 
     func toggleSpinner(active: Bool) {
