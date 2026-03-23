@@ -29,7 +29,7 @@ final class RoleSelectionNode: ASDisplayNode {
     init(roleImage: UIImage?, title: String, description: String, typeOfRole: String) {
         self.roleImageNode = ASImageNode()
         self.roleImageNode.image = roleImage
-        self.roleImageNode.cornerRadius = 10
+        self.roleImageNode.cornerRadius = 4
         self.roleImageNode.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
         self.roleImageNode.contentMode = .scaleAspectFill
         
@@ -46,11 +46,10 @@ final class RoleSelectionNode: ASDisplayNode {
         self.checkmarkNode.image = UIImage(bundleImageName: "Components/Checkbox")
         self.checkmarkNode.tintColor = .gray
         
-        let blurEffect = UIBlurEffect(style: .dark)
+        let blurEffect = UIBlurEffect(style: .systemChromeMaterialDark)
         self.backgroundBlurView = UIVisualEffectView(effect: blurEffect)
-        self.backgroundBlurView.layer.cornerRadius = 6
+        self.backgroundBlurView.layer.cornerRadius = 4
         self.backgroundBlurView.clipsToBounds = true
-        self.backgroundBlurView.alpha = 0.8
         self.typeOfRole = typeOfRole
         
         super.init()
@@ -91,26 +90,24 @@ final class RoleSelectionNode: ASDisplayNode {
         let insets = UIEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
         let imageInsets = UIEdgeInsets(top: 4, left: 4, bottom: 4, right: 4)
         
-        let imageSize = CGSize(width: 90, height: 110)
-        let checkmarkSize = CGSize(width: 24, height: 24)
+        let imageSize = CGSize(width: 98, height: 110)
+        let checkmarkSize = CGSize(width: 16, height: 16)
         
-        self.roleImageNode.frame = CGRect(origin: CGPoint(x: 10, y: imageInsets.top), size: imageSize)
+        self.roleImageNode.frame = CGRect(origin: CGPoint(x: imageInsets.left, y: imageInsets.top), size: imageSize)
         
         let textX = insets.left + imageSize.width
         let availableWidthForText = self.bounds.width - textX - 20 - checkmarkSize.width - 10
         
         let titleSize = self.roleTitleNode.measure(CGSize(width: availableWidthForText + 20, height: .greatestFiniteMagnitude))
         let descriptionSize = self.roleDescriptionNode.measure(CGSize(width: availableWidthForText, height: .greatestFiniteMagnitude))
-        
-        let totalTextHeight = titleSize.height + (descriptionSize.height > 0 ? 10 : 0) + descriptionSize.height
-        
+                
         let textY = insets.top
         
         self.roleTitleNode.frame = CGRect(origin: CGPoint(x: textX, y: textY), size: titleSize)
         
         self.roleDescriptionNode.frame = CGRect(origin: CGPoint(x: textX, y: textY + titleSize.height + 10), size: descriptionSize)
         
-        let checkmarkY = textY + (totalTextHeight - checkmarkSize.height) / 2.0
-        self.checkmarkNode.frame = CGRect(origin: CGPoint(x: self.bounds.width - 15 - checkmarkSize.width, y: checkmarkY), size: checkmarkSize)
+        let checkmarkY = (imageSize.height + imageInsets.bottom + imageInsets.top) / 2 - checkmarkSize.width / 2
+        self.checkmarkNode.frame = CGRect(origin: CGPoint(x: self.bounds.width - 16 - checkmarkSize.width, y: checkmarkY), size: checkmarkSize)
     }
 }
