@@ -13,10 +13,13 @@ import AppBundle
 import ItemListUI
 
 final class DivoTextField: ASDisplayNode, UITextFieldDelegate {
-    
+
     let fieldNode = TextFieldNode()
     private let prefix: String?
-    
+
+    var onReturn: (() -> Void)?
+    var onBeginEditing: (() -> Void)?
+
     var textField: UITextField {
         get { fieldNode.textField }
     }
@@ -91,8 +94,16 @@ final class DivoTextField: ASDisplayNode, UITextFieldDelegate {
         return false
     }
     
+    func textFieldDidBeginEditing(_ textField: UITextField) {
+        onBeginEditing?()
+    }
+
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        textField.resignFirstResponder()
+        if let onReturn = onReturn {
+            onReturn()
+        } else {
+            textField.resignFirstResponder()
+        }
         return false
     }
     

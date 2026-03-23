@@ -156,6 +156,38 @@ public final class DivoSettingsController: TelegramBaseController {
     }
 }
 
+// MARK: - Shimmer
+
+private extension UIView {
+    func startSettingsShimmer() {
+        let shimmerColor = UIColor(white: 0.88, alpha: 1.0).cgColor
+        let highlightColor = UIColor(white: 0.96, alpha: 1.0).cgColor
+
+        let gradient = CAGradientLayer()
+        gradient.name = "settingsShimmer"
+        gradient.startPoint = CGPoint(x: 0, y: 0.5)
+        gradient.endPoint = CGPoint(x: 1, y: 0.5)
+        gradient.colors = [shimmerColor, highlightColor, shimmerColor]
+        gradient.locations = [0.0, 0.5, 1.0]
+        gradient.frame = CGRect(x: -bounds.width, y: 0, width: bounds.width * 3, height: bounds.height)
+        gradient.cornerRadius = layer.cornerRadius
+
+        let animation = CABasicAnimation(keyPath: "locations")
+        animation.fromValue = [0.0, 0.1, 0.2]
+        animation.toValue = [0.8, 0.9, 1.0]
+        animation.duration = 1.4
+        animation.repeatCount = .infinity
+        animation.isRemovedOnCompletion = false
+        gradient.add(animation, forKey: "shimmer")
+
+        layer.addSublayer(gradient)
+    }
+
+    func stopSettingsShimmer() {
+        layer.sublayers?.filter { $0.name == "settingsShimmer" }.forEach { $0.removeFromSuperlayer() }
+    }
+}
+
 // MARK: - Colors
 
 private enum DivoSettingsColors {
@@ -398,6 +430,7 @@ private final class DivoSettingsNode: ASDisplayNode {
     // MARK: - Data loading
 
     func loadProfile() {
+        startProfileShimmer()
         Task { @MainActor in
             do {
                 let response: UserDetailResponse = try await DivoAPIClient.shared.request(
@@ -405,12 +438,32 @@ private final class DivoSettingsNode: ASDisplayNode {
                 )
                 self.updateWithProfile(response.data)
             } catch {
-                // Silently handle — placeholder text remains
+                self.stopProfileShimmer()
             }
         }
     }
 
+    private func startProfileShimmer() {
+        nameLabel.text = nil
+        phoneLabel.text = nil
+        let placeholderColor = UIColor(white: 0.88, alpha: 1)
+        nameLabel.backgroundColor = placeholderColor
+        nameLabel.layer.cornerRadius = 4
+        nameLabel.clipsToBounds = true
+        phoneLabel.backgroundColor = placeholderColor
+        phoneLabel.layer.cornerRadius = 4
+        phoneLabel.clipsToBounds = true
+        [avatarImageView, nameLabel, phoneLabel].forEach { $0.startSettingsShimmer() }
+    }
+
+    private func stopProfileShimmer() {
+        [avatarImageView, nameLabel, phoneLabel].forEach { $0.stopSettingsShimmer() }
+        nameLabel.backgroundColor = .clear
+        phoneLabel.backgroundColor = .clear
+    }
+
     private func updateWithProfile(_ user: UserDetail) {
+        stopProfileShimmer()
         nameLabel.text = user.fullName ?? "User"
         phoneLabel.text = user.phone ?? ""
 
@@ -422,6 +475,7 @@ private final class DivoSettingsNode: ASDisplayNode {
                     if let image = UIImage(data: data) {
                         await MainActor.run {
                             self.avatarImageView.image = image
+                            self.avatarImageView.applyAvatarTopCropIfNeeded(image: image)
                         }
                     }
                 } catch {}

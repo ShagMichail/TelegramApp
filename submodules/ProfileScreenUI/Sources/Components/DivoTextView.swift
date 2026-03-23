@@ -11,6 +11,10 @@ final class DivoTextView: ASDisplayNode, ASEditableTextNodeDelegate {
     private let backgroundNode = ASDisplayNode()
     private let titleNode = ASTextNode()
     private let textNode = ASEditableTextNode()
+
+    var textView: UITextView {
+        return textNode.textView
+    }
     
     private let title: String
     
