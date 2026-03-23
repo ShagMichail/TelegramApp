@@ -141,6 +141,7 @@ class ProfileHeaderView: UIView {
         label.font = Font.helveticaNeue(10)
         label.textColor = .white
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.setContentCompressionResistancePriority(.required, for: .horizontal)
         return label
     }()
     
@@ -150,6 +151,7 @@ class ProfileHeaderView: UIView {
         label.textColor = .white
         label.translatesAutoresizingMaskIntoConstraints = false
         label.setContentHuggingPriority(.required, for: .horizontal)
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return label
     }()
     
