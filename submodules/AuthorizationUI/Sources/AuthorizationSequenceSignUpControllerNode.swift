@@ -13,9 +13,6 @@ final class AuthorizationSequenceSignUpControllerNode: ASDisplayNode, UITextFiel
     private let theme: PresentationTheme
     private let strings: PresentationStrings
     
-    private let titleNode: ASTextNode
-    private let currentOptionNode: ASTextNode
-    
     private let proceedNode: SolidRoundedButtonNode
     private var typeOfRole: String = ""
     
@@ -42,12 +39,16 @@ final class AuthorizationSequenceSignUpControllerNode: ASDisplayNode, UITextFiel
         }
     }
     
-    let titleNode_new: ASTextNode
-    let subtitleNode: ASTextNode
+    private let scrollNode: ASScrollNode
+    private let contentNode: ASDisplayNode
+    
+    private let titleNode: ASTextNode
+    private let subtitleNode: ASTextNode
     
     private let talentNode: RoleSelectionNode
     private let modelNode: RoleSelectionNode
     private let agencyNode: RoleSelectionNode
+    private let fanNode: RoleSelectionNode
     
     private var selectedNode: RoleSelectionNode?
     private let backgroundNode: ASImageNode
@@ -56,72 +57,12 @@ final class AuthorizationSequenceSignUpControllerNode: ASDisplayNode, UITextFiel
         self.theme = theme
         self.strings = strings
         
-        self.titleNode = ASTextNode()
-        self.titleNode.isUserInteractionEnabled = false
-        self.titleNode.displaysAsynchronously = false
-        self.titleNode.attributedText = NSAttributedString(string: self.strings.Login_InfoTitle, font: Font.semibold(28.0), textColor: theme.list.itemPrimaryTextColor)
+        self.scrollNode = ASScrollNode()
+        self.scrollNode.view.showsVerticalScrollIndicator = false
+        // Включаем автоматическую подстройку под Safe Area (челку)
+        self.scrollNode.view.contentInsetAdjustmentBehavior = .always
         
-        self.currentOptionNode = ASTextNode()
-        self.currentOptionNode.isUserInteractionEnabled = false
-        self.currentOptionNode.displaysAsynchronously = false
-        self.currentOptionNode.attributedText = NSAttributedString(string: self.strings.Login_InfoHelp, font: Font.regular(16.0), textColor: theme.list.itemPrimaryTextColor, paragraphAlignment: .center)
-        
-// MARK: MASTER
-        // self.termsNode = ImmediateTextNode()
-        // self.termsNode.textAlignment = .center
-        // self.termsNode.maximumNumberOfLines = 0
-        // self.termsNode.displaysAsynchronously = false
-        // let body = MarkdownAttributeSet(font: Font.regular(13.0), textColor: theme.list.itemSecondaryTextColor)
-        // let link = MarkdownAttributeSet(font: Font.regular(13.0), textColor: theme.list.itemAccentColor, additionalAttributes: [TelegramTextAttributes.URL: ""])
-        // self.termsNode.attributedText = parseMarkdownIntoAttributedString(strings.Login_TermsOfServiceLabel.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "]", with: "]()"), attributes: MarkdownAttributes(body: body, bold: body, link: link, linkAttribute: { _ in nil }), textAlignment: .center)
-        
-        // self.firstSeparatorNode = ASDisplayNode()
-        // self.firstSeparatorNode.isLayerBacked = true
-        // self.firstSeparatorNode.backgroundColor = self.theme.list.itemPlainSeparatorColor
-        
-        // self.lastSeparatorNode = ASDisplayNode()
-        // self.lastSeparatorNode.isLayerBacked = true
-        // self.lastSeparatorNode.backgroundColor = self.theme.list.itemPlainSeparatorColor
-        
-        // self.firstNameField = TextFieldNode()
-        // self.firstNameField.textField.font = Font.regular(20.0)
-        // self.firstNameField.textField.textColor = self.theme.list.itemPrimaryTextColor
-        // self.firstNameField.textField.textAlignment = .natural
-        // self.firstNameField.textField.returnKeyType = .next
-        // self.firstNameField.textField.attributedPlaceholder = NSAttributedString(string: self.strings.UserInfo_FirstNamePlaceholder, font: self.firstNameField.textField.font, textColor: self.theme.list.itemPlaceholderTextColor)
-        // self.firstNameField.textField.autocapitalizationType = .words
-        // self.firstNameField.textField.autocorrectionType = .no
-        // if #available(iOSApplicationExtension 10.0, iOS 10.0, *) {
-        //     self.firstNameField.textField.textContentType = .givenName
-        // }
-        // self.firstNameField.textField.keyboardAppearance = theme.rootController.keyboardColor.keyboardAppearance
-        // self.firstNameField.textField.tintColor = theme.list.itemAccentColor
-        
-        // self.lastNameField = TextFieldNode()
-        // self.lastNameField.textField.font = Font.regular(20.0)
-        // self.lastNameField.textField.textColor = self.theme.list.itemPrimaryTextColor
-        // self.lastNameField.textField.textAlignment = .natural
-        // self.lastNameField.textField.returnKeyType = .done
-        // self.lastNameField.textField.attributedPlaceholder = NSAttributedString(string: strings.UserInfo_LastNamePlaceholder, font: self.lastNameField.textField.font, textColor: self.theme.list.itemPlaceholderTextColor)
-        // self.lastNameField.textField.autocapitalizationType = .words
-        // self.lastNameField.textField.autocorrectionType = .no
-        // if #available(iOSApplicationExtension 10.0, iOS 10.0, *) {
-        //     self.lastNameField.textField.textContentType = .familyName
-        // }
-        // self.lastNameField.textField.keyboardAppearance = theme.rootController.keyboardColor.keyboardAppearance
-        // self.lastNameField.textField.tintColor = theme.list.itemAccentColor
-        
-        // self.addPhotoButton = HighlightableButtonNode()
-        // self.addPhotoButton.setImage(generateTintedImage(image: UIImage(bundleImageName: "Avatar/EditAvatarIconLarge"), color: self.theme.list.itemAccentColor), for: .normal)
-        // self.addPhotoButton.setBackgroundImage(generateFilledCircleImage(diameter: 110.0, color: self.theme.list.itemAccentColor.withAlphaComponent(0.1), strokeColor: nil, strokeWidth: nil, backgroundColor: nil), for: .normal)
-        
-        // self.addPhotoButton.allowsGroupOpacity = true
-        
-
-// MARK: MASTER
-        // self.proceedNode = SolidRoundedButtonNode(title: self.strings.Login_Continue, theme: SolidRoundedButtonTheme(theme: self.theme), glass: false, height: 50.0, cornerRadius: 50.0 * 0.5)
-
-// MARK: LEGACY -------------
+        self.contentNode = ASDisplayNode()
 
         let customButtonTheme = SolidRoundedButtonTheme(
             backgroundColor: UIColor(red: 0.75, green: 0.48, blue: 0.33, alpha: 1.00),
@@ -131,17 +72,16 @@ final class AuthorizationSequenceSignUpControllerNode: ASDisplayNode, UITextFiel
         )
         
         self.proceedNode = SolidRoundedButtonNode(title: self.strings.Login_Continue, theme: customButtonTheme, glass: false, height: 50.0, cornerRadius: 11.0)
-// MARK: LEGACY -------------
         self.proceedNode.progressType = .embedded
         
-        self.titleNode_new = ASTextNode()
-        self.titleNode_new.attributedText = Font.helveticaNeue("Choose a role".uppercased(), 34)
+        self.titleNode = ASTextNode()
+        self.titleNode.attributedText = Font.helveticaNeue("Choose a role".uppercased(), 34)
         
         self.subtitleNode = ASTextNode()
         let paragraphStyle: NSMutableParagraphStyle = NSMutableParagraphStyle()
         paragraphStyle.alignment = .center
         
-        self.subtitleNode.attributedText = NSAttributedString(string: "Select the role that your profile will correspond to. The role can be changed at any time", attributes: [
+        self.subtitleNode.attributedText = NSAttributedString(string: "Select the role that your profile will correspond to. The role can be changed at any time", attributes:[
             .font: UIFont.systemFont(ofSize: 16),
             .foregroundColor: UIColor.white.withAlphaComponent(0.6),
             .paragraphStyle: paragraphStyle
@@ -165,6 +105,12 @@ final class AuthorizationSequenceSignUpControllerNode: ASDisplayNode, UITextFiel
             description: "Looking for / working with models.",
             typeOfRole: "AGENCIES"
         )
+        self.fanNode = RoleSelectionNode(
+            roleImage: UIImage(bundleImageName: "Components/Fan"),
+            title: "FAN",
+            description: "I will view other users' content. I am a fan.",
+            typeOfRole: "FAN"
+        )
         
         self.backgroundNode = ASImageNode()
         self.backgroundNode.contentMode = .scaleAspectFill
@@ -174,30 +120,29 @@ final class AuthorizationSequenceSignUpControllerNode: ASDisplayNode, UITextFiel
         super.init()
         
         self.automaticallyManagesSubnodes = true
+        self.backgroundColor = UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.00)
         
         self.addSubnode(self.backgroundNode)
+        self.addSubnode(self.scrollNode)
         
-        self.addSubnode(titleNode_new)
-        self.addSubnode(subtitleNode)
-        self.addSubnode(talentNode)
-        self.addSubnode(modelNode)
-        self.addSubnode(agencyNode)
+        self.scrollNode.addSubnode(self.contentNode)
+        
+        self.contentNode.addSubnode(titleNode)
+        self.contentNode.addSubnode(subtitleNode)
+        self.contentNode.addSubnode(talentNode)
+        self.contentNode.addSubnode(modelNode)
+        self.contentNode.addSubnode(agencyNode)
+        self.contentNode.addSubnode(fanNode)
+        self.contentNode.addSubnode(proceedNode)
         
         self.talentNode.tapped = { [weak self] in self?.selectNode(self!.talentNode) }
         self.modelNode.tapped = { [weak self] in self?.selectNode(self!.modelNode) }
-        self.agencyNode.tapped = { [weak self] in self?.selectNode(self!.agencyNode) }
+        self.agencyNode.tapped = {[weak self] in self?.selectNode(self!.agencyNode) }
+        self.fanNode.tapped = { [weak self] in self?.selectNode(self!.fanNode) }
         
         self.setViewBlock({
             return UITracingLayerView()
         })
-        
-        self.backgroundColor = UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.00)
-        
-        
-
-        self.addSubnode(self.titleNode)
-        self.addSubnode(self.currentOptionNode)
-        self.addSubnode(self.proceedNode)
         
         self.proceedNode.pressed = { [weak self] in
             if let strongSelf = self,
@@ -206,6 +151,90 @@ final class AuthorizationSequenceSignUpControllerNode: ASDisplayNode, UITextFiel
                 strongSelf.signUpWithName?(typeOfRole, name.1)
             }
         }
+    }
+    
+    // MARK: - Setup Constraints (Auto Layout)
+    override func didLoad() {
+        super.didLoad()
+        
+        let nodesToConstraint = [
+            backgroundNode, scrollNode, contentNode, proceedNode,
+            titleNode, subtitleNode, talentNode, modelNode, agencyNode, fanNode
+        ]
+        
+        nodesToConstraint.forEach { $0.view.translatesAutoresizingMaskIntoConstraints = false }
+        
+        let safeArea = self.view.safeAreaLayoutGuide
+        let contentGuide = scrollNode.view.contentLayoutGuide
+        let frameGuide = scrollNode.view.frameLayoutGuide
+        
+        NSLayoutConstraint.activate([
+            // --- Фон ---
+            backgroundNode.view.topAnchor.constraint(equalTo: self.view.topAnchor),
+            backgroundNode.view.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            backgroundNode.view.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            backgroundNode.view.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
+            
+            // --- Скролл на весь экран ---
+            scrollNode.view.topAnchor.constraint(equalTo: self.view.topAnchor),
+            scrollNode.view.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
+            scrollNode.view.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
+            scrollNode.view.bottomAnchor.constraint(equalTo: self.view.bottomAnchor),
+            
+            // --- Content Node ---
+            contentNode.view.topAnchor.constraint(equalTo: contentGuide.topAnchor),
+            contentNode.view.leadingAnchor.constraint(equalTo: contentGuide.leadingAnchor),
+            contentNode.view.trailingAnchor.constraint(equalTo: contentGuide.trailingAnchor),
+            contentNode.view.bottomAnchor.constraint(equalTo: contentGuide.bottomAnchor),
+            contentNode.view.widthAnchor.constraint(equalTo: frameGuide.widthAnchor),
+            contentNode.view.heightAnchor.constraint(greaterThanOrEqualTo: safeArea.heightAnchor),
+            
+            // --- Title ---
+            titleNode.view.topAnchor.constraint(equalTo: contentNode.view.topAnchor, constant: 30),
+            titleNode.view.heightAnchor.constraint(equalToConstant: 50),
+            titleNode.view.centerXAnchor.constraint(equalTo: contentNode.view.centerXAnchor),
+            titleNode.view.leadingAnchor.constraint(equalTo: contentNode.view.leadingAnchor, constant: 16),
+            titleNode.view.trailingAnchor.constraint(equalTo: contentNode.view.trailingAnchor, constant: -16),
+            
+            // --- Subtitle ---
+            subtitleNode.view.topAnchor.constraint(equalTo: titleNode.view.bottomAnchor, constant: 6),
+            subtitleNode.view.centerXAnchor.constraint(equalTo: contentNode.view.centerXAnchor),
+            subtitleNode.view.leadingAnchor.constraint(equalTo: contentNode.view.leadingAnchor, constant: 58),
+            subtitleNode.view.trailingAnchor.constraint(equalTo: contentNode.view.trailingAnchor, constant: -58),
+            subtitleNode.view.heightAnchor.constraint(equalToConstant: 80),
+            
+            // --- Talent Node ---
+            talentNode.view.topAnchor.constraint(equalTo: subtitleNode.view.bottomAnchor, constant: 0),
+            talentNode.view.leadingAnchor.constraint(equalTo: contentNode.view.leadingAnchor, constant: 16),
+            talentNode.view.trailingAnchor.constraint(equalTo: contentNode.view.trailingAnchor, constant: -16),
+            talentNode.view.heightAnchor.constraint(equalToConstant: 117),
+            
+            // --- Model Node ---
+            modelNode.view.topAnchor.constraint(equalTo: talentNode.view.bottomAnchor, constant: 16),
+            modelNode.view.leadingAnchor.constraint(equalTo: contentNode.view.leadingAnchor, constant: 16),
+            modelNode.view.trailingAnchor.constraint(equalTo: contentNode.view.trailingAnchor, constant: -16),
+            modelNode.view.heightAnchor.constraint(equalToConstant: 117),
+            
+            // --- Agency Node ---
+            agencyNode.view.topAnchor.constraint(equalTo: modelNode.view.bottomAnchor, constant: 16),
+            agencyNode.view.leadingAnchor.constraint(equalTo: contentNode.view.leadingAnchor, constant: 16),
+            agencyNode.view.trailingAnchor.constraint(equalTo: contentNode.view.trailingAnchor, constant: -16),
+            agencyNode.view.heightAnchor.constraint(equalToConstant: 117),
+            
+            // --- Fan Node ---
+            fanNode.view.topAnchor.constraint(equalTo: agencyNode.view.bottomAnchor, constant: 16),
+            fanNode.view.leadingAnchor.constraint(equalTo: contentNode.view.leadingAnchor, constant: 16),
+            fanNode.view.trailingAnchor.constraint(equalTo: contentNode.view.trailingAnchor, constant: -16),
+            fanNode.view.heightAnchor.constraint(equalToConstant: 117),
+            
+            // --- Кнопка Продолжить ---
+            proceedNode.view.leadingAnchor.constraint(equalTo: contentNode.view.leadingAnchor, constant: 16),
+            proceedNode.view.trailingAnchor.constraint(equalTo: contentNode.view.trailingAnchor, constant: -16),
+            proceedNode.view.heightAnchor.constraint(equalToConstant: 50),
+            
+            proceedNode.view.topAnchor.constraint(greaterThanOrEqualTo: fanNode.view.bottomAnchor, constant: 20),
+            proceedNode.view.bottomAnchor.constraint(equalTo: contentNode.view.bottomAnchor, constant: -20),
+        ])
     }
     
     private func selectNode(_ node: RoleSelectionNode) {
@@ -221,68 +250,20 @@ final class AuthorizationSequenceSignUpControllerNode: ASDisplayNode, UITextFiel
     }
     
     func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
-        
-        let maximumWidth: CGFloat = min(430.0, layout.size.width)
-        
-        let insets = layout.insets(options: [.statusBar])
-
+        self.layoutArguments = (layout, navigationBarHeight)
         self.proceedNode.isHidden = false
-        
-        let inset: CGFloat = 24.0
-        let proceedHeight = self.proceedNode.updateLayout(width: maximumWidth - 48.0, transition: transition)
-        let proceedSize = CGSize(width: maximumWidth - 48.0, height: proceedHeight)
-        transition.updateFrame(node: self.proceedNode, frame: CGRect(origin: CGPoint(x: floorToScreenPixels((layout.size.width - proceedSize.width) / 2.0), y: layout.size.height - insets.bottom - proceedSize.height - inset), size: proceedSize))
 
-        let sideInsets: CGFloat = 20.0
-        let verticalSpacing: CGFloat = 15.0
-        
-        self.backgroundNode.frame = CGRect(origin: .zero, size: layout.size)
-        
-        let titleSize = self.titleNode_new.measure(CGSize(width: maximumWidth, height: .greatestFiniteMagnitude))
-        let titleOriginY: CGFloat = 40.0
-        let titleFrame = CGRect(
-            origin: CGPoint(x: floorToScreenPixels((layout.size.width - titleSize.width) / 2.0), y: titleOriginY + 100),
-            size: titleSize
-        )
-        self.titleNode_new.frame = titleFrame
-        
-        let noticeSize = self.subtitleNode.measure(CGSize(width: maximumWidth - 140, height: CGFloat.greatestFiniteMagnitude))
-        let noticeFrame = CGRect(
-            origin: CGPoint(x: floorToScreenPixels((layout.size.width - noticeSize.width) / 2.0), y: titleFrame.maxY + 5),
-            size: noticeSize
-        )
-        self.subtitleNode.frame = noticeFrame
-        
-        var currentY = noticeFrame.maxY + 40
-        let nodeWidth = maximumWidth - sideInsets * 2
-        let nodeHeight: CGFloat = 120
-        
-        let talentFrame = CGRect(x: sideInsets, y: currentY, width: nodeWidth, height: nodeHeight)
-        self.talentNode.frame = talentFrame
-        self.talentNode.layout()
-        currentY = talentFrame.maxY + verticalSpacing
-        
-        let modelFrame = CGRect(x: sideInsets, y: currentY, width: nodeWidth, height: nodeHeight)
-        self.modelNode.frame = modelFrame
-        self.modelNode.layout()
-        currentY = modelFrame.maxY + verticalSpacing
-        
-        let agencyFrame = CGRect(x: sideInsets, y: currentY, width: nodeWidth, height: nodeHeight)
-        self.agencyNode.frame = agencyFrame
-        self.agencyNode.layout()
-        currentY = agencyFrame.maxY + verticalSpacing
+        let maximumWidth: CGFloat = min(430.0, layout.size.width)
+        let _ = self.proceedNode.updateLayout(width: maximumWidth - 32.0, transition: transition)
     }
     
     func activateInput() {
-        
     }
     
     func animateError() {
-        
     }
     
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-      
         return false
     }
 }
