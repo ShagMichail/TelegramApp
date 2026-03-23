@@ -74,12 +74,18 @@ final class SimilarProfileCell: UICollectionViewCell {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        imageView.cancelImageLoad()
+        imageView.image = nil
+        imageView.layer.contentsRect = CGRect(x: 0, y: 0, width: 1, height: 1)
+    }
+
     func configure(with item: SimilarProfileItem) {
         nameLabel.text = item.name.uppercased()
         infoLabel.text = item.info
-
-        if item.avatarURL != nil {
-            // TODO: Загрузка аватара через ImageLoader
+        imageView.loadImage(from: item.avatarURL) { [weak self] image in
+            self?.imageView.applyAvatarTopCropIfNeeded(image: image)
         }
     }
 }

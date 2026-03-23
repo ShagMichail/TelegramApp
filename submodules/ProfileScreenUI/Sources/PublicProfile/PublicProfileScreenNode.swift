@@ -1623,16 +1623,46 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     func loadSimilarProfiles() {
-        // TODO: Заменить на API запрос
-        let mockProfiles: [SimilarProfileItem] = [
-            SimilarProfileItem(id: 1, name: "KRISTINA REACH", info: "22 y.o · 🇺🇸 New York", avatarURL: nil),
-            SimilarProfileItem(id: 2, name: "SARAH PARKER", info: "24 y.o · 🇬🇧 London", avatarURL: nil),
-            SimilarProfileItem(id: 3, name: "JESSICA WONG", info: "21 y.o · 🇨🇦 Toronto", avatarURL: nil),
-            SimilarProfileItem(id: 4, name: "EMMA STONE", info: "26 y.o · 🇺🇸 Los Angeles", avatarURL: nil),
-            SimilarProfileItem(id: 5, name: "OLIVIA WILD", info: "23 y.o · 🇦🇺 Sydney", avatarURL: nil)
-        ]
-        
-        appendSimilarProfiles(mockProfiles, totalCount: mockProfiles.count)
+        guard !similarProfilesIsLoading else { return }
+        similarProfilesIsLoading = true
+
+        let currentUserId = model.userId
+        let limit = 10
+
+        let requestBody = FeedlineListRequest(
+            offset: similarProfilesOffset,
+            limit: limit,
+            modelsOnly: true
+        )
+
+        Task { @MainActor in
+            do {
+                let response: FeedlineResponse = try await DivoAPIClient.shared.request(
+                    path: "/feedline/list",
+                    method: "POST",
+                    body: requestBody
+                )
+                let items = response.data.items
+                let profiles = items.compactMap { item -> SimilarProfileItem? in
+                    guard item.user.id != currentUserId else { return nil }
+                    let imageURL = CDNURLHelper.convertToCDNURL(
+                        item.searchImage?.fullUrl ?? item.files.first?.fullUrl
+                    )
+                    return SimilarProfileItem(
+                        id: item.user.id,
+                        name: item.user.fullName,
+                        info: item.user.roleLabel,
+                        avatarURL: imageURL
+                    )
+                }
+                self.similarProfilesIsLoading = false
+                self.similarProfilesHasMore = items.count >= limit
+                appendSimilarProfiles(profiles, totalCount: similarProfilesOffset + profiles.count + (similarProfilesHasMore ? 1 : 0))
+            } catch {
+                print("❌ [SIMILAR] Error loading similar profiles: \(error)")
+                self.similarProfilesIsLoading = false
+            }
+        }
     }
     
     // Обновляем Layout после загрузки контроллера
