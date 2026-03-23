@@ -83,6 +83,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     public var eventsController: EventsController?
     public var chatListController: ChatListController?
     public var accountSettingsController: PeerInfoScreen?
+    public var divoSettingsController: DivoSettingsController?
     
     private var permissionsDisposable: Disposable?
     private var presentationDataDisposable: Disposable?
@@ -232,23 +233,16 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
             sharedContext.switchingData = (nil, nil, nil)
         }
         
-        let accountSettingsController = PeerInfoScreenImpl(context: self.context, updatedPresentationData: nil, peerId: self.context.account.peerId, avatarInitiallyExpanded: false, isOpenedFromChat: false, nearbyPeerDistance: nil, reactionSourceMessageId: nil, callMessages: [], isSettings: true)
-        accountSettingsController.tabBarItemDebugTapAction = { [weak self] in
-            guard let strongSelf = self else {
-                return
-            }
-            strongSelf.pushViewController(debugController(sharedContext: strongSelf.context.sharedContext, context: strongSelf.context))
-        }
-        accountSettingsController.parentController = self
-        controllers.append(accountSettingsController)
-                
-        tabBarController.setControllers(controllers, selectedIndex: restoreSettignsController != nil ? (controllers.count - 1) : (controllers.count - 2))
-        
+        let divoSettingsController = DivoSettingsController(context: self.context)
+        controllers.append(divoSettingsController)
+
+        tabBarController.setControllers(controllers, selectedIndex: restoreSettignsController != nil ? (controllers.count - 1) : 0)
+
         self.contactsController = contactsController
         self.modelsFeedNode = modelsFeedNode
         self.eventsController = eventsController
         self.chatListController = chatListController
-        self.accountSettingsController = accountSettingsController
+        self.divoSettingsController = divoSettingsController
         self.rootTabController = tabBarController
         self.pushViewController(tabBarController, animated: false)
     }
@@ -263,7 +257,9 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         //     controllers.append(self.callListController!)
         // }
         controllers.append(self.chatListController!)
-        controllers.append(self.accountSettingsController!)
+        if let divoSettings = self.divoSettingsController {
+            controllers.append(divoSettings)
+        }
         
         rootTabController.setControllers(controllers, selectedIndex: nil)
     }

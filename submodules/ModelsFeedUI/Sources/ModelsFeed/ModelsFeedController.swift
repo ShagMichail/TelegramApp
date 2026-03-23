@@ -148,6 +148,7 @@ public final class ModelsFeedController: TelegramBaseController {
         }
 
         self.displayNodeDidLoad()
+        self._ready.set(.single(true))
         loadFeedline(tabIndex: 0, reset: true)
     }
 

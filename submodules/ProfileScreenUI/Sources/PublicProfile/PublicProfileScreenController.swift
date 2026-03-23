@@ -67,8 +67,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
 
     private weak var activeGalleryController: ProfileGalleryController?
 
-    // для разработки
-    private var isMyProfile: Bool = false
+    private var isMyProfile: Bool
     
     internal var currentGalleryPhotos: [UserPhoto] = []
     internal var currentGalleryVideos: [UserVideoItem] = []
@@ -81,6 +80,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
     public init(context: AccountContext, model: ProfileModel, peer: Peer? = nil) {
         self.context = context
         self.model = model
+        self.isMyProfile = model.isMyProfile
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
         self.peer = peer
         let darkNavigationTheme = NavigationBarTheme(
@@ -351,42 +351,42 @@ public final class PublicProfileScreenController: TelegramBaseController {
     }
     
     private func getUserProfile() {
-        guard let userId = model.userId else { return }
         Task {
             do {
                 guard !profileLoaded else { return }
                 profileLoaded = true
-                var requestPath: String
-                if !isMyProfile {
-                    requestPath = model.isMyProfile ? "/user/info" : "/user/\(userId)"
+                let requestPath: String
+                if isMyProfile {
+                    requestPath = "/user/info"
                 } else {
-                    // для тестов модели 31999
-                    requestPath = isMyProfile ? "/user/info" : "/user/\(userId)"
+                    guard let userId = model.userId else { return }
+                    requestPath = "/user/\(userId)"
                 }
                 let response: UserDetailResponse = try await DivoAPIClient.shared.request(
                     path: requestPath
                 )
                 await MainActor.run {
                     self.userDetailModel = response.data
-                    if !isMyProfile {
-                        self.controllerNode.updateWithUserDetail(response.data, self.model.isMyProfile)
-                    } else {
-                        // для тестов модели 31999
-                        self.controllerNode.updateWithUserDetail(response.data, self.isMyProfile)
-                    }
+                    self.controllerNode.updateWithUserDetail(response.data, self.isMyProfile)
                 }
             } catch {
-                self.debugLog("[DivoAPI] user/\(userId) error: \(error)")
+                self.debugLog("[DivoAPI] getUserProfile error: \(error)")
             }
         }
     }
     
     private func getUserGalleryProfile() {
-        guard let userId = model.userId else { return }
         guard !galleryLoaded else { return }
-        galleryLoaded = true
-        controllerNode.resetGalleryPagination()
-        loadGalleryPage(userId: userId, offset: 0)
+        if !isMyProfile {
+            guard let userId = model.userId else { return }
+            galleryLoaded = true
+            controllerNode.resetGalleryPagination()
+            loadGalleryPage(userId: userId, offset: 0)
+        } else {
+            galleryLoaded = true
+            controllerNode.resetGalleryPagination()
+            loadGalleryPage(userId: 0, offset: 0)
+        }
     }
     
     @objc func moreMenu() {

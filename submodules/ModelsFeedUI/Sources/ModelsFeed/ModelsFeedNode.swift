@@ -252,6 +252,7 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         self.mainCollectionView.register(CardCollectionViewCell.self, forCellWithReuseIdentifier: "CardCell")
         self.mainCollectionView.register(PaginationShimmerCell.self, forCellWithReuseIdentifier: "PaginationShimmerCell")
 
+
         self.titleLabel.text = presentationData.strings.ModelsFeed_TabTitle.uppercased()
 
         // Create floating avatars + names for ALL stories (animate 5→3→navbar)
@@ -601,9 +602,6 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
 
         } else if collectionView === mainCollectionView {
             if let flowLayout = collectionViewLayout as? UICollectionViewFlowLayout {
-                if isPaginating && indexPath.item == cards.count {
-                    return flowLayout.itemSize
-                }
                 return flowLayout.itemSize
             }
         }
@@ -617,7 +615,6 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         } else if collectionView === mainCollectionView {
             guard indexPath.item < cards.count else { return }
             showProfile?(cards[indexPath.item])
-            print("didSelectItemAt: \(cards[indexPath.item].name)")
         }
     }
 
@@ -639,7 +636,9 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
 
     func cardCell(_ cell: CardCollectionViewCell, didTapReaction reaction: ReactionType, for cardName: String, isSelected: Bool) {
         guard let indexPath = mainCollectionView.indexPath(for: cell) else { return }
-        var card = self.cards[indexPath.item]
+        let idx = indexPath.item
+        guard idx < self.cards.count else { return }
+        var card = self.cards[idx]
 
         if isSelected {
              card.userReaction = reaction
@@ -658,7 +657,7 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
             print("🔥 didSelectItemAt 'Fire': \(cardName)")
         }
 
-        self.cards[indexPath.item] = card
+        self.cards[idx] = card
     }
 
     // MARK: - Loading Placeholder
