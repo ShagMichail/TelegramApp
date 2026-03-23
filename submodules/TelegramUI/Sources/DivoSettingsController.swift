@@ -475,6 +475,7 @@ private final class DivoSettingsNode: ASDisplayNode {
                     if let image = UIImage(data: data) {
                         await MainActor.run {
                             self.avatarImageView.image = image
+                            self.avatarImageView.applyAvatarTopCropIfNeeded(image: image)
                         }
                     }
                 } catch {}

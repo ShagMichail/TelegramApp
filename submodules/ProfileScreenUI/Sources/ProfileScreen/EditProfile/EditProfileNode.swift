@@ -283,15 +283,6 @@ final class EditProfileNode: ASDisplayNode {
         
         
         self.backgroundColor = UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.00)
-        if let avatarURLString = model?.avatar?.fullUrl {
-            if let avatarURL = CDNURLHelper.convertToCDNURL(avatarURLString) {
-                ImageLoader.shared.load(url: avatarURL) { [weak self] image in
-                    if let image = image {
-                        self?.avatarImageView.image = image
-                    }
-                }
-            }
-        }
     }
     
     override func didLoad() {
@@ -320,6 +311,7 @@ final class EditProfileNode: ASDisplayNode {
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
 
         updateTabsTextColor()
+        loadAvatarIfNeeded()
 
         DispatchQueue.main.async {
             self.updatePagerHeight()
@@ -678,6 +670,31 @@ final class EditProfileNode: ASDisplayNode {
         return "\(birthYear)-01-01"
     }
 
+    private func loadAvatarIfNeeded() {
+        guard let avatarURL = CDNURLHelper.convertToCDNURL(model?.avatar?.fullUrl) else { return }
+        avatarSpinner.startAnimating()
+        avatarImageView.alpha = 0.5
+        ImageLoader.shared.load(url: avatarURL) { [weak self] image in
+            guard let self else { return }
+            self.avatarSpinner.stopAnimating()
+            self.avatarImageView.alpha = 1.0
+            if let image {
+                self.avatarImageView.image = image
+                self.avatarImageView.applyAvatarTopCropIfNeeded(image: image)
+            }
+        }
+    }
+
+    func setAvatarLoading(_ loading: Bool) {
+        if loading {
+            avatarSpinner.startAnimating()
+            avatarImageView.alpha = 0.5
+        } else {
+            avatarSpinner.stopAnimating()
+            avatarImageView.alpha = 1.0
+        }
+    }
+
     func toggleSpinner(active: Bool) {
         if active {
             self.applyButtonSpinner.startAnimating()
@@ -707,6 +724,7 @@ extension EditProfileNode: UITextFieldDelegate {
         guard selectedIndex != index else { return }
         selectedIndex = index
         updateTabsTextColor()
+        updatePagerHeight()
 
         let offsetX = CGFloat(index) * horizontalPager.bounds.width
 
@@ -734,7 +752,7 @@ extension EditProfileNode: UITextFieldDelegate {
         let bioHeight = bioStackView.frame.height
         let appHeight = appearanceStackView.frame.height
 
-        let targetHeight = max(bioHeight, appHeight)
+        let targetHeight = selectedIndex == 0 ? bioHeight : appHeight
 
         pagerHeightConstraint.constant = targetHeight
         self.view.layoutIfNeeded()
@@ -782,6 +800,7 @@ extension EditProfileNode: UIScrollViewDelegate {
         if selectedIndex != page {
             selectedIndex = page
             updateTabsTextColor()
+            updatePagerHeight()
         }
     }
 }

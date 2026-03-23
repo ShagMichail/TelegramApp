@@ -189,7 +189,8 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
     }
     
     private var selectedAvatarImage: UIImage?
-    
+    private var selectedAvatarUUID: String?
+
     private func openPhotoGallery() {
         print("📸 Opening photo gallery...")
         
@@ -212,28 +213,53 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
 
     private func uploadAvatar(image: UIImage) {
         self.selectedAvatarImage = image
-        self.createEventNode.toggleSpinner(active: false)
-        
-        print("✅ Avatar selected and ready to upload")
-        // TODO: Здесь будет отправка на сервер через API
-        // Пока просто показываем алерт
+        self.selectedAvatarUUID = nil
+
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            self.createEventNode.setAvatarLoading(false)
+            return
+        }
+
+        Task { @MainActor in
+            do {
+                let response: FileUploadResponse = try await DivoAPIClient.shared.upload(
+                    path: "/file/upload-file",
+                    fileData: imageData
+                )
+                self.selectedAvatarUUID = response.data?.uuid
+                self.createEventNode.setAvatarLoading(false)
+                print("✅ Avatar uploaded, uuid: \(self.selectedAvatarUUID ?? "nil")")
+            } catch {
+                self.createEventNode.setAvatarLoading(false)
+                print("❌ Avatar upload error: \(error)")
+                self.showAlert(text: "Failed to upload photo: \(error.localizedDescription)")
+            }
+        }
     }
 
     private func handleSave(with rawData: UpdateBiographyPageRequest) {
         Task { @MainActor in
             do {
-                let request = rawData
-                
+                let avatarUuid = self.selectedAvatarUUID.map {
+                    UpdateBiographyPageRequest.AvatarUuid(uuid: $0)
+                }
+                let request = UpdateBiographyPageRequest(
+                    fullName: rawData.fullName,
+                    gender: rawData.gender,
+                    model: rawData.model,
+                    avatar: avatarUuid
+                )
+
                 let response: UpdateBiographyPageResponse = try await DivoAPIClient.shared.request(
                     path: "/user/update-profile",
                     method: "POST",
                     body: request
                 )
                 
-                print("✅ Social links successfully saved: \(response.message ?? "OK")")
+                print("✅ Profile successfully saved: \(response.message ?? "OK")")
                 self.delegate?.didUpdateProfileData()
                 self.createEventNode.toggleSpinner(active: false)
-                self.showAlert(text: "Social links updated")
+                self.showAlert(text: "Profile updated")
                 
                 self.navigationController?.popViewController(animated: true)
                 
@@ -266,19 +292,21 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
 extension EditProfileController {
     public func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true)
-        
+
         guard let result = results.first else {
             return
         }
-        
+
         result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
             guard let self = self, let uiImage = image as? UIImage else {
                 return
             }
-            
-            self.createEventNode.currentPhoto = uiImage
-            self.createEventNode.toggleSpinner(active: true)
-            self.uploadAvatar(image: uiImage)
+            let normalized = uiImage.fixedOrientation()
+            DispatchQueue.main.async {
+                self.createEventNode.setAvatarLoading(true)
+                self.createEventNode.currentPhoto = normalized
+            }
+            self.uploadAvatar(image: normalized)
         }
     }
 }
@@ -302,8 +330,23 @@ extension EditProfileController: UIImagePickerControllerDelegate {
     }
     
     private func handleSelectedImage(_ image: UIImage) {
-        self.createEventNode.currentPhoto = image
-        self.createEventNode.toggleSpinner(active: true)
-        self.uploadAvatar(image: image)
+        let normalized = image.fixedOrientation()
+        self.createEventNode.setAvatarLoading(true)
+        self.createEventNode.currentPhoto = normalized
+        self.uploadAvatar(image: normalized)
+    }
+}
+
+
+// MARK: - UIImage orientation fix
+
+private extension UIImage {
+    func fixedOrientation() -> UIImage {
+        guard imageOrientation != .up else { return self }
+        UIGraphicsBeginImageContextWithOptions(size, false, scale)
+        draw(in: CGRect(origin: .zero, size: size))
+        let fixed = UIGraphicsGetImageFromCurrentImageContext() ?? self
+        UIGraphicsEndImageContext()
+        return fixed
     }
 }
