@@ -163,7 +163,7 @@ private final class DropdownListSheetController: UIViewController, UITableViewDe
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        view.backgroundColor = UIColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0)
+        view.backgroundColor = UIColor(red: 0.17, green: 0.17, blue: 0.18, alpha: 1.0)
         
         handleView.backgroundColor = UIColor.white.withAlphaComponent(0.3)
         handleView.layer.cornerRadius = 2.5

@@ -262,6 +262,34 @@ public struct GenderOption: Codable {
     public let title: String
 }
 
+public struct AgencyListRequest: Encodable {
+    public let offset: Int
+    public let limit: Int
+    public let title: String?
+
+    public init(offset: Int, limit: Int, title: String?) {
+        self.offset = offset
+        self.limit = limit
+        self.title = title
+    }
+}
+
+public struct AgencyListResponse: Decodable {
+    public let message: String?
+    public let data: AgencyListData
+    public let errors: [String]?
+}
+
+public struct AgencyListData: Decodable {
+    public let items: [AgencyItem]
+    public let pagination: Pagination
+}
+
+public struct AgencyItem: Decodable {
+    public let id: Int
+    public let title: String
+}
+
 public struct AppearanceDictionaryResponse: Codable {
     public let data: AppearanceDictionaryData
 }
