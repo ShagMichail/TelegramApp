@@ -91,10 +91,24 @@ final class EventListCell: UICollectionViewCell {
         ])
     }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        avatarImageView.cancelImageLoad()
+        avatarImageView.image = nil
+    }
+
     func configure(with item: EventItem, context: AccountContext) {
         nameLabel.text = item.name
-        infoLabel.text = "\(item.data) • \(item.time) • \(item.countryFlag) \(item.city)"
-        // TODO: integrate avatar loading if needed
+        var infoParts: [String] = []
+        if !item.data.isEmpty { infoParts.append(item.data) }
+        if !item.time.isEmpty { infoParts.append(item.time) }
+        let location = [item.countryFlag, item.city].filter { !$0.isEmpty }.joined(separator: " ")
+        if !location.isEmpty { infoParts.append(location) }
+        infoLabel.text = infoParts.joined(separator: " · ")
+
+        if let urlString = item.customAvatarURL, let url = URL(string: urlString) {
+            avatarImageView.loadImage(from: url)
+        }
     }
 }
 

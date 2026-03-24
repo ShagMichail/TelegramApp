@@ -84,11 +84,19 @@ final class ChannelListCell: UICollectionViewCell {
         ])
     }
 
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        avatarImageView.cancelImageLoad()
+        avatarImageView.image = nil
+    }
+
     func configure(with item: ProfileChannelItem, context: AccountContext) {
         titleLabel.text = item.title
         subtitleLabel.text = "\(item.followersCount) followers"
         premiumBadge.isHidden = !item.isPremium
-        // TODO: integrate Avatar loading via Telegram avatar/URL
+        if let urlString = item.customAvatarURL, let url = URL(string: urlString) {
+            avatarImageView.loadImage(from: url)
+        }
     }
 }
 
