@@ -33,12 +33,11 @@ private func roundCorners(diameter: CGFloat) -> UIImage {
 private func getTextField(title: String) -> TextFieldNode {
     let field = TextFieldNode()
     field.textField.font = Font.regular(16.0)
-    field.textField.textColor = .white.withAlphaComponent(0.6)
+    field.textField.textColor = .white
     field.textField.textAlignment = .natural
     field.textField.attributedPlaceholder = NSAttributedString(string: title, font: field.textField.font, textColor: UIColor(red: 1, green: 1, blue: 1, alpha: 0.4))
     field.textField.autocapitalizationType = .none
     field.textField.autocorrectionType = .no
-    //    field.textField.keyboardType = .URL
     field.borderWidth = 1.0
     field.borderColor = UIColor(red: 1, green: 1, blue: 1, alpha: 0.4).cgColor
     field.cornerRadius = 10.0
@@ -51,7 +50,7 @@ private func getTextField(title: String) -> TextFieldNode {
 private func getChevronTextField(title: String) -> TextFieldNodeWithChevron {
     let field = TextFieldNodeWithChevron()
     field.textField.textField.font = Font.regular(16.0)
-    field.textField.textField.textColor = .white.withAlphaComponent(0.6)
+    field.textField.textField.textColor = .white
     field.textField.textField.textAlignment = .natural
     field.textField.textField.attributedPlaceholder = NSAttributedString(string: title, font: field.textField.textField.font, textColor: UIColor(red: 1, green: 1, blue: 1, alpha: 0.4))
     field.textField.textField.autocapitalizationType = .none
@@ -72,7 +71,7 @@ class TextFieldNodeWithChevron: ASDisplayNode {
     override init() {
         self.textField = TextFieldNode()
         self.chevronNode = ASImageNode()
-        self.chevronNode.image = generateTintedImage(image: UIImage(bundleImageName: "Item List/InlineTextDownArrow"), color: UIColor.white.withAlphaComponent(0.4))
+        self.chevronNode.image = generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/InlineTextDownArrow"), color: UIColor.white)
         self.chevronNode.contentMode = .scaleAspectFit
         self.chevronNode.isUserInteractionEnabled = false
 
@@ -127,10 +126,13 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     private let nameAgency: TextFieldNode
     private let chooseCountryField: TextFieldNodeWithChevron
     private var countryId: String = ""
-    private let chooseGenderField: TextFieldNodeWithChevron
     private let chooseAgencyField: TextFieldNodeWithChevron
     private let websiteField: TextFieldNode
     
+    private let genderDropdown: DropdownNode
+    private var genderDictionaries: GenderResponse?
+    private var selectedGenderId: String = ""
+
     private let ageSliderNode: AgeSliderNode
     
     private var activeTextField: UITextField?
@@ -167,11 +169,13 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     
     var signUpWithName: ((AuthorizationModelInfo) -> Void)?
     var selectCountryCode: (() -> Void)?
-    var selectGender: (() -> Void)?
+    var selectGender: ((String) -> Void)?
     var selectAgency: (() -> Void)?
     var openTermsOfService: (() -> Void)?
     var back: (() -> Void)?
     
+    var loadGenderDictionary: (() -> Void)?
+
     var inProgress: Bool = false
     
     init(theme: PresentationTheme, strings: PresentationStrings, typeOfRole: String, addPhoto: @escaping () -> Void) {
@@ -240,9 +244,9 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         self.nameAgency = getTextField(title: nameAgencyText)
         self.websiteField = getTextField(title: "Enter name your website")
         self.chooseCountryField = getChevronTextField(title: "Choose a country")
-        self.chooseGenderField = getChevronTextField(title: "Select a Gender")
         self.chooseAgencyField = getChevronTextField(title: "Choose agency name")
         
+        self.genderDropdown = DropdownNode(title: "Gender", placeholder: "Select a Gender", options: ["Loading..."])
         self.ageSliderNode = AgeSliderNode(title: "Age (y.o)", type: "y.o", defaultValue: 17, minimumValue: 14, maximumValue: 45)
         
         self.currentPhotoNode = ASImageNode()
@@ -277,6 +281,13 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
 
         super.init()
 
+        self.genderDropdown.onSelect = { [weak self] value in
+            self?.genderDropdown.selectedValue = value
+            if let genderOption = self?.genderDictionaries?.data.first(where: { $0.title == value }) {
+                self?.selectedGenderId = genderOption.id
+            }
+        }
+
         self.agenciesCheckboxNode.addTarget(self, action: #selector(self.agenciesCheckboxTapped))
         self.brandsCheckboxNode.addTarget(self, action: #selector(self.brandsCheckboxTapped))
 
@@ -289,7 +300,6 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         self.nameAgency.textField.delegate = self
         self.websiteField.textField.delegate = self
         self.chooseCountryField.textField.textField.delegate = self
-        self.chooseGenderField.textField.textField.delegate = self
         self.chooseAgencyField.textField.textField.delegate = self
         
         self.backgroundColor = UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.00)
@@ -301,11 +311,14 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         
         self.contentNode.addSubnode(self.websiteField)
         self.contentNode.addSubnode(self.chooseCountryField)
-        
+
         if self.typeOfRole != .agencies {
             self.contentNode.addSubnode(self.ageSliderNode)
         }
-        self.contentNode.addSubnode(self.chooseGenderField)
+        
+        self.contentNode.addSubnode(self.genderDropdown)
+        // self.genderDropdown.isHidden = true
+
         self.contentNode.addSubnode(self.chooseAgencyField)
         self.contentNode.addSubnode(self.nameAgency)
         self.contentNode.addSubnode(self.titleNode)
@@ -354,6 +367,12 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         }
     }
     
+    func configureGenderDictionaries(_ dict: GenderResponse) {
+        self.genderDictionaries = dict
+        self.genderDropdown.options = dict.data.map { $0.title }
+        self.genderDropdown.setNeedsLayout()
+    }
+
     func updateCountry(countryId: String, countryName: String) {
         chooseCountryField.textField.textField.text = countryName
         self.countryId = countryId
@@ -459,58 +478,59 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
             
             layoutField(agenciesCheckboxNode)
             layoutField(brandsCheckboxNode)
-            
-            chooseGenderField.isHidden = true
+
+            genderDropdown.isHidden = true
             ageSliderNode.isHidden = true
             chooseAgencyField.isHidden = true
         }
-        
+
         if typeOfRole == .talent {
             layoutField(nameAgency)
-            layoutField(chooseGenderField)
+            layoutField(genderDropdown)
+
             layoutField(chooseCountryField)
-            
+
             transition.updateFrame(
                 node: ageSliderNode,
                 frame: CGRect(x: 0, y: contentHeight, width: maximumWidth, height: 60)
             )
             contentHeight += 60 + 12
-            
+
             websiteField.isHidden = true
             typeNode.isHidden = true
             agenciesCheckboxNode.isHidden = true
             brandsCheckboxNode.isHidden = true
             chooseAgencyField.isHidden = true
         }
-        
+
         if typeOfRole == .model {
             layoutField(nameAgency)
-            layoutField(chooseGenderField)
+            layoutField(genderDropdown)
             layoutField(chooseCountryField)
             layoutField(chooseAgencyField)
-            
+
             transition.updateFrame(
                 node: ageSliderNode,
                 frame: CGRect(x: 0, y: contentHeight, width: maximumWidth, height: 60)
             )
             contentHeight += 60 + 12
-            
+
             websiteField.isHidden = true
             typeNode.isHidden = true
             agenciesCheckboxNode.isHidden = true
             brandsCheckboxNode.isHidden = true
         }
-        
+
         if typeOfRole == .fan {
             layoutField(nameAgency)
             layoutField(chooseCountryField)
-            
+
             ageSliderNode.isHidden = true
             websiteField.isHidden = true
             typeNode.isHidden = true
             agenciesCheckboxNode.isHidden = true
             brandsCheckboxNode.isHidden = true
-            chooseGenderField.isHidden = true
+            genderDropdown.isHidden = true
             chooseAgencyField.isHidden = true
         }
         
@@ -561,13 +581,8 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     }
     
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        //        if textField === self.firstNameField.textField {
-        //            self.lastNameField.textField.becomeFirstResponder()
-        //        } else {
-        //            let name = self.currentName
-        //            self.signUpWithName?(name.0, name.1)
-        //        }
-        return false
+        textField.resignFirstResponder()
+        return true
     }
     
     @objc private func addPhotoPressed() {
@@ -581,9 +596,10 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     @objc private func saveButtonPressed() {
         print("Save button pressed!")
         let typeId: Int32 = typeOfRole == .talent ? 1 : typeOfRole == .model ? 2 : 3
+        let genderId = Int32(selectedGenderId) ?? 2
         let modelInfo = AuthorizationModelInfo(
             typeId: typeId,
-            gender: 2,//chooseGenderField
+            gender: genderId,
             age: Int32(ageSliderNode.slider.value.rounded()),
             name: nameAgency.textField.text,
             agencyName: chooseAgencyField.textField.textField.text,
@@ -608,9 +624,6 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         if textField == chooseCountryField.textField.textField {
             selectCountryCode?()
             return false
-        } else if textField == chooseGenderField.textField.textField {
-            selectGender?()
-            return false
         } else if textField == chooseAgencyField.textField.textField {
             selectAgency?()
             return false
@@ -618,7 +631,7 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
             return true
         }
     }
-    
+
     override func didLoad() {
         super.didLoad()
         

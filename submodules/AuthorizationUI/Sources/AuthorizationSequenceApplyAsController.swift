@@ -221,12 +221,17 @@ final class AuthorizationSequenceApplyAsController: ViewController {
             presentAlertImpl()
         }
         
+        self.controllerNode.loadGenderDictionary = { [weak self] in
+            self?.loadGenderDictionary()
+        }
+
         self.controllerNode.updateData(firstName: self.initialName.0, lastName: self.initialName.1, hasTermsOfService: self.termsOfService != nil)
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         self.controllerNode.activateInput()
+        self.loadGenderDictionary()
     }
     
     func updateData(firstName: String, lastName: String, termsOfService: UnauthorizedAccountTermsOfService?) {
@@ -293,6 +298,22 @@ final class AuthorizationSequenceApplyAsController: ViewController {
             TempBox.shared.dispose(tempFile)
             return result
         }), self.avatarAsset, self.avatarAdjustments, self.announceSignUp)
+    }
+    
+    private func loadGenderDictionary() {
+        Task { @MainActor in
+            do {
+                let response: GenderResponse = try await DivoAPIClient.shared.request(
+                    path: "/dictionary/gender",
+                    method: "GET"
+                )
+
+                self.controllerNode.configureGenderDictionaries(response)
+
+            } catch {
+                print("❌ Error loading gender dictionary: \(error)")
+            }
+        }
     }
 }
 
