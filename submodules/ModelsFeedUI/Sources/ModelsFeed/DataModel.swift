@@ -16,11 +16,13 @@ struct CardModel {
     var userReaction: ReactionType?
 
     let userId: Int?
+    let role: String?
     let mainImageURL: URL?
     let avatarImageURL: URL?
     let previewImageURLs: [URL]
     let likesCount: Int
     let isFavorite: Bool
+    var isFollowed: Bool
 
     init(
         name: String,
@@ -29,11 +31,13 @@ struct CardModel {
         previewImagesName: [String] = [],
         userReaction: ReactionType? = nil,
         userId: Int? = nil,
+        role: String? = nil,
         mainImageURL: URL? = nil,
         avatarImageURL: URL? = nil,
         previewImageURLs: [URL] = [],
         likesCount: Int = 0,
-        isFavorite: Bool = false
+        isFavorite: Bool = false,
+        isFollowed: Bool = false
     ) {
         self.name = name
         self.mainImageName = mainImageName
@@ -41,11 +45,13 @@ struct CardModel {
         self.previewImagesName = previewImagesName
         self.userReaction = userReaction
         self.userId = userId
+        self.role = role
         self.mainImageURL = mainImageURL
         self.avatarImageURL = avatarImageURL
         self.previewImageURLs = previewImageURLs
         self.likesCount = likesCount
         self.isFavorite = isFavorite
+        self.isFollowed = isFollowed
     }
 }
 

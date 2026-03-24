@@ -4,12 +4,15 @@ import TelegramCore
 
 protocol CardCellDelegate: AnyObject {
     func cardCell(_ cell: CardCollectionViewCell, didTapReaction reaction: ReactionType, for cardName: String, isSelected: Bool)
+    func cardCell(_ cell: CardCollectionViewCell, didTapFollowForUserId userId: Int, isFollowed: Bool)
 }
 
 final class CardCollectionViewCell: UICollectionViewCell {
 
     weak var delegate: CardCellDelegate?
     private var currentCardName: String?
+    private var currentUserId: Int?
+    private var currentIsFollowed: Bool = false
 
     private let mainImageView: UIImageView = {
         let imageView = UIImageView()
@@ -190,10 +193,23 @@ final class CardCollectionViewCell: UICollectionViewCell {
         previewScrollView.addSubview(previewStackView)
 
         setupDmButtonContent()
+        saveButton.addTarget(self, action: #selector(saveButtonTapped), for: .touchUpInside)
         reactionsStackView.addArrangedSubview(createReactionButton(symbol: "👍", count: 11, reactionType: .like, isSelected: false))
         reactionsStackView.addArrangedSubview(createReactionButton(symbol: "❤️", count: 8, reactionType: .heart, isSelected: false))
         reactionsStackView.addArrangedSubview(createReactionButton(symbol: "👎", count: 4, reactionType: .dislike, isSelected: false))
         reactionsStackView.addArrangedSubview(createReactionButton(symbol: "🔥", count: 18, reactionType: .fire, isSelected: false))
+    }
+
+    @objc private func saveButtonTapped() {
+        guard let userId = currentUserId else { return }
+        currentIsFollowed.toggle()
+        updateSaveButtonAppearance()
+        delegate?.cardCell(self, didTapFollowForUserId: userId, isFollowed: currentIsFollowed)
+    }
+
+    private func updateSaveButtonAppearance() {
+        let color: UIColor = currentIsFollowed ? UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0) : .white
+        saveButton.tintColor = color
     }
 
     @objc private func reactionButtonTapped(_ sender: UIButton) {
@@ -384,6 +400,9 @@ final class CardCollectionViewCell: UICollectionViewCell {
     func configure(with model: CardModel, delegate: CardCellDelegate) {
         self.delegate = delegate
         self.currentCardName = model.name
+        self.currentUserId = model.userId
+        self.currentIsFollowed = model.isFollowed
+        updateSaveButtonAppearance()
 
         let userReaction = model.userReaction
 

@@ -7,7 +7,7 @@ struct AppearanceAttribute {
 }
 
 protocol ProfileInfoViewDelegate: AnyObject {
-    func profileInfoViewDidUpdateContentHeight()
+    func profileInfoViewDidUpdateContentHeight(animated: Bool)
 }
 
 final class ProfileInfoView: UIView {
@@ -272,19 +272,16 @@ final class ProfileInfoView: UIView {
     private func updateContent(animated: Bool) {
         let isBio = selectedIndex == 0
         var shouldShowSeeMore = false
-        
+
         if isBio {
-            self.seeMoreStack.isHidden = true
             contentLabel.text = biographyText
             contentLabel.numberOfLines = isExpanded ? 0 : maxLinesCollapsed
-            
+
             let viewWidth = self.bounds.width > 0 ? self.bounds.width : UIScreen.main.bounds.width
             let labelWidth = viewWidth - 32
             let actualLines = biographyText.lineCount(for: contentLabel.font, width: labelWidth)
             shouldShowSeeMore = actualLines > maxLinesCollapsed
-            
         } else {
-            self.seeMoreStack.isHidden = true
             let dataToShow: [AppearanceAttribute]
             if isExpanded {
                 dataToShow = appearanceData
@@ -292,27 +289,25 @@ final class ProfileInfoView: UIView {
                 dataToShow = Array(appearanceData.prefix(4))
             }
             rebuildAppearanceGrid(with: dataToShow)
-            
             shouldShowSeeMore = appearanceData.count > 4
         }
-        
-        seeMoreButton.setTitle(isExpanded ? "SEE LESS" : "SEE MORE", for: .normal)
-        
-        let changes = {
-            self.contentLabel.alpha = isBio ? 1 : 0
-            self.appearanceStack.alpha = isBio ? 0 : 1
-            self.seeMoreStack.isHidden = !shouldShowSeeMore
+
+        let newTitle = isExpanded ? "SEE LESS" : "SEE MORE"
+        if animated {
+            UIView.transition(with: seeMoreButton, duration: 0.25, options: .transitionCrossDissolve) {
+                self.seeMoreButton.setTitle(newTitle, for: .normal)
+            }
+        } else {
+            seeMoreButton.setTitle(newTitle, for: .normal)
         }
-        
-        let completion: (Bool) -> Void = { _ in
-            self.contentLabel.isHidden = !isBio
-            self.appearanceStack.isHidden = isBio
-            self.delegate?.profileInfoViewDidUpdateContentHeight()
-        }
-        
-        changes()
+
         seeMoreStack.isHidden = !shouldShowSeeMore
-        completion(true)
+        contentLabel.alpha = isBio ? 1 : 0
+        contentLabel.isHidden = !isBio
+        appearanceStack.alpha = isBio ? 0 : 1
+        appearanceStack.isHidden = isBio
+
+        self.delegate?.profileInfoViewDidUpdateContentHeight(animated: false)
     }
     
     private func rebuildAppearanceGrid(with attributes: [AppearanceAttribute]) {
@@ -396,8 +391,7 @@ final class ProfileInfoView: UIView {
     
     @objc private func seeMoreTapped() {
         isExpanded.toggle()
-//        updateContent(animated: true)
-        updateContent(animated: false)
+        updateContent(animated: true)
     }
 }
 

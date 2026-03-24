@@ -26,6 +26,7 @@ public struct ProfileModel {
     let isMyProfile: Bool
 
     let userId: Int?
+    let role: String?
     let mainImageURL: URL?
     let avatarImageURL: URL?
     
@@ -47,6 +48,7 @@ public struct ProfileModel {
         photos: [TelegramPeerPhoto] = [],
         isMyProfile: Bool = false,
         userId: Int? = nil,
+        role: String? = nil,
         mainImageURL: URL? = nil,
         avatarImageURL: URL? = nil
     ) {
@@ -67,6 +69,7 @@ public struct ProfileModel {
         self.photos = photos
         self.isMyProfile = isMyProfile
         self.userId = userId
+        self.role = role
         self.mainImageURL = mainImageURL
         self.avatarImageURL = avatarImageURL
     }

@@ -117,6 +117,7 @@ public final class ModelsFeedController: TelegramBaseController {
             galleryImageNames: [],
             galleryImageURLs: [],
             userId: model.userId,
+            role: model.role,
             mainImageURL: model.mainImageURL,
             avatarImageURL: model.avatarImageURL
         )
@@ -218,7 +219,8 @@ public final class ModelsFeedController: TelegramBaseController {
                     method: "POST",
                     body: body
                 )
-                let cards = response.data.items.map { Self.mapCard($0) }
+                let isSubscribedTab = tabIndex == 0
+                let cards = response.data.items.map { Self.mapCard($0, isFollowed: isSubscribedTab) }
                 await MainActor.run {
                     if reset {
                         self.tabStates[tabIndex].cards = cards
@@ -258,18 +260,20 @@ public final class ModelsFeedController: TelegramBaseController {
         }
     }
 
-    private static func mapCard(_ item: FeedlineItem) -> CardModel {
+    private static func mapCard(_ item: FeedlineItem, isFollowed: Bool = false) -> CardModel {
         let mainURL = item.files.first.flatMap { URL(string: $0.fullUrl) }
         let avatarURL = item.searchImage.flatMap { URL(string: $0.fullUrl) }
         let previewURLs = item.files.dropFirst().compactMap { URL(string: $0.fullUrl) }
         return CardModel(
             name: item.title,
             userId: item.user.id,
+            role: item.user.role,
             mainImageURL: mainURL,
             avatarImageURL: avatarURL,
             previewImageURLs: previewURLs,
             likesCount: item.likesCount,
-            isFavorite: item.isFavoriteByUser
+            isFavorite: item.isFavoriteByUser,
+            isFollowed: isFollowed
         )
     }
 
