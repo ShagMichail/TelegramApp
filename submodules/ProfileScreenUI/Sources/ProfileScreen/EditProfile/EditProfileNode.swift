@@ -214,6 +214,13 @@ final class EditProfileNode: ASDisplayNode {
         spinner.hidesWhenStopped = true
         return spinner
     }()
+    private let applyButtonAppearance: ASControlNode
+    private let applyButtonAppearanceSpinner: UIActivityIndicatorView = {
+        let spinner = UIActivityIndicatorView(style: .large)
+        spinner.color = .white
+        spinner.hidesWhenStopped = true
+        return spinner
+    }()
     
     var currentPhoto: UIImage? = nil {
         didSet {
@@ -267,6 +274,8 @@ final class EditProfileNode: ASDisplayNode {
         
         self.applyButton = ButtonWithIconNode(title: "Save", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
         self.applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
+        self.applyButtonAppearance = ButtonWithIconNode(title: "Save", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
+        self.applyButtonAppearance.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
         
         super.init()
         
@@ -274,15 +283,6 @@ final class EditProfileNode: ASDisplayNode {
         
         
         self.backgroundColor = UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.00)
-        if let avatarURLString = model?.avatar?.fullUrl {
-            if let avatarURL = CDNURLHelper.convertToCDNURL(avatarURLString) {
-                ImageLoader.shared.load(url: avatarURL) { [weak self] image in
-                    if let image = image {
-                        self?.avatarImageView.image = image
-                    }
-                }
-            }
-        }
     }
     
     override func didLoad() {
@@ -295,12 +295,26 @@ final class EditProfileNode: ASDisplayNode {
         self.biographyButton.addTarget(self, action: #selector(biographyTapped), for: .touchUpInside)
         self.appearanceButton.addTarget(self, action: #selector(appearanceTapped), for: .touchUpInside)
         self.applyButton.addTarget(self, action: #selector(self.saveButtonPressed), forControlEvents: .touchUpInside)
+        self.applyButtonAppearance.addTarget(self, action: #selector(self.saveButtonPressed), forControlEvents: .touchUpInside)
         self.chancePhotoView.addTarget(self, action: #selector(self.avatarTapped), for: .touchUpInside)
         
+        let dismissTap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
+        dismissTap.cancelsTouchesInView = false
+        self.view.addGestureRecognizer(dismissTap)
+
+        scrollView.keyboardDismissMode = .interactive
+
+        self.nameEventTextField.textField.returnKeyType = .next
+        self.nameEventTextField.textField.delegate = self
+
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(_:)), name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)), name: UIResponder.keyboardWillHideNotification, object: nil)
+
         updateTabsTextColor()
-        
+        loadAvatarIfNeeded()
+
         DispatchQueue.main.async {
-            self.updatePagerHeight(animated: false)
+            self.updatePagerHeight()
             self.updateIndicatorPosition(progress: 0, animated: false)
             self.readyValue = true
         }
@@ -313,7 +327,7 @@ final class EditProfileNode: ASDisplayNode {
         navigationBarTitleHeightConstraint.isActive = true
         
         DispatchQueue.main.async {
-            self.updatePagerHeight(animated: false)
+            self.updatePagerHeight()
             self.updateIndicatorPosition(progress: CGFloat(self.selectedIndex), animated: false)
         }
 //        self.layoutIfNeeded()
@@ -390,26 +404,6 @@ final class EditProfileNode: ASDisplayNode {
         
         setupTabs()
         setupPager()
-        
-        let buttonContainer = UIView()
-        buttonContainer.translatesAutoresizingMaskIntoConstraints = false
-        applyButton.view.translatesAutoresizingMaskIntoConstraints = false
-        buttonContainer.addSubview(applyButton.view)
-        applyButtonSpinner.translatesAutoresizingMaskIntoConstraints = false
-        buttonContainer.addSubview(self.applyButtonSpinner)
-        
-        NSLayoutConstraint.activate([
-            applyButton.view.topAnchor.constraint(equalTo: buttonContainer.topAnchor),
-            applyButton.view.bottomAnchor.constraint(equalTo: buttonContainer.bottomAnchor),
-            applyButton.view.leadingAnchor.constraint(equalTo: buttonContainer.leadingAnchor, constant: 16),
-            applyButton.view.trailingAnchor.constraint(equalTo: buttonContainer.trailingAnchor, constant: -16),
-            applyButton.view.heightAnchor.constraint(equalToConstant: 50),
-            
-            applyButtonSpinner.centerXAnchor.constraint(equalTo: buttonContainer.centerXAnchor),
-            applyButtonSpinner.centerYAnchor.constraint(equalTo: buttonContainer.centerYAnchor),
-        ])
-        
-        mainStackView.addArrangedSubview(buttonContainer)
     }
     
     private func setupTabs() {
@@ -522,6 +516,27 @@ final class EditProfileNode: ASDisplayNode {
             aboutEventTextField.view.widthAnchor.constraint(equalTo: bioStackView.widthAnchor),
             aboutEventTextField.view.heightAnchor.constraint(equalToConstant: 140)
         ])
+
+        let buttonContainer = UIView()
+        buttonContainer.translatesAutoresizingMaskIntoConstraints = false
+        applyButton.view.translatesAutoresizingMaskIntoConstraints = false
+        buttonContainer.addSubview(applyButton.view)
+        applyButtonSpinner.translatesAutoresizingMaskIntoConstraints = false
+        buttonContainer.addSubview(applyButtonSpinner)
+
+        NSLayoutConstraint.activate([
+            applyButton.view.topAnchor.constraint(equalTo: buttonContainer.topAnchor),
+            applyButton.view.bottomAnchor.constraint(equalTo: buttonContainer.bottomAnchor),
+            applyButton.view.leadingAnchor.constraint(equalTo: buttonContainer.leadingAnchor),
+            applyButton.view.trailingAnchor.constraint(equalTo: buttonContainer.trailingAnchor),
+            applyButton.view.heightAnchor.constraint(equalToConstant: 50),
+
+            applyButtonSpinner.centerXAnchor.constraint(equalTo: buttonContainer.centerXAnchor),
+            applyButtonSpinner.centerYAnchor.constraint(equalTo: buttonContainer.centerYAnchor),
+        ])
+
+        bioStackView.addArrangedSubview(buttonContainer)
+        buttonContainer.widthAnchor.constraint(equalTo: bioStackView.widthAnchor).isActive = true
     }
     
     private func setupAppearanceContent() {
@@ -541,9 +556,61 @@ final class EditProfileNode: ASDisplayNode {
         }
         
         appearanceStackView.setCustomSpacing(24, after: genderDropdown.view)
+
+        let buttonContainer = UIView()
+        buttonContainer.translatesAutoresizingMaskIntoConstraints = false
+        applyButtonAppearance.view.translatesAutoresizingMaskIntoConstraints = false
+        buttonContainer.addSubview(applyButtonAppearance.view)
+        applyButtonAppearanceSpinner.translatesAutoresizingMaskIntoConstraints = false
+        buttonContainer.addSubview(applyButtonAppearanceSpinner)
+
+        NSLayoutConstraint.activate([
+            applyButtonAppearance.view.topAnchor.constraint(equalTo: buttonContainer.topAnchor),
+            applyButtonAppearance.view.bottomAnchor.constraint(equalTo: buttonContainer.bottomAnchor),
+            applyButtonAppearance.view.leadingAnchor.constraint(equalTo: buttonContainer.leadingAnchor),
+            applyButtonAppearance.view.trailingAnchor.constraint(equalTo: buttonContainer.trailingAnchor),
+            applyButtonAppearance.view.heightAnchor.constraint(equalToConstant: 50),
+
+            applyButtonAppearanceSpinner.centerXAnchor.constraint(equalTo: buttonContainer.centerXAnchor),
+            applyButtonAppearanceSpinner.centerYAnchor.constraint(equalTo: buttonContainer.centerYAnchor),
+        ])
+
+        appearanceStackView.addArrangedSubview(buttonContainer)
+        buttonContainer.widthAnchor.constraint(equalTo: appearanceStackView.widthAnchor).isActive = true
     }
     
     
+    // MARK: - Keyboard
+
+    @objc private func keyboardWillShow(_ notification: Notification) {
+        guard let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
+              let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double else { return }
+
+        let keyboardHeight = keyboardFrame.height
+        scrollView.contentInset.bottom = keyboardHeight
+        scrollView.verticalScrollIndicatorInsets.bottom = keyboardHeight
+
+        UIView.animate(withDuration: duration) {
+            if self.aboutEventTextField.textView.isFirstResponder {
+                let fieldFrame = self.aboutEventTextField.view.convert(self.aboutEventTextField.bounds, to: self.scrollView)
+                self.scrollView.scrollRectToVisible(fieldFrame, animated: false)
+            }
+        }
+    }
+
+    @objc private func keyboardWillHide(_ notification: Notification) {
+        guard let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double else { return }
+
+        UIView.animate(withDuration: duration) {
+            self.scrollView.contentInset.bottom = 0
+            self.scrollView.verticalScrollIndicatorInsets.bottom = 0
+        }
+    }
+
+    @objc private func dismissKeyboard() {
+        self.view.endEditing(true)
+    }
+
     // MARK: - Actions
 
     @objc private func avatarTapped() {
@@ -603,13 +670,42 @@ final class EditProfileNode: ASDisplayNode {
         return "\(birthYear)-01-01"
     }
 
+    private func loadAvatarIfNeeded() {
+        guard let avatarURL = CDNURLHelper.convertToCDNURL(model?.avatar?.fullUrl) else { return }
+        avatarSpinner.startAnimating()
+        avatarImageView.alpha = 0.5
+        ImageLoader.shared.load(url: avatarURL) { [weak self] image in
+            guard let self else { return }
+            self.avatarSpinner.stopAnimating()
+            self.avatarImageView.alpha = 1.0
+            if let image {
+                self.avatarImageView.image = image
+                self.avatarImageView.applyAvatarTopCropIfNeeded(image: image)
+            }
+        }
+    }
+
+    func setAvatarLoading(_ loading: Bool) {
+        if loading {
+            avatarSpinner.startAnimating()
+            avatarImageView.alpha = 0.5
+        } else {
+            avatarSpinner.stopAnimating()
+            avatarImageView.alpha = 1.0
+        }
+    }
+
     func toggleSpinner(active: Bool) {
         if active {
             self.applyButtonSpinner.startAnimating()
             self.applyButton.alpha = 0.0
+            self.applyButtonAppearanceSpinner.startAnimating()
+            self.applyButtonAppearance.alpha = 0.0
         } else {
             self.applyButtonSpinner.stopAnimating()
             self.applyButton.alpha = 1.0
+            self.applyButtonAppearanceSpinner.stopAnimating()
+            self.applyButtonAppearance.alpha = 1.0
         }
     }
 }
@@ -617,15 +713,28 @@ final class EditProfileNode: ASDisplayNode {
 
 // UITextFieldDelegate
 extension EditProfileNode: UITextFieldDelegate {
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        if textField === nameEventTextField.textField {
+            aboutEventTextField.textView.becomeFirstResponder()
+        }
+        return false
+    }
+
     private func setSelectedIndex(_ index: Int, animated: Bool) {
         guard selectedIndex != index else { return }
         selectedIndex = index
         updateTabsTextColor()
-        
+        updatePagerHeight()
+
         let offsetX = CGFloat(index) * horizontalPager.bounds.width
-        horizontalPager.setContentOffset(CGPoint(x: offsetX, y: 0), animated: animated)
-        
-        updatePagerHeight(animated: animated)
+
+        if animated {
+            UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseInOut, .allowUserInteraction], animations: {
+                self.horizontalPager.contentOffset = CGPoint(x: offsetX, y: 0)
+            })
+        } else {
+            horizontalPager.contentOffset = CGPoint(x: offsetX, y: 0)
+        }
     }
     
     private func updateTabsTextColor() {
@@ -636,24 +745,17 @@ extension EditProfileNode: UITextFieldDelegate {
         appearanceButton.setTitleColor(selectedIndex == 1 ? selectedColor : unselectedColor, for: .normal)
     }
     
-    private func updatePagerHeight(animated: Bool) {
+    private func updatePagerHeight() {
         bioStackView.layoutIfNeeded()
         appearanceStackView.layoutIfNeeded()
-        
+
         let bioHeight = bioStackView.frame.height
         let appHeight = appearanceStackView.frame.height
-        
-        let targetHeight = max(100, selectedIndex == 0 ? bioHeight : appHeight)
-        
+
+        let targetHeight = selectedIndex == 0 ? bioHeight : appHeight
+
         pagerHeightConstraint.constant = targetHeight
-        
-        if animated {
-            UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseInOut, .allowUserInteraction], animations: {
-                self.view.layoutIfNeeded()
-            }, completion: nil)
-        } else {
-            self.view.layoutIfNeeded()
-        }
+        self.view.layoutIfNeeded()
     }
     
     private func updateIndicatorPosition(progress: CGFloat, animated: Bool = false) {
@@ -693,12 +795,12 @@ extension EditProfileNode: UIScrollViewDelegate {
     
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         guard scrollView == horizontalPager else { return }
-        
+
         let page = Int(round(scrollView.contentOffset.x / scrollView.bounds.width))
         if selectedIndex != page {
             selectedIndex = page
             updateTabsTextColor()
-            updatePagerHeight(animated: true)
+            updatePagerHeight()
         }
     }
 }

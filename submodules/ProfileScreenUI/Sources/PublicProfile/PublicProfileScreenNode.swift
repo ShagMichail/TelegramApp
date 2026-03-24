@@ -203,7 +203,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
         let view = CurrentAgencyView()
         view.delegate = self
         view.translatesAutoresizingMaskIntoConstraints = false
-        view.isHidden = true
         return view
     }()
     
@@ -761,7 +760,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
         
         headerContainer.addSubview(infoStack)
         infoStack.addArrangedSubview(profileHeaderView)
-        infoStack.addArrangedSubview(profileHeaderShimmerView)
+        // Шиммер как overlay поверх profileHeaderView (не arranged subview),
+        // чтобы избежать UIStackView-анимации при переключении isHidden
+        profileHeaderShimmerView.translatesAutoresizingMaskIntoConstraints = false
+        infoStack.addSubview(profileHeaderShimmerView)
         
         NSLayoutConstraint.activate([
             headerContainer.widthAnchor.constraint(equalTo: contentViewStack.widthAnchor),
@@ -769,6 +771,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
             infoStack.leadingAnchor.constraint(equalTo: headerContainer.leadingAnchor, constant: 16),
             infoStack.trailingAnchor.constraint(equalTo: headerContainer.trailingAnchor, constant: -16),
             infoStack.heightAnchor.constraint(equalToConstant: 85),
+            profileHeaderShimmerView.leadingAnchor.constraint(equalTo: infoStack.leadingAnchor),
+            profileHeaderShimmerView.trailingAnchor.constraint(equalTo: infoStack.trailingAnchor),
+            profileHeaderShimmerView.topAnchor.constraint(equalTo: infoStack.topAnchor),
+            profileHeaderShimmerView.bottomAnchor.constraint(equalTo: infoStack.bottomAnchor),
         ])
     }
     
@@ -1087,13 +1093,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
         counterActionsStack.isHidden = true
         
         profileInfoShimmerView.isHidden = false
-        profileInfoView.isHidden = true
         
         socialShimmerView.isHidden = false
-        socialMediaStack.isHidden = true
         
         currentAgencyShimmerView.isHidden = false
-        currentAgencyView.isHidden = true
         
         if !model.isMyProfile {
             self.addWorkHistoryContainer.removeFromSuperview()
@@ -1102,7 +1105,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     // Убираем шиммеры, после загрузки
     private func stopShimmers() {
-        guard profileHeaderView.isHidden else { return }
+        guard !profileHeaderShimmerView.isHidden else { return }
 
         // Важно: переключение шиммеров на контент должно быть без каких-либо анимаций,
         // иначе некоторые блоки (например Current Agency) визуально «дергаются».
@@ -1113,34 +1116,27 @@ final class PublicProfileScreenNode: ASDisplayNode {
             CATransaction.setAnimationDuration(0.0)
             CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
 
-            // Мгновенно переключаем шиммеры на контент
             profileHeaderShimmerView.isHidden = true
             profileHeaderView.alpha = 1.0
-            profileHeaderView.isHidden = false  // Убедимся, что view виден
+            profileHeaderView.isHidden = false
 
             actionsShimmerView.isHidden = true
             counterActionsStack.alpha = 1.0
             counterActionsStack.isHidden = false
 
             profileInfoShimmerView.isHidden = true
-            profileInfoView.alpha = 1.0
-            profileInfoView.isHidden = false
 
             socialShimmerView.isHidden = true
-            socialMediaStack.alpha = 1.0
-            socialMediaStack.isHidden = false
 
             currentAgencyShimmerView.isHidden = true
-            currentAgencyView.alpha = 1.0
-            currentAgencyView.isHidden = false
 
-            CATransaction.commit()
-
-            // Принудительно обновляем layout
+            // Принудительно обновляем layout внутри CATransaction,
+            // чтобы изменения фреймов тоже не были анимированы
             self.contentViewStack.setNeedsLayout()
             self.contentViewStack.layoutIfNeeded()
             self.view.setNeedsLayout()
             self.view.layoutIfNeeded()
+            CATransaction.commit()
         }
     }
     
@@ -1627,16 +1623,46 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     func loadSimilarProfiles() {
-        // TODO: Заменить на API запрос
-        let mockProfiles: [SimilarProfileItem] = [
-            SimilarProfileItem(id: 1, name: "KRISTINA REACH", info: "22 y.o · 🇺🇸 New York", avatarURL: nil),
-            SimilarProfileItem(id: 2, name: "SARAH PARKER", info: "24 y.o · 🇬🇧 London", avatarURL: nil),
-            SimilarProfileItem(id: 3, name: "JESSICA WONG", info: "21 y.o · 🇨🇦 Toronto", avatarURL: nil),
-            SimilarProfileItem(id: 4, name: "EMMA STONE", info: "26 y.o · 🇺🇸 Los Angeles", avatarURL: nil),
-            SimilarProfileItem(id: 5, name: "OLIVIA WILD", info: "23 y.o · 🇦🇺 Sydney", avatarURL: nil)
-        ]
-        
-        appendSimilarProfiles(mockProfiles, totalCount: mockProfiles.count)
+        guard !similarProfilesIsLoading else { return }
+        similarProfilesIsLoading = true
+
+        let currentUserId = model.userId
+        let limit = 10
+
+        let requestBody = FeedlineListRequest(
+            offset: similarProfilesOffset,
+            limit: limit,
+            modelsOnly: true
+        )
+
+        Task { @MainActor in
+            do {
+                let response: FeedlineResponse = try await DivoAPIClient.shared.request(
+                    path: "/feedline/list",
+                    method: "POST",
+                    body: requestBody
+                )
+                let items = response.data.items
+                let profiles = items.compactMap { item -> SimilarProfileItem? in
+                    guard item.user.id != currentUserId else { return nil }
+                    let imageURL = CDNURLHelper.convertToCDNURL(
+                        item.searchImage?.fullUrl ?? item.files.first?.fullUrl
+                    )
+                    return SimilarProfileItem(
+                        id: item.user.id,
+                        name: item.user.fullName,
+                        info: item.user.roleLabel,
+                        avatarURL: imageURL
+                    )
+                }
+                self.similarProfilesIsLoading = false
+                self.similarProfilesHasMore = items.count >= limit
+                appendSimilarProfiles(profiles, totalCount: similarProfilesOffset + profiles.count + (similarProfilesHasMore ? 1 : 0))
+            } catch {
+                print("❌ [SIMILAR] Error loading similar profiles: \(error)")
+                self.similarProfilesIsLoading = false
+            }
+        }
     }
     
     // Обновляем Layout после загрузки контроллера
@@ -1681,7 +1707,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
             ? (detail.agency?.description ?? "")
             : Self.mockBiographyText
             
-            profileInfoView.update(biography: bio)
+            UIView.performWithoutAnimation {
+                profileInfoView.update(biography: bio)
+                profileInfoView.layoutIfNeeded()
+            }
             currentAgencyContainer.removeFromSuperview()
             segmentedBar.configure(isAgency: true, isMyProfile: isMyProfile)
         } else {
@@ -1699,7 +1728,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
             
             appearance = buildAppearanceList(from: detail.model?.appearance, gender: detail.gender)
             
-            profileInfoView.update(biography: bio, appearance: appearance)
+            UIView.performWithoutAnimation {
+                profileInfoView.update(biography: bio, appearance: appearance)
+                profileInfoView.layoutIfNeeded()
+            }
             if detail.model?.agency == nil {
                 currentAgencyContainer.removeFromSuperview()
             } else {
@@ -1750,13 +1782,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             titleEditContainer.isHidden = !socialLinks.isEmpty ? false : true
         }
         
-        stopShimmers()
-        activateTitleVisibility()
-        
-        // Теперь устанавливаем информацию профиля после того, как шиммеры скрыты
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
+        UIView.performWithoutAnimation {
             if detail.role == "agency_employee" {
                 let viewModel = UserProfileViewModel(
                     name: detail.agency?.title ?? "No name",
@@ -1768,9 +1794,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
                     isPremium: true,
                     isOnline: true
                 )
-                self.profileHeaderView.configure(with: viewModel)
+                profileHeaderView.configure(with: viewModel)
             } else {
-                let age = detail.birthday.flatMap { self.calculateAge(from: $0) } ?? 0
+                let age = detail.birthday.flatMap { calculateAge(from: $0) } ?? 0
                 let viewModel = UserProfileViewModel(
                     name: detail.fullName ?? "No name",
                     age: age,
@@ -1781,9 +1807,11 @@ final class PublicProfileScreenNode: ASDisplayNode {
                     isPremium: true,
                     isOnline: true
                 )
-                self.profileHeaderView.configure(with: viewModel)
+                profileHeaderView.configure(with: viewModel)
             }
         }
+        stopShimmers()
+        activateTitleVisibility()
     }
 
     func updateEngagementStats(likes: Int, views: Int, saves: Int) {
@@ -1826,7 +1854,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             
             if let layout = self.containerLayout?.0 {
                 self.updateAllCollectionViewHeights(layout: layout)
-                if self.currentTabIndex == 0 { self.updateCollectionsContainerHeight(animated: true) }
+                if self.currentTabIndex == 0 { self.updateCollectionsContainerHeight(animated: false) }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 self?.checkAndLoadMoreGalleryPhotos()
@@ -2319,7 +2347,12 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 self.view.layoutIfNeeded()
             }
         } else {
-            self.view.layoutIfNeeded()
+            UIView.performWithoutAnimation {
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                self.view.layoutIfNeeded()
+                CATransaction.commit()
+            }
         }
     }
     
@@ -2620,7 +2653,7 @@ extension PublicProfileScreenNode: UIScrollViewDelegate {
 
 extension PublicProfileScreenNode: ProfileInfoViewDelegate {
     func profileInfoViewDidUpdateContentHeight() {
-        DispatchQueue.main.async {
+        UIView.performWithoutAnimation {
             self.setNeedsLayout()
             self.layoutIfNeeded()
         }

@@ -217,6 +217,12 @@ public struct UpdateBiographyPageRequest: Encodable {
     public let fullName: String?
     public let gender: String?
     public let model: ModelData
+    public let avatar: AvatarUuid?
+
+    public struct AvatarUuid: Encodable {
+        public let uuid: String
+        public init(uuid: String) { self.uuid = uuid }
+    }
 
     public struct ModelData: Encodable {
         public let description: String?
@@ -227,10 +233,11 @@ public struct UpdateBiographyPageRequest: Encodable {
         }
     }
 
-    public init(fullName: String?, gender: String?, model: ModelData) {
+    public init(fullName: String?, gender: String?, model: ModelData, avatar: AvatarUuid? = nil) {
         self.fullName = fullName
         self.gender = gender
         self.model = model
+        self.avatar = avatar
     }
 }
 
