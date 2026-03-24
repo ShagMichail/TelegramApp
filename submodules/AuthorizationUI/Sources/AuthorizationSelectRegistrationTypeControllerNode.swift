@@ -126,12 +126,19 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     private let nameAgency: TextFieldNode
     private let chooseCountryField: TextFieldNodeWithChevron
     private var countryId: String = ""
-    private let chooseAgencyField: TextFieldNodeWithChevron
     private let websiteField: TextFieldNode
-    
-    private let genderDropdown: DropdownNode
+
+    let genderDropdown: DropdownNode
     private var genderDictionaries: GenderResponse?
     private var selectedGenderId: String = ""
+
+    let agencyDropdown: DropdownNode
+    private var agencyItems: [AgencyItem] = []
+    private var selectedAgencyId: Int?
+    private var agencyOffset: Int = 0
+    private var agencyLimit: Int = 20
+    private var isLoadingAgencies: Bool = false
+    private var hasMoreAgencies: Bool = true
 
     private let ageSliderNode: AgeSliderNode
     
@@ -244,9 +251,15 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         self.nameAgency = getTextField(title: nameAgencyText)
         self.websiteField = getTextField(title: "Enter name your website")
         self.chooseCountryField = getChevronTextField(title: "Choose a country")
-        self.chooseAgencyField = getChevronTextField(title: "Choose agency name")
-        
-        self.genderDropdown = DropdownNode(title: "Gender", placeholder: "Select a Gender", options: ["Loading..."])
+
+        self.genderDropdown = DropdownNode(title: "Gender", placeholder: "Select a Gender")
+        self.genderDropdown.isLoading = true
+        self.genderDropdown.showsSearchBar = false
+
+        self.agencyDropdown = DropdownNode(title: "Agency", placeholder: "Choose agency name")
+        self.agencyDropdown.isLoading = true
+        self.agencyDropdown.showsSearchBar = true
+
         self.ageSliderNode = AgeSliderNode(title: "Age (y.o)", type: "y.o", defaultValue: 17, minimumValue: 14, maximumValue: 45)
         
         self.currentPhotoNode = ASImageNode()
@@ -288,6 +301,13 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
             }
         }
 
+        self.agencyDropdown.onSelect = { [weak self] value in
+            self?.agencyDropdown.selectedValue = value
+            if let agencyItem = self?.agencyItems.first(where: { $0.title == value }) {
+                self?.selectedAgencyId = agencyItem.id
+            }
+        }
+
         self.agenciesCheckboxNode.addTarget(self, action: #selector(self.agenciesCheckboxTapped))
         self.brandsCheckboxNode.addTarget(self, action: #selector(self.brandsCheckboxTapped))
 
@@ -300,26 +320,23 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         self.nameAgency.textField.delegate = self
         self.websiteField.textField.delegate = self
         self.chooseCountryField.textField.textField.delegate = self
-        self.chooseAgencyField.textField.textField.delegate = self
-        
+
         self.backgroundColor = UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.00)
-        
+
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(self.dismissKeyboard))
         self.view.addGestureRecognizer(tapGesture)
-        
+
         self.contentNode.addSubnode(self.sectionTitleNode)
-        
+
         self.contentNode.addSubnode(self.websiteField)
         self.contentNode.addSubnode(self.chooseCountryField)
 
         if self.typeOfRole != .agencies {
             self.contentNode.addSubnode(self.ageSliderNode)
         }
-        
-        self.contentNode.addSubnode(self.genderDropdown)
-        // self.genderDropdown.isHidden = true
 
-        self.contentNode.addSubnode(self.chooseAgencyField)
+        self.contentNode.addSubnode(self.genderDropdown)
+        self.contentNode.addSubnode(self.agencyDropdown)
         self.contentNode.addSubnode(self.nameAgency)
         self.contentNode.addSubnode(self.titleNode)
         self.contentNode.addSubnode(self.typeNode)
@@ -341,7 +358,6 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     }
     
     @objc private func agenciesCheckboxTapped() {
-        // Если уже выбрано, ничего не делаем
         guard selectedAgencyType != .agencies else { return }
         
         selectedAgencyType = .agencies
@@ -369,17 +385,51 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
     
     func configureGenderDictionaries(_ dict: GenderResponse) {
         self.genderDictionaries = dict
-        self.genderDropdown.options = dict.data.map { $0.title }
-        self.genderDropdown.setNeedsLayout()
+        self.genderDropdown.updateOptions(dict.data.map { $0.title })
     }
+    
+    func loadAgenciesComplete(_ items: [AgencyItem], totalCount: Int, offset: Int) {
+        self.isLoadingAgencies = false
+        
+        if offset == 0 {
+            self.agencyItems = items
+        } else {
+            let existingIds = Set(self.agencyItems.map { $0.id })
+            let newItems = items.filter { !existingIds.contains($0.id) }
+            self.agencyItems.append(contentsOf: newItems)
+        }
+        
+        self.hasMoreAgencies = self.agencyItems.count < totalCount
+        self.agencyDropdown.isLoading = false
+        
+        self.agencyDropdown.updateOptions(self.agencyItems.map { $0.title })
+
+        if self.hasMoreAgencies {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.loadMoreAgencies()
+            }
+        }
+    }
+    
+    func configureAgencyList(_ items: [AgencyItem], totalCount: Int) {
+        self.agencyItems = items
+        self.agencyDropdown.options = items.map { $0.title }
+        self.agencyDropdown.isLoading = false
+        self.agencyDropdown.setNeedsLayout()
+        self.hasMoreAgencies = self.agencyOffset + self.agencyLimit < totalCount
+    }
+    
+    func appendAgencyItems(_ items: [AgencyItem]) {
+        self.agencyItems.append(contentsOf: items)
+        self.agencyDropdown.options = self.agencyItems.map { $0.title }
+        self.agencyDropdown.setNeedsLayout()
+    }
+    
+    var loadAgencyList: ((Int, Int) -> Void)?
 
     func updateCountry(countryId: String, countryName: String) {
         chooseCountryField.textField.textField.text = countryName
         self.countryId = countryId
-//        if let (layout, navigationHeight) = self.layoutArguments {
-//            self.containerLayoutUpdated(layout, navigationBarHeight: navigationHeight, transition: .immediate)
-//        }
-        
     }
     
     func containerLayoutUpdated(
@@ -394,7 +444,7 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         let fieldHeight: CGFloat = 40.0
         
         var insets = layout.insets(options: [.statusBar])
-        let bottomButtonsHeight: CGFloat = 50.0 + 50.0 // кнопка + отступ
+        let bottomButtonsHeight: CGFloat = 50.0 + 50.0
         insets.bottom += bottomButtonsHeight
         
         // Scroll занимает весь экран
@@ -468,20 +518,20 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
             layoutField(nameAgency)
             layoutField(chooseCountryField)
             layoutField(websiteField)
-            
+
             // Type title
             transition.updateFrame(
                 node: self.typeNode,
                 frame: CGRect(x: sideInset, y: contentHeight + 12, width: maximumWidth, height: typeTitleSize.height)
             )
             contentHeight += typeTitleSize.height + 16
-            
+
             layoutField(agenciesCheckboxNode)
             layoutField(brandsCheckboxNode)
 
             genderDropdown.isHidden = true
             ageSliderNode.isHidden = true
-            chooseAgencyField.isHidden = true
+            agencyDropdown.isHidden = true
         }
 
         if typeOfRole == .talent {
@@ -500,14 +550,14 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
             typeNode.isHidden = true
             agenciesCheckboxNode.isHidden = true
             brandsCheckboxNode.isHidden = true
-            chooseAgencyField.isHidden = true
+            agencyDropdown.isHidden = true
         }
 
         if typeOfRole == .model {
             layoutField(nameAgency)
             layoutField(genderDropdown)
             layoutField(chooseCountryField)
-            layoutField(chooseAgencyField)
+            layoutField(agencyDropdown)
 
             transition.updateFrame(
                 node: ageSliderNode,
@@ -531,7 +581,7 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
             agenciesCheckboxNode.isHidden = true
             brandsCheckboxNode.isHidden = true
             genderDropdown.isHidden = true
-            chooseAgencyField.isHidden = true
+            agencyDropdown.isHidden = true
         }
         
         // MARK: - Content size
@@ -597,12 +647,13 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         print("Save button pressed!")
         let typeId: Int32 = typeOfRole == .talent ? 1 : typeOfRole == .model ? 2 : 3
         let genderId = Int32(selectedGenderId) ?? 2
+        let agencyName = agencyItems.first(where: { $0.id == selectedAgencyId })?.title ?? ""
         let modelInfo = AuthorizationModelInfo(
             typeId: typeId,
             gender: genderId,
             age: Int32(ageSliderNode.slider.value.rounded()),
             name: nameAgency.textField.text,
-            agencyName: chooseAgencyField.textField.textField.text,
+            agencyName: agencyName,
             countryCode: countryId,
             url: websiteField.textField.text)
         signUpWithName?(modelInfo)
@@ -624,9 +675,6 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         if textField == chooseCountryField.textField.textField {
             selectCountryCode?()
             return false
-        } else if textField == chooseAgencyField.textField.textField {
-            selectAgency?()
-            return false
         } else {
             return true
         }
@@ -643,6 +691,25 @@ final class ChooseRoleControllerNode: ASDisplayNode, UITextFieldDelegate {
         NotificationCenter.default.removeObserver(self)
     }
     
+    private func loadMoreAgenciesIfNeeded() {
+        guard !self.isLoadingAgencies && self.hasMoreAgencies else { return }
+        
+        let threshold = max(0, self.agencyItems.count - 2)
+        let selectedIndex = self.agencyItems.firstIndex(where: { $0.id == self.selectedAgencyId }) ?? -1
+        
+        if selectedIndex >= threshold {
+            self.loadMoreAgencies()
+        }
+    }
+    
+    private func loadMoreAgencies() {
+        guard !self.isLoadingAgencies && self.hasMoreAgencies else { return }
+        
+        self.isLoadingAgencies = true
+        
+        let currentOffset = self.agencyItems.count 
+        self.loadAgencyList?(currentOffset, self.agencyLimit)
+    }
     
     @objc func keyboardWillShow(notification: NSNotification) {
         guard let userInfo = notification.userInfo,

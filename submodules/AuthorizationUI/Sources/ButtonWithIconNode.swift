@@ -139,25 +139,24 @@ final class ButtonWithIconNode: ASControlNode {
     private let iconNode: ASImageNode
     private let spacing: CGFloat
     private let imageSize: CGSize
-    
+    var showsSearchBar: Bool = true
+
     init(title: String, icon: UIImage?, theme: PresentationTheme, spacing: CGFloat, imageSize: CGSize) {
         self.spacing = spacing
         self.imageSize = imageSize
-        
+
         self.textNode = ASTextNode()
         self.textNode.attributedText = NSAttributedString(string: title, font: Font.bold(20.0), textColor: .white)
-        
+
         self.iconNode = ASImageNode()
         self.iconNode.image = icon
         self.iconNode.contentMode = .scaleAspectFit
-        
+
         super.init()
-        
+
         self.backgroundColor = theme.list.itemBlocksBackgroundColor
         self.cornerRadius = 6
-//        self.layer.borderColor = UIColor(red: 1.00, green: 1.00, blue: 1.00, alpha: 0.14).cgColor
-//        self.layer.borderWidth = 1
-        
+
         if icon != nil {
             self.addSubnode(self.iconNode)
         }
@@ -170,7 +169,6 @@ final class ButtonWithIconNode: ASControlNode {
         let textSize = self.textNode.measure(self.bounds.size)
         
         if self.iconNode.image != nil {
-            // Layout with icon
             let contentWidth = self.imageSize.width + self.spacing + textSize.width
             let contentOriginX = (self.bounds.width - contentWidth) / 2.0
             
@@ -184,7 +182,6 @@ final class ButtonWithIconNode: ASControlNode {
                                          width: textSize.width,
                                          height: textSize.height)
         } else {
-            // Layout without icon (center the text)
             self.textNode.frame = CGRect(x: (self.bounds.width - textSize.width) / 2.0,
                                          y: (self.bounds.height - textSize.height) / 2.0,
                                          width: textSize.width,
@@ -193,52 +190,53 @@ final class ButtonWithIconNode: ASControlNode {
     }
 }
 
+// MARK: - DropdownNode
 final class DropdownNode: ASDisplayNode {
     
     private let backgroundNode: ASDisplayNode
-    // private let apperTitleNode: ASTextNode
     private let titleNode: ASTextNode
     private let arrowNode: ASImageNode
     
-    var options: [String]
+    var options: [String] = []
     private let placeholder: String
     private let title: String
     
+    var showsSearchBar: Bool = true
+
     var onSelect: ((String) -> Void)?
-    var selectedValue: String? {
-        didSet {
-            updateTitleText()
-        }
+
+    weak var activeSheet: DropdownListSheetController?
+
+    var isLoading: Bool = false {
+        didSet { updateTitleText() }
     }
-    
-    init(title: String, placeholder: String, options: [String]) {
+
+    var selectedValue: String? {
+        didSet { updateTitleText() }
+    }
+
+    init(title: String, placeholder: String) {
         self.title = title
         self.placeholder = placeholder
-        self.options = options
-        
+
         self.backgroundNode = ASDisplayNode()
         self.backgroundNode.borderWidth = 1.0
         self.backgroundNode.borderColor = UIColor.white.withAlphaComponent(0.4).cgColor
         self.backgroundNode.cornerRadius = 10.0
-        
+
         self.titleNode = ASTextNode()
         self.titleNode.maximumNumberOfLines = 1
-        
+
         self.arrowNode = ASImageNode()
         self.arrowNode.image = generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/InlineTextDownArrow"), color: .white)
         self.arrowNode.contentMode = .center
-        
-        // self.apperTitleNode = ASTextNode()
-        // self.apperTitleNode.maximumNumberOfLines = 1
-        // self.apperTitleNode.attributedText = NSAttributedString(string: title, font: Font.regular(14.0), textColor: .white.withAlphaComponent(0.6))
-        
+
         super.init()
-        
-        // self.addSubnode(apperTitleNode)
+
         self.addSubnode(backgroundNode)
         self.addSubnode(titleNode)
         self.addSubnode(arrowNode)
-        
+
         updateTitleText()
     }
     
@@ -249,34 +247,41 @@ final class DropdownNode: ASDisplayNode {
         self.isUserInteractionEnabled = true
     }
     
+    func updateOptions(_ newOptions: [String]) {
+        self.options = newOptions
+        self.isLoading = false
+        self.activeSheet?.updateOptions(newOptions)
+    }
+    
     private func updateTitleText() {
-        let text = selectedValue ?? placeholder
-        let color: UIColor = selectedValue == nil ? UIColor.white.withAlphaComponent(0.4) : .white
+        let text = isLoading ? "Loading..." : (selectedValue ?? placeholder)
+        let color: UIColor = (selectedValue == nil || isLoading) ? UIColor.white.withAlphaComponent(0.4) : .white
         titleNode.attributedText = NSAttributedString(string: text, font: Font.regular(16.0), textColor: color)
         setNeedsLayout()
     }
     
     @objc private func tapped() {
-        guard !options.isEmpty else { return }
+        guard !isLoading || !options.isEmpty else { return }
         guard let viewController = findViewController() else { return }
-        
+
         let sheet = DropdownListSheetController(
             title: title,
             options: options,
-            selectedValue: selectedValue
-        ) { [weak self] selected in
+            selectedValue: selectedValue,
+            showsSearchBar: showsSearchBar
+        ) {[weak self] selected in
             self?.selectedValue = selected
             self?.onSelect?(selected)
         }
+
+        self.activeSheet = sheet
         viewController.present(sheet, animated: true)
     }
     
     private func findViewController() -> UIViewController? {
         var responder: UIResponder? = self.view
         while let next = responder?.next {
-            if let vc = next as? UIViewController {
-                return vc
-            }
+            if let vc = next as? UIViewController { return vc }
             responder = next
         }
         return nil
@@ -285,137 +290,174 @@ final class DropdownNode: ASDisplayNode {
     override func layout() {
         super.layout()
         backgroundNode.frame = bounds
-        
         let arrowSize = CGSize(width: 20, height: 20)
-        arrowNode.frame = CGRect(x: bounds.width - 16 - arrowSize.width,
-                                 y: (bounds.height - arrowSize.height) / 2.0,
-                                 width: arrowSize.width,
-                                 height: arrowSize.height)
-        
+        arrowNode.frame = CGRect(x: bounds.width - 16 - arrowSize.width, y: (bounds.height - arrowSize.height) / 2.0, width: arrowSize.width, height: arrowSize.height)
         let titleSize = titleNode.measure(CGSize(width: bounds.width - 32 - arrowSize.width - 10, height: .greatestFiniteMagnitude))
-        titleNode.frame = CGRect(x: 16,
-                                 y: (bounds.height - titleSize.height) / 2.0,
-                                 width: titleSize.width,
-                                 height: titleSize.height)
-        
-        // let apperTitleSize = apperTitleNode.measure(CGSize(width: bounds.width - 32 - arrowSize.width - 10, height: .greatestFiniteMagnitude))
-        // apperTitleNode.frame = CGRect(x: bounds.width - 16 - arrowSize.width - apperTitleSize.width,
-                                //  y: (bounds.height - apperTitleSize.height) / 2.0,
-                                //  width: apperTitleSize.width,
-                                //  height: apperTitleSize.height)
+        titleNode.frame = CGRect(x: 16, y: (bounds.height - titleSize.height) / 2.0, width: titleSize.width, height: titleSize.height)
     }
 }
 
+final class DropdownListSheetController: UIViewController, UITableViewDelegate, UITableViewDataSource, UISearchBarDelegate {
 
-// MARK: - Sheet Controller
+    private var allOptions: [String]
+    private var filteredOptions: [String]
 
-private final class DropdownListSheetController: UIViewController, UITableViewDelegate, UITableViewDataSource {
-    
-    private let options: [String]
     private let selectedValue: String?
     private let onSelect: (String) -> Void
+
     private let sheetTitle: String
-    
+    private let showsSearchBar: Bool
     private let tableView = UITableView(frame: .zero, style: .plain)
+    private let searchBar = UISearchBar()
     private let titleLabel = UILabel()
     private let handleView = UIView()
-    
+
     private let cellReuseId = "OptionCell"
     private let accentColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
-    
-    init(title: String, options: [String], selectedValue: String?, onSelect: @escaping (String) -> Void) {
+
+    init(title: String, options: [String], selectedValue: String?, showsSearchBar: Bool = true, onSelect: @escaping (String) -> Void) {
         self.sheetTitle = title
-        self.options = options
+        self.allOptions = options
+        self.filteredOptions = options
         self.selectedValue = selectedValue
+        self.showsSearchBar = showsSearchBar
         self.onSelect = onSelect
         super.init(nibName: nil, bundle: nil)
-        
+
+        tableView.showsVerticalScrollIndicator = false
         modalPresentationStyle = .pageSheet
         if #available(iOS 15.0, *), let sheet = sheetPresentationController {
-            let rowHeight: CGFloat = 52
-            let headerHeight: CGFloat = 56
-            let bottomPadding: CGFloat = 34
-            let totalHeight = headerHeight + rowHeight * CGFloat(min(options.count, 8)) + bottomPadding
-            
-            if #available(iOS 16.0, *) {
-                sheet.detents = [.custom { _ in totalHeight }]
-            } else {
-                sheet.detents = [.medium()]
-            }
+            sheet.detents = [.medium(), .large()]
             sheet.prefersGrabberVisible = false
             sheet.preferredCornerRadius = 20
         }
     }
+
+    required init?(coder: NSCoder) { fatalError() }
     
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
+    func updateOptions(_ newOptions: [String]) {
+        DispatchQueue.main.async {
+            let oldCount = self.allOptions.count
+            let newCount = newOptions.count
+            
+            self.allOptions = newOptions
+            
+            let searchText = self.searchBar.text ?? ""
+            
+            if searchText.isEmpty {
+                self.filteredOptions = self.allOptions
+                
+                if oldCount == 0 || newCount <= oldCount {
+                    self.tableView.reloadData()
+                } else {
+                    let indexPaths = (oldCount..<newCount).map { IndexPath(row: $0, section: 0) }
+                    self.tableView.performBatchUpdates({
+                        self.tableView.insertRows(at: indexPaths, with: .fade)
+                    }, completion: nil)
+                }
+            } else {
+                self.filteredOptions = self.allOptions.filter { $0.lowercased().contains(searchText.lowercased()) }
+                self.tableView.reloadData()
+            }
+        }
     }
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
         view.backgroundColor = UIColor(red: 0.15, green: 0.15, blue: 0.15, alpha: 1.0)
-        
+
         handleView.backgroundColor = UIColor.white.withAlphaComponent(0.3)
         handleView.layer.cornerRadius = 2.5
         handleView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(handleView)
-        
+
         titleLabel.text = sheetTitle
         titleLabel.textColor = .white
         titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
         titleLabel.textAlignment = .center
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(titleLabel)
-        
+
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
         tableView.delegate = self
         tableView.dataSource = self
+        tableView.keyboardDismissMode = .onDrag
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: cellReuseId)
         tableView.translatesAutoresizingMaskIntoConstraints = false
-        tableView.bounces = options.count > 8
         view.addSubview(tableView)
         
+        if showsSearchBar {
+            searchBar.searchBarStyle = .minimal
+            searchBar.placeholder = "Search..."
+            searchBar.delegate = self
+            searchBar.barStyle = .black
+            searchBar.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(searchBar)
+        }
+
         NSLayoutConstraint.activate([
             handleView.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
             handleView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             handleView.widthAnchor.constraint(equalToConstant: 36),
             handleView.heightAnchor.constraint(equalToConstant: 5),
-            
+
             titleLabel.topAnchor.constraint(equalTo: handleView.bottomAnchor, constant: 12),
             titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            
-            tableView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
-            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16)
         ])
+        
+        if showsSearchBar {
+            NSLayoutConstraint.activate([
+                searchBar.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
+                searchBar.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+                searchBar.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+                
+                tableView.topAnchor.constraint(equalTo: searchBar.bottomAnchor, constant: 4),
+                tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            ])
+        } else {
+            NSLayoutConstraint.activate([
+                tableView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+                tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            ])
+        }
+    }
+    
+    // MARK: - UISearchBarDelegate
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchText.isEmpty {
+            filteredOptions = allOptions
+        } else {
+            filteredOptions = allOptions.filter { $0.lowercased().contains(searchText.lowercased()) }
+        }
+        tableView.reloadData()
     }
     
     // MARK: - UITableView
-    
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return options.count
+    // Используем filteredOptions вместо options
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int { 
+        return filteredOptions.count 
     }
     
-    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 52
+    func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat { 
+        return 52 
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: cellReuseId, for: indexPath)
-        let option = options[indexPath.row]
+        let option = filteredOptions[indexPath.row]
         let isSelected = option == selectedValue
         
         cell.backgroundColor = .clear
         cell.selectionStyle = .none
-        
         cell.textLabel?.text = option
         cell.textLabel?.font = .systemFont(ofSize: 17, weight: isSelected ? .semibold : .regular)
         cell.textLabel?.textColor = isSelected ? accentColor : .white
-        
         cell.accessoryType = isSelected ? .checkmark : .none
         cell.tintColor = accentColor
         
@@ -423,7 +465,8 @@ private final class DropdownListSheetController: UIViewController, UITableViewDe
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        onSelect(options[indexPath.row])
+        onSelect(filteredOptions[indexPath.row])
+        searchBar.resignFirstResponder()
         dismiss(animated: true)
     }
 }

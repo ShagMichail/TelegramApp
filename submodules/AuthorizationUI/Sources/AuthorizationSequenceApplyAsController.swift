@@ -163,6 +163,9 @@ final class AuthorizationSequenceApplyAsController: ViewController {
             })
         })
         self.displayNodeDidLoad()
+        
+        self.controllerNode.genderDropdown.isLoading = true
+        self.controllerNode.agencyDropdown.isLoading = true
 
         self.controllerNode.signUpWithName = { [weak self] modelInfo in
             self?.nextPressed(modelInfo: modelInfo)
@@ -224,6 +227,10 @@ final class AuthorizationSequenceApplyAsController: ViewController {
         self.controllerNode.loadGenderDictionary = { [weak self] in
             self?.loadGenderDictionary()
         }
+        
+        self.controllerNode.loadAgencyList = { [weak self] offset, limit in
+            self?.loadAgencyList(offset: offset, limit: limit)
+        }
 
         self.controllerNode.updateData(firstName: self.initialName.0, lastName: self.initialName.1, hasTermsOfService: self.termsOfService != nil)
     }
@@ -232,6 +239,7 @@ final class AuthorizationSequenceApplyAsController: ViewController {
         super.viewDidAppear(animated)
         self.controllerNode.activateInput()
         self.loadGenderDictionary()
+        self.loadAgencyList(offset: 0, limit: 5)
     }
     
     func updateData(firstName: String, lastName: String, termsOfService: UnauthorizedAccountTermsOfService?) {
@@ -312,6 +320,33 @@ final class AuthorizationSequenceApplyAsController: ViewController {
 
             } catch {
                 print("❌ Error loading gender dictionary: \(error)")
+                self.controllerNode.genderDropdown.isLoading = false
+                self.controllerNode.genderDropdown.options = []
+            }
+        }
+    }
+    
+    private func loadAgencyList(offset: Int, limit: Int) {
+        Task { @MainActor in
+            do {
+                let request = AgencyListRequest(offset: offset, limit: limit, title: nil)
+                let response: AgencyListResponse = try await DivoAPIClient.shared.request(
+                    path: "/agency/list",
+                    method: "POST",
+                    body: request
+                )
+
+                // Передаем offset обратно в метод узла
+                self.controllerNode.loadAgenciesComplete(
+                    response.data.items, 
+                    totalCount: response.data.pagination.meta.totalCount, 
+                    offset: offset // <-- ДОБАВИЛИ ПАРАМЕТР
+                )
+
+            } catch {
+                print("❌ Error loading agency list: \(error)")
+                // При ошибке также передаем offset
+                self.controllerNode.loadAgenciesComplete([], totalCount: 0, offset: offset)
             }
         }
     }
