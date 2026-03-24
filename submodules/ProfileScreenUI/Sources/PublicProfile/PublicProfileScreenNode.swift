@@ -605,9 +605,14 @@ final class PublicProfileScreenNode: ASDisplayNode {
         super.init()
         
         self.view.backgroundColor = .black
-        
+
+        if model.role == "agency_employee" {
+            self.modelRole = "agency_employee"
+        }
+
         setupContent()
         configureNodes()
+        segmentedBar.configure(isAgency: model.role == "agency_employee", isMyProfile: model.isMyProfile, animated: false)
         loadSimilarProfiles()
     }
     
@@ -2652,7 +2657,7 @@ extension PublicProfileScreenNode: UIScrollViewDelegate {
 // MARK: - ProfileInfoViewDelegate
 
 extension PublicProfileScreenNode: ProfileInfoViewDelegate {
-    func profileInfoViewDidUpdateContentHeight() {
+    func profileInfoViewDidUpdateContentHeight(animated: Bool) {
         UIView.performWithoutAnimation {
             self.setNeedsLayout()
             self.layoutIfNeeded()

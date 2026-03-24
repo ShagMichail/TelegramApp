@@ -101,3 +101,13 @@ public struct FeedlineFile: Codable {
         case videoThumbnail, fileUuid
     }
 }
+
+public struct FollowRequest: Encodable {
+    public let id: Int
+    public init(id: Int) { self.id = id }
+}
+
+public struct FollowResponse: Decodable {
+    public let message: String?
+    public let errors: String?
+}
