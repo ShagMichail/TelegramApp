@@ -13,74 +13,126 @@ class AgeSliderNode: ASDisplayNode {
     private let titleNode: ASTextNode
     private let valueNode: ASTextNode
     public let slider: UISlider
-    
+
     private let minAgeNode: ASTextNode
     private let maxAgeNode: ASTextNode
-    
-    override init() {
+    private let type: String
+
+    init(title: String, type: String, defaultValue: Int, minimumValue: Int, maximumValue: Int) {
+        self.type = type
         self.titleNode = ASTextNode()
-        self.titleNode.attributedText = NSAttributedString(string: "Age (y.o)", font: Font.regular(16), textColor: .white)
+        self.titleNode.attributedText = NSAttributedString(string: title, font: Font.regular(16), textColor: .white)
         self.titleNode.displaysAsynchronously = false
-        
+
         self.valueNode = ASTextNode()
-        self.valueNode.attributedText = NSAttributedString(string: "17 y.o", font: Font.bold(16), textColor: .white)
+        self.valueNode.attributedText = NSAttributedString(string: String(defaultValue) + " " + type, font: Font.bold(16), textColor: .white)
         self.valueNode.displaysAsynchronously = false
-        
+
         self.slider = UISlider()
-        self.slider.minimumValue = 14
-        self.slider.maximumValue = 45
-        self.slider.value = 17
+        self.slider.minimumValue = Float(minimumValue)
+        self.slider.maximumValue = Float(maximumValue)
+        self.slider.value = Float(defaultValue)
         self.slider.tintColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
-        
+
+        // Кастомизация ползунка: меньший размер с цветным border
+        let thumbSize: CGFloat = 16.0
+        let borderColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
+        let thumbImage = generateImage(CGSize(width: thumbSize, height: thumbSize), rotatedContext: { size, context in
+            context.clear(CGRect(origin: CGPoint(), size: size))
+            // Рисуем круг с border
+            let borderRect = CGRect(x: 1, y: 1, width: size.width - 2, height: size.height - 2)
+            let path = UIBezierPath(ovalIn: borderRect)
+            context.setStrokeColor(borderColor.cgColor)
+            context.setLineWidth(2.0)
+            context.addPath(path.cgPath)
+            context.strokePath()
+            // Белая середина (без просвета)
+            let innerRect = CGRect(x: 2, y: 2, width: size.width - 4, height: size.height - 4)
+            let innerPath = UIBezierPath(ovalIn: innerRect)
+            context.setFillColor(UIColor.white.cgColor)
+            context.addPath(innerPath.cgPath)
+            context.fillPath()
+        })
+        self.slider.setThumbImage(thumbImage, for: .normal)
+        self.slider.setThumbImage(thumbImage, for: .highlighted)
+
         self.minAgeNode = ASTextNode()
-        self.minAgeNode.attributedText = NSAttributedString(string: "14", font: Font.regular(14), textColor: .white.withAlphaComponent(0.8))
+        self.minAgeNode.attributedText = NSAttributedString(string: String(minimumValue), font: Font.regular(14), textColor: .white.withAlphaComponent(0.8))
         self.minAgeNode.displaysAsynchronously = false
-        
+
         self.maxAgeNode = ASTextNode()
-        self.maxAgeNode.attributedText = NSAttributedString(string: "45", font: Font.regular(14), textColor: .white.withAlphaComponent(0.8))
+        self.maxAgeNode.attributedText = NSAttributedString(string: String(maximumValue), font: Font.regular(14), textColor: .white.withAlphaComponent(0.8))
         self.maxAgeNode.displaysAsynchronously = false
-        
+
         super.init()
-        
+
         self.slider.addTarget(self, action: #selector(sliderValueChanged), for: .valueChanged)
         self.addSubnode(titleNode)
         self.addSubnode(valueNode)
         self.view.addSubview(self.slider)
-        
+
         self.addSubnode(self.minAgeNode)
         self.addSubnode(self.maxAgeNode)
     }
     
     override func layout() {
         super.layout()
-        
-        let sideInset: CGFloat = 24.0
+
+        let sideInset: CGFloat = 16.0
         let maximumWidth: CGFloat = self.bounds.width
-        
+//        let maxHeight: CGFloat = self.bounds.height
+
         let titleSize = self.titleNode.measure(CGSize(width: maximumWidth / 2.0, height: .greatestFiniteMagnitude))
         self.titleNode.frame = CGRect(x: sideInset, y: 0, width: titleSize.width, height: titleSize.height)
-        
+
         let valueSize = self.valueNode.measure(CGSize(width: maximumWidth / 2.0, height: .greatestFiniteMagnitude))
         self.valueNode.frame = CGRect(x: maximumWidth - sideInset - valueSize.width, y: 0, width: valueSize.width, height: valueSize.height)
-        
+
         let sliderWidth = maximumWidth - sideInset * 2.0
-        let sliderHeight = self.slider.intrinsicContentSize.height
+        let sliderHeight: CGFloat = 30.0 // Фиксированная высота для слайдера
         let sliderY = titleSize.height
         self.slider.frame = CGRect(x: sideInset, y: sliderY, width: sliderWidth, height: sliderHeight)
-        
-        let minSize = self.minAgeNode.measure(CGSize(width: 20, height: 20))
+
+        let minSize = self.minAgeNode.measure(CGSize(width: maximumWidth / 2.0, height: .greatestFiniteMagnitude))
         self.minAgeNode.frame = CGRect(x: sideInset, y: sliderY + sliderHeight, width: minSize.width, height: minSize.height)
-        
-        let maxSize = self.maxAgeNode.measure(CGSize(width: 20, height: 20))
+
+        let maxSize = self.maxAgeNode.measure(CGSize(width: maximumWidth / 2.0, height: .greatestFiniteMagnitude))
         self.maxAgeNode.frame = CGRect(x: maximumWidth - sideInset - maxSize.width, y: sliderY + sliderHeight, width: maxSize.width, height: maxSize.height)
     }
     
     @objc private func sliderValueChanged() {
         let roundedValue = Int(self.slider.value.rounded())
-        self.valueNode.attributedText = NSAttributedString(string: "\(roundedValue) y.o", font: Font.bold(16), textColor: .white)
-//        self.setNeedsLayout()
+        self.valueNode.attributedText = NSAttributedString(string: "\(roundedValue) " + type, font: Font.bold(16), textColor: .white)
+        self.setNeedsLayout()
     }
 }
+
+class CheckboxNode: ASButtonNode {
+    private let checkboxSize: CGSize
+    
+    init(size: CGSize = CGSize(width: 20, height: 20)) {
+        self.checkboxSize = size
+        super.init()
+        self.updateAppearance()
+    }
+    
+    override var isSelected: Bool {
+        didSet {
+            updateAppearance()
+        }
+    }
+    
+    private func updateAppearance() {
+        let normalImage = UIImage(bundleImageName: "Models/Checkbox")
+        let selectedImage = UIImage(bundleImageName: "Models/CheckboxSelected")
+        
+        self.setImage(normalImage, for: .normal)
+        self.setImage(selectedImage, for: .selected)
+        self.setImage(selectedImage, for: .highlighted)
+    }
+}
+
+
 
 final class ButtonWithIconNode: ASControlNode {
     private let textNode: ASTextNode
