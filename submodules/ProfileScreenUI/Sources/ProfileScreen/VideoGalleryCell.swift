@@ -242,6 +242,21 @@ final class VideoGalleryCell: UICollectionViewCell {
         layoutIfNeeded()
     }
 
+    func configureUploading(thumbnail: UIImage?) {
+        configurationId &+= 1
+        fallbackContainer.isHidden = true
+        if let thumbnail = thumbnail {
+            thumbnailImageView.image = thumbnail
+            thumbnailImageView.alpha = 0.6
+            shimmerContainer.isHidden = true
+            hasVisualContent = true
+        } else {
+            shimmerContainer.isHidden = false
+            shimmerContainer.alpha = 1.0
+            shimmerContainer.startShimmering()
+        }
+    }
+
     func configure(with videoUrl: String, previewUrl: String? = nil, title: String? = nil) {
         configurationId &+= 1
         let currentConfigurationId = configurationId

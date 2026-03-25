@@ -1,6 +1,7 @@
 import UIKit
 import PhotosUI
 import UniformTypeIdentifiers
+import AVFoundation
 import AsyncDisplayKit
 import Display
 import TelegramCore
@@ -369,6 +370,27 @@ public final class PublicProfileScreenController: TelegramBaseController {
     
     @objc func moreMenu() {
 
+    }
+
+    func showErrorAlert(_ message: String) {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        self.present(alert, animated: true)
+    }
+
+    private static func userFacingMessage(from error: Error) -> String {
+        if case DivoAPIError.httpError(_, let body) = error, !body.isEmpty {
+            if let data = body.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let message = json["message"] as? String {
+                return message
+            }
+            return body
+        }
+        if (error as NSError).domain == NSURLErrorDomain {
+            return "No internet connection. Please try again."
+        }
+        return "Something went wrong. Please try again."
     }
 }
 
@@ -746,12 +768,12 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
 
     private func uploadAndAddPhoto(_ image: UIImage) {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
-        
+
+        Task { @MainActor in
+            self.controllerNode.startPhotoUpload(image: image)
+        }
+
         Task {
-            await MainActor.run {
-                self.controllerNode.setGalleryLoading(true, true)
-            }
-            
             do {
                 let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
                     path: "/file/upload-file",
@@ -759,55 +781,52 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                     fileName: "photo.jpg",
                     mimeType: "image/jpeg"
                 )
-                
+
                 guard let fileUuid = uploadResponse.data?.uuid else {
                     throw DivoAPIError.unknown
                 }
-                
+
                 let body = AddGalleryRequest(uuid: fileUuid)
-                
+
                 let addResponse: AddGalleryResponse = try await DivoAPIClient.shared.request(
                     path: "/user-gallery/add",
                     method: "POST",
                     body: body
                 )
-                
+
                 await MainActor.run {
-                    self.controllerNode.setGalleryLoading(false)
-                    
                     if let newPhoto = addResponse.data {
-                        self.controllerNode.insertNewPhoto(newPhoto)
+                        self.controllerNode.finishPhotoUpload(photo: newPhoto)
                         self.currentGalleryPhotos.insert(newPhoto, at: 0)
                     } else {
+                        self.controllerNode.cancelPhotoUpload()
                         self.galleryLoaded = false
                         self.getUserGalleryProfile()
                     }
                 }
-                
+
             } catch {
-                print("❌ [UPLOAD PHOTO] Ошибка: \(error)")
                 await MainActor.run {
-                    self.controllerNode.showGalleryError("Upload failed: \(error.localizedDescription)")
+                    self.controllerNode.cancelPhotoUpload()
+                    self.showErrorAlert(Self.userFacingMessage(from: error))
                 }
             }
         }
     }
 
     private func uploadAndAddVideo(_ videoURL: URL) {
-        print("🎬 [UPLOAD VIDEO] Starting upload for: \(videoURL)")
-        
         guard let videoData = try? Data(contentsOf: videoURL) else {
             print("❌ [UPLOAD VIDEO] Failed to read video data")
             return
         }
-        
-        print("🎬 [UPLOAD VIDEO] Video size: \(videoData.count) bytes")
-        
+
+        let thumbnail = generateVideoThumbnailSync(from: videoURL)
+
+        Task { @MainActor in
+            self.controllerNode.startVideoUpload(thumbnail: thumbnail)
+        }
+
         Task {
-            await MainActor.run {
-                self.controllerNode.setVideoGalleryLoading(true, true)
-            }
-            
             do {
                 let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
                     path: "/file/upload-file",
@@ -838,8 +857,6 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                 )
                 
                 await MainActor.run {
-                    self.controllerNode.setVideoGalleryLoading(false)
-                    
                     if let newVideo = addResponse.data {
                         let video = UserPhoto(
                             id: newVideo.id ?? 0,
@@ -853,7 +870,7 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                             isLikedByUser: false,
                             preview: nil
                         )
-                        self.controllerNode.insertNewVideo(video)
+                        self.controllerNode.finishVideoUpload(video: video)
                         self.currentGalleryVideos.insert(
                             UserVideoItem(
                                 id: video.id,
@@ -873,20 +890,30 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                             ),
                             at: 0
                         )
+                    } else {
+                        self.controllerNode.cancelVideoUpload()
                     }
                 }
-                
-                print("🎬 [UPLOAD VIDEO] Publication added successfully")
-                
+
                 try? FileManager.default.removeItem(at: videoURL)
-                
+
             } catch {
-                print("❌ [UPLOAD VIDEO] Ошибка: \(error)")
                 await MainActor.run {
-                    self.controllerNode.showVideoGalleryError("Upload failed: \(error.localizedDescription)")
+                    self.controllerNode.cancelVideoUpload()
+                    self.showErrorAlert(Self.userFacingMessage(from: error))
                 }
                 try? FileManager.default.removeItem(at: videoURL)
             }
         }
+    }
+
+    private func generateVideoThumbnailSync(from url: URL) -> UIImage? {
+        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 480, height: 480)
+        let time = CMTime(seconds: 0.1, preferredTimescale: 600)
+        guard let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) else { return nil }
+        return UIImage(cgImage: cgImage)
     }
 }

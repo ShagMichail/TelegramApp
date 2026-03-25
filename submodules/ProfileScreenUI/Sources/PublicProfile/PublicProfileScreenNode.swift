@@ -382,6 +382,8 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private var galleryHasMore: Bool = true
     private var galleryInitialized: Bool = false
     private var galleryImageNames: [String] = []
+    private var uploadingPhotoImage: UIImage?
+    private var uploadingVideoImage: UIImage?
     
     private lazy var galleryCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -1897,19 +1899,78 @@ final class PublicProfileScreenNode: ASDisplayNode {
         galleryCollectionView.layoutIfNeeded()
     }
 
-    // Добавление одной новой фотографии в начало (после успешной загрузки)
-    func insertNewPhoto(_ photo: UserPhoto) {
+    // MARK: - Photo Upload with Placeholder
+
+    func startPhotoUpload(image: UIImage) {
+        uploadingPhotoImage = image
+        let placeholder = UserPhoto(id: -1, photo: UserFile(fileName: "", fullUrl: nil, fileExtension: "", fileUuid: ""), likesCount: 0, isLikedByUser: false, preview: nil)
+
         let wasEmpty = galleryPhotos.isEmpty
-        
-        galleryPhotos.insert(photo, at: 0)
-        
+        galleryPhotos.insert(placeholder, at: 0)
         galleryCurrentOffset += 1
-        
+
         if wasEmpty {
             galleryStatusView.isHidden = true
             galleryCollectionView.isHidden = false
             galleryCollectionView.reloadData()
-            
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
+            }
+        } else {
+            galleryCollectionView.performBatchUpdates({
+                galleryCollectionView.insertItems(at: [IndexPath(item: 0, section: 0)])
+                if let layout = self.containerLayout?.0 {
+                    updateAllCollectionViewHeights(layout: layout)
+                    if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
+                }
+            }, completion: { _ in
+                self.galleryCollectionView.scrollToItem(at: IndexPath(item: 0, section: 0), at: .left, animated: true)
+            })
+        }
+    }
+
+    func finishPhotoUpload(photo: UserPhoto) {
+        uploadingPhotoImage = nil
+        if !galleryPhotos.isEmpty && galleryPhotos[0].id == -1 {
+            galleryPhotos[0] = photo
+            galleryCollectionView.reloadItems(at: [IndexPath(item: 0, section: 0)])
+        }
+    }
+
+    func cancelPhotoUpload() {
+        uploadingPhotoImage = nil
+        guard !galleryPhotos.isEmpty && galleryPhotos[0].id == -1 else { return }
+        galleryPhotos.remove(at: 0)
+        galleryCurrentOffset = max(0, galleryCurrentOffset - 1)
+        galleryCollectionView.performBatchUpdates({
+            galleryCollectionView.deleteItems(at: [IndexPath(item: 0, section: 0)])
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
+            }
+        }, completion: { [weak self] _ in
+            guard let self = self else { return }
+            if self.galleryPhotos.isEmpty {
+                self.galleryStatusView.isHidden = false
+                self.galleryCollectionView.isHidden = true
+            }
+        })
+    }
+
+    // Добавление одной новой фотографии в начало (после успешной загрузки)
+    func insertNewPhoto(_ photo: UserPhoto) {
+        let wasEmpty = galleryPhotos.isEmpty
+
+        galleryPhotos.insert(photo, at: 0)
+
+        galleryCurrentOffset += 1
+
+        if wasEmpty {
+            galleryStatusView.isHidden = true
+            galleryCollectionView.isHidden = false
+            galleryCollectionView.reloadData()
+
             if let layout = self.containerLayout?.0 {
                 updateAllCollectionViewHeights(layout: layout)
                 if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
@@ -1918,7 +1979,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             galleryCollectionView.performBatchUpdates({
                 let indexPath = IndexPath(item: 0, section: 0)
                 galleryCollectionView.insertItems(at: [indexPath])
-                
+
                 if let layout = self.containerLayout?.0 {
                     updateAllCollectionViewHeights(layout: layout)
                     if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
@@ -2112,19 +2173,77 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoGalleryCollectionView.layoutIfNeeded()
     }
     
-    // Добавление одной новой фотографии в начало (после успешной загрузки)
-    func insertNewVideo(_ video: UserPhoto) {
+    // MARK: - Video Upload with Placeholder
+
+    func startVideoUpload(thumbnail: UIImage?) {
+        uploadingVideoImage = thumbnail
+        let placeholder = UserPhoto(id: -1, photo: UserFile(fileName: "", fullUrl: nil, fileExtension: "", fileUuid: ""), likesCount: 0, isLikedByUser: false, preview: nil)
+
         let wasEmpty = videoGalleryItems.isEmpty
-        
-        videoGalleryItems.insert(video, at: 0)
-        
+        videoGalleryItems.insert(placeholder, at: 0)
         videoGalleryCurrentOffset += 1
-        
+
         if wasEmpty {
             videoGalleryStatusView.isHidden = true
             videoGalleryCollectionView.isHidden = false
             videoGalleryCollectionView.reloadData()
-            
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 1 { updateCollectionsContainerHeight(animated: true) }
+            }
+        } else {
+            videoGalleryCollectionView.performBatchUpdates({
+                videoGalleryCollectionView.insertItems(at: [IndexPath(item: 0, section: 0)])
+                if let layout = self.containerLayout?.0 {
+                    updateAllCollectionViewHeights(layout: layout)
+                    if currentTabIndex == 1 { updateCollectionsContainerHeight(animated: true) }
+                }
+            }, completion: { _ in
+                self.videoGalleryCollectionView.scrollToItem(at: IndexPath(item: 0, section: 0), at: .left, animated: true)
+            })
+        }
+    }
+
+    func finishVideoUpload(video: UserPhoto) {
+        uploadingVideoImage = nil
+        if !videoGalleryItems.isEmpty && videoGalleryItems[0].id == -1 {
+            videoGalleryItems[0] = video
+            videoGalleryCollectionView.reloadItems(at: [IndexPath(item: 0, section: 0)])
+        }
+    }
+
+    func cancelVideoUpload() {
+        uploadingVideoImage = nil
+        guard !videoGalleryItems.isEmpty && videoGalleryItems[0].id == -1 else { return }
+        videoGalleryItems.remove(at: 0)
+        videoGalleryCurrentOffset = max(0, videoGalleryCurrentOffset - 1)
+        videoGalleryCollectionView.performBatchUpdates({
+            videoGalleryCollectionView.deleteItems(at: [IndexPath(item: 0, section: 0)])
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 1 { updateCollectionsContainerHeight(animated: true) }
+            }
+        }, completion: { [weak self] _ in
+            guard let self = self else { return }
+            if self.videoGalleryItems.isEmpty {
+                self.videoGalleryStatusView.isHidden = false
+                self.videoGalleryCollectionView.isHidden = true
+            }
+        })
+    }
+
+    func insertNewVideo(_ video: UserPhoto) {
+        let wasEmpty = videoGalleryItems.isEmpty
+
+        videoGalleryItems.insert(video, at: 0)
+
+        videoGalleryCurrentOffset += 1
+
+        if wasEmpty {
+            videoGalleryStatusView.isHidden = true
+            videoGalleryCollectionView.isHidden = false
+            videoGalleryCollectionView.reloadData()
+
             if let layout = self.containerLayout?.0 {
                 updateAllCollectionViewHeights(layout: layout)
                 if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
@@ -2133,7 +2252,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             videoGalleryCollectionView.performBatchUpdates({
                 let indexPath = IndexPath(item: 0, section: 0)
                 videoGalleryCollectionView.insertItems(at: [indexPath])
-                
+
                 if let layout = self.containerLayout?.0 {
                     updateAllCollectionViewHeights(layout: layout)
                     if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
@@ -2216,52 +2335,6 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoGalleryStatusView.loadingSpinner(isLoading: loading)
     }
 
-    // MARK: - Error Handling for Galleries
-
-    func showGalleryError(_ message: String) {
-        galleryIsLoading = false
-        galleryStatusView.isHidden = false
-        
-        // Показываем текст ошибки (без спиннера)
-        galleryStatusView.configure(isLoading: false, text: message, isMyProfile: false)
-        
-        // Через 3 секунды убираем ошибку
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-            guard let self = self else { return }
-            
-            if self.galleryPhotos.isEmpty {
-                // Если фотографий вообще нет, возвращаем стандартный текст-заглушку
-                let defaultText = self.model.isMyProfile ? "Upload your photos" : "No photos yet"
-                self.galleryStatusView.configure(isLoading: false, text: defaultText, isMyProfile: self.model.isMyProfile)
-            } else {
-                self.galleryStatusView.isHidden = true
-                let defaultText = self.model.isMyProfile ? "Upload your photos" : "No photos yet"
-                self.galleryStatusView.configure(isLoading: false, text: defaultText, isMyProfile: self.model.isMyProfile)
-            }
-        }
-    }
-
-    func showVideoGalleryError(_ message: String) {
-        videoGalleryIsLoading = false
-        videoGalleryStatusView.isHidden = false
-        
-        videoGalleryStatusView.configure(isLoading: false, text: message, isMyProfile: false)
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-            guard let self = self else { return }
-            
-            if self.videoGalleryItems.isEmpty {
-                let defaultText = self.model.isMyProfile ? "Upload your videos" : "No videos yet"
-                self.videoGalleryStatusView.configure(isLoading: false, text: defaultText, isMyProfile: self.model.isMyProfile)
-            } else {
-                self.videoGalleryStatusView.isHidden = true
-                let defaultText = self.model.isMyProfile ? "Upload your videos" : "No videos yet"
-                self.videoGalleryStatusView.configure(isLoading: false, text: defaultText, isMyProfile: self.model.isMyProfile)
-            }
-        }
-    }
-    
-    
     // MARK: - Channels Gallery Methods
     
     // Загрузка галереи каналов
@@ -2554,28 +2627,32 @@ extension PublicProfileScreenNode: UICollectionViewDataSource {
                 return UICollectionViewCell()
             }
             let photoItem = galleryPhotos[indexPath.item]
-            
-            if let previewUrlString = photoItem.preview?.fullUrl, let url = CDNURLHelper.convertToCDNURL(previewUrlString) {
+
+            if photoItem.id == -1, let localImage = uploadingPhotoImage {
+                cell.configure(with: localImage, isUploading: true)
+            } else if let previewUrlString = photoItem.preview?.fullUrl, let url = CDNURLHelper.convertToCDNURL(previewUrlString) {
                 cell.configure(with: url)
             } else {
                 if let fullUrlString = photoItem.photo.fullUrl, let url = CDNURLHelper.convertToCDNURL(fullUrlString) {
                     cell.configure(with: url)
                 }
             }
-            
+
             return cell
         } else if collectionView == videoGalleryCollectionView {
             guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: VideoGalleryCell.reuseIdentifier, for: indexPath) as? VideoGalleryCell else {
                 return UICollectionViewCell()
             }
             let videoItem = videoGalleryItems[indexPath.item]
-            
-            if let videoUrlString = videoItem.photo.fullUrl {
+
+            if videoItem.id == -1, let localImage = uploadingVideoImage {
+                cell.configureUploading(thumbnail: localImage)
+            } else if let videoUrlString = videoItem.photo.fullUrl {
                 let cdnVideoUrl = CDNURLHelper.convertToCDN(videoUrlString) ?? ""
                 let previewUrl = videoItem.preview?.fullUrl.flatMap { CDNURLHelper.convertToCDN($0) }
                 cell.configure(with: cdnVideoUrl, previewUrl: previewUrl, title: nil)
             }
-            
+
             return cell
         } else if collectionView == channelGalleryCollectionView {
             guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ChannelListCell.reuseIdentifier, for: indexPath) as? ChannelListCell else {
@@ -2614,8 +2691,10 @@ extension PublicProfileScreenNode: UICollectionViewDelegate {
             // TODO: Открыть профиль выбранного пользователя
             // handleSimilarProfileTap(profile)
         } else if collectionView == galleryCollectionView {
+            guard galleryPhotos[indexPath.item].id != -1 else { return }
             onGalleryItemTapped?(0, indexPath.item)
         } else if collectionView == videoGalleryCollectionView {
+            guard videoGalleryItems[indexPath.item].id != -1 else { return }
             onGalleryItemTapped?(1, indexPath.item)
         }
     }
