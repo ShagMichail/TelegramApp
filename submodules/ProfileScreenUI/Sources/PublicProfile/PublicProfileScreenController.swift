@@ -176,40 +176,22 @@ public final class PublicProfileScreenController: TelegramBaseController {
 
     @available(iOS 14, *)
     private func navigateToAddPhoto() {
-        PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] status in
-            guard status == .authorized else {
-                return
-            }
-
-            DispatchQueue.main.async {
-                var configuration = PHPickerConfiguration()
-                configuration.filter = .images
-                configuration.selectionLimit = 1
-
-                let picker = PHPickerViewController(configuration: configuration)
-                picker.delegate = self
-                self?.present(picker, animated: true)
-            }
-        }
+        var configuration = PHPickerConfiguration()
+        configuration.filter = .images
+        configuration.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = self
+        self.present(picker, animated: true)
     }
 
     @available(iOS 14, *)
     private func navigateToAddVideo() {
-        PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
-            guard status == .authorized else {
-                return
-            }
-
-            DispatchQueue.main.async {
-                var configuration = PHPickerConfiguration()
-                configuration.filter = .videos
-                configuration.selectionLimit = 1
-
-                let picker = PHPickerViewController(configuration: configuration)
-                picker.delegate = self
-                self.present(picker, animated: true)
-            }
-        }
+        var configuration = PHPickerConfiguration()
+        configuration.filter = .videos
+        configuration.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = self
+        self.present(picker, animated: true)
     }
 
     private func navigateToEditProfile() {
@@ -315,9 +297,10 @@ public final class PublicProfileScreenController: TelegramBaseController {
     }
 
     private func getEngagementTotals() {
+        guard isMyProfile || model.userId != nil else { return }
         Task {
             do {
-                let path = isMyProfile ? "/user/engagement?offset=0&limit=1" : "/user/engagement?offset=0&limit=1&userId=\(model.userId ?? 0)"
+                let path = isMyProfile ? "/user/engagement?offset=0&limit=1" : "/user/engagement?offset=0&limit=1&userId=\(model.userId!)"
                 
                 let response: UserEngagementResponse = try await DivoAPIClient.shared.request(
                     path: path,

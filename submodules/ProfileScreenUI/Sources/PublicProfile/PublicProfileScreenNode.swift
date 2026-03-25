@@ -1758,9 +1758,17 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 }
             }
         }
-                
+
+        let stats = detail.statistic
+        UIView.performWithoutAnimation {
+            setupCounterView(likesView, count: "\(stats?.followersCount ?? 0)", name: "Like", iconName: "Instant View/Favorite")
+            setupCounterView(viewsView, count: "\(stats?.viewsCount ?? 0)", name: "Viewed", iconName: "Instant View/Visibility")
+            setupCounterView(savesView, count: "\(stats?.followingCount ?? 0)", name: "Save", iconName: "Instant View/Bookmark")
+            self.counterActionsContainer.layoutIfNeeded()
+        }
+
         var socialLinks: [String] = []
-    
+
         // Собираем все непустые ссылки в один массив
         if let tiktok = detail.model?.tiktokUrl, !tiktok.isEmpty { socialLinks.append(tiktok) }
         if let youtube = detail.model?.youtubeUrl, !youtube.isEmpty { socialLinks.append(youtube) }
