@@ -87,7 +87,9 @@ final class PreviewCell: UICollectionViewCell {
         }
         
         if isVideo {
-            if let cached = VideoGalleryCell.cachedFirstFrame(for: url.absoluteString) {
+            let urlKey = url.absoluteString
+            if let cached = VideoGalleryCell.cachedFirstFrame(for: urlKey)
+                ?? VideoGalleryCell.cachedPreviewFrame(for: urlKey) {
                 self.imageView.image = cached
                 self.spinner.stopAnimating()
             } else {
@@ -96,6 +98,7 @@ final class PreviewCell: UICollectionViewCell {
                         let image = try await self.generateVideoThumbnail(from: url, at: 0.1)
                         guard !Task.isCancelled, self.configurationId == currentConfigurationId else { return }
                         self.imageView.image = image
+                        VideoGalleryCell.cachePreviewFrame(image, for: urlKey)
                     } catch {
                         guard !Task.isCancelled else { return }
                         print("Failed to generate video thumbnail: \(error)")

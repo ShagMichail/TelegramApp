@@ -294,6 +294,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
             getEngagementTotals()
         }
         getUserGalleryProfile()
+        controllerNode.retryVisibleVideoThumbnails()
     }
 
     private func getEngagementTotals() {

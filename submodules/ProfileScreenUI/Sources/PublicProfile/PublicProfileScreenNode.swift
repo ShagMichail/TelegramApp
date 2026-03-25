@@ -2637,6 +2637,17 @@ extension PublicProfileScreenNode: UICollectionViewDelegate {
     }
 }
 
+// MARK: - Video Thumbnail Retry
+
+extension PublicProfileScreenNode {
+    func retryVisibleVideoThumbnails() {
+        for cell in videoGalleryCollectionView.visibleCells {
+            if let videoCell = cell as? VideoGalleryCell {
+                videoCell.willDisplay()
+            }
+        }
+    }
+}
 
 // MARK: - UICollectionViewDelegateFlowLayout
 
