@@ -61,7 +61,12 @@ final class ProfileSegmentedBar: UIView {
             delegate?.segmentedBar(self, didSelectIndex: selectedIndex)
         }
     }
-    
+
+    func selectIndex(_ index: Int) {
+        guard index >= 0 && index < imageViews.count else { return }
+        selectedIndex = index
+    }
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupView()

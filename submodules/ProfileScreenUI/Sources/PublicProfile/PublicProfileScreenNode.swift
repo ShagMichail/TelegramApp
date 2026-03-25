@@ -1899,9 +1899,16 @@ final class PublicProfileScreenNode: ASDisplayNode {
         galleryCollectionView.layoutIfNeeded()
     }
 
+    // MARK: - Tab Switching
+
+    func switchToTab(_ index: Int) {
+        segmentedBar.selectIndex(index)
+    }
+
     // MARK: - Photo Upload with Placeholder
 
     func startPhotoUpload(image: UIImage) {
+        switchToTab(0)
         uploadingPhotoImage = image
         let placeholder = UserPhoto(id: -1, photo: UserFile(fileName: "", fullUrl: nil, fileExtension: "", fileUuid: ""), likesCount: 0, isLikedByUser: false, preview: nil)
 
@@ -2176,6 +2183,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     // MARK: - Video Upload with Placeholder
 
     func startVideoUpload(thumbnail: UIImage?) {
+        switchToTab(1)
         uploadingVideoImage = thumbnail
         let placeholder = UserPhoto(id: -1, photo: UserFile(fileName: "", fullUrl: nil, fileExtension: "", fileUuid: ""), likesCount: 0, isLikedByUser: false, preview: nil)
 
