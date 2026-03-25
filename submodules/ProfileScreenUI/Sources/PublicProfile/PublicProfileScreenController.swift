@@ -315,11 +315,9 @@ public final class PublicProfileScreenController: TelegramBaseController {
     }
 
     private func getEngagementTotals() {
-        guard let userId = model.userId else { return }
-        
         Task {
             do {
-                let path = isMyProfile ? "/user/engagement?offset=0&limit=1" : "/user/engagement?offset=0&limit=1&userId=\(userId)"
+                let path = isMyProfile ? "/user/engagement?offset=0&limit=1" : "/user/engagement?offset=0&limit=1&userId=\(model.userId ?? 0)"
                 
                 let response: UserEngagementResponse = try await DivoAPIClient.shared.request(
                     path: path,
@@ -658,12 +656,12 @@ extension PublicProfileScreenController {
     }
     
     private func loadInteractionData(type: InteractionListType, offset: Int, completion: @escaping ([InteractionUser], Bool) -> Void) {
-        guard let userId = model.userId else { return }
+        guard self.userID != -1 else { return }
         
         let limit = 20
         Task {
             do {
-                let path = isMyProfile ? "/user/engagement?offset=\(offset)&limit=\(limit)" : "/user/engagement?offset=\(offset)&limit=\(limit)&userId=\(userId)"
+                let path = isMyProfile ? "/user/engagement?offset=\(offset)&limit=\(limit)" : "/user/engagement?offset=\(offset)&limit=\(limit)&userId=\(self.userID)"
                 let response: UserEngagementResponse = try await DivoAPIClient.shared.request(path: path, method: "GET")
                 
                 var apiItems: [EngagementItem] = []

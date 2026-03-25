@@ -1758,17 +1758,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 }
             }
         }
-        
-        let stats = detail.statistic
-        // Обновляем экшен-блок без пересоздания subviews, чтобы не было «дерганья» после загрузки
-        UIView.performWithoutAnimation {
-            setupCounterView(likesView, count: "\(stats?.followersCount ?? 0)", name: "Like", iconName: "Instant View/Favorite")
-            setupCounterView(viewsView, count: "\(stats?.viewsCount ?? 0)", name: "Viewed", iconName: "Instant View/Visibility")
-            setupCounterView(savesView, count: "\(stats?.followingCount ?? 0)", name: "Save", iconName: "Instant View/Bookmark")
-            self.counterActionsContainer.layoutIfNeeded()
-        }
-        // что такое Save в модели?
-        
+                
         var socialLinks: [String] = []
     
         // Собираем все непустые ссылки в один массив
