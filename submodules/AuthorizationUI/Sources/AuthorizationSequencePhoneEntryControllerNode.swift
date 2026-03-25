@@ -62,7 +62,7 @@ private final class PhoneAndCountryNode: ASDisplayNode {
         let countryButtonHighlightedBackground = generateImage(CGSize(width: 70.0, height: 67.0), rotatedContext: { size, context in
             let arrowSize: CGFloat = 10.0
             context.clear(CGRect(origin: CGPoint(), size: size))
-            context.setFillColor(theme.list.itemHighlightedBackgroundColor.cgColor)
+            context.setFillColor(DivoGlassColors.highlightedBackground.cgColor)
             context.fill(CGRect(origin: CGPoint(), size: CGSize(width: size.width, height: size.height - arrowSize)))
             context.move(to: CGPoint(x: size.width, y: size.height - arrowSize))
             context.addLine(to: CGPoint(x: size.width - 1.0, y: size.height - arrowSize))
@@ -156,7 +156,7 @@ private final class PhoneAndCountryNode: ASDisplayNode {
                     if name == "FT" {
                         localizedName = strongSelf.strings.Login_AnonymousNumbers
                     }
-                    strongSelf.countryButton.setTitle("\(flagString) \(localizedName)", with: Font.regular(20.0), with: theme.list.itemAccentColor, for: [])
+                    strongSelf.countryButton.setTitle("\(flagString) \(localizedName)", with: Font.regular(20.0), with: DivoGlassColors.primaryText, for: [])
                     strongSelf.hasCountry = true
                     
                     if strongSelf.phoneInputNode.mask == nil {
@@ -168,7 +168,7 @@ private final class PhoneAndCountryNode: ASDisplayNode {
                     if countryId == "FT" {
                         localizedName = strongSelf.strings.Login_AnonymousNumbers
                     }
-                    strongSelf.countryButton.setTitle("\(flagString) \(localizedName)", with: Font.regular(20.0), with: theme.list.itemAccentColor, for: [])
+                    strongSelf.countryButton.setTitle("\(flagString) \(localizedName)", with: Font.regular(20.0), with: DivoGlassColors.primaryText, for: [])
                     strongSelf.hasCountry = true
                     
                     if strongSelf.phoneInputNode.mask == nil {
@@ -652,9 +652,6 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         self.eulaCheckboxNode.alpha = 1.0
         self.phoneAndCountryNode = PhoneAndCountryNode(strings: strings, theme: theme)
         
-        // MARK: MASTER
-        // self.proceedNode = SolidRoundedButtonNode(title: self.strings.Login_Continue, theme: SolidRoundedButtonTheme(theme: self.theme), glass: false, height: 50.0, cornerRadius: 50 * 0.5)
-        // MARK: LEGACY + new
         let customButtonTheme = SolidRoundedButtonTheme(
             backgroundColor: UIColor(red: 0.75, green: 0.48, blue: 0.33, alpha: 1.00),
             foregroundColor: .white,
@@ -810,114 +807,9 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         let _ = self.phoneAndCountryNode.processNumberChange(number: self.phoneAndCountryNode.phoneInputNode.number)
     }
     
-    // MARK: MASTER
     func updateDisplayPasskeyLoginOption() {
         if self.account == nil {
             return
-
-// MARK: LEGACY
-    // func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
-            
-    //     var insets = layout.insets(options: [])
-    //         insets.top = layout.statusBarHeight ?? 20.0
-            
-    //         if let inputHeight = layout.inputHeight, !inputHeight.isZero {
-    //             insets.bottom = max(inputHeight, insets.bottom)
-    //         }
-            
-    //         let maximumWidth: CGFloat = min(430.0, layout.size.width)
-    //         let horizontalInset: CGFloat = 24.0
-            
-    //         var currentY: CGFloat = insets.top + (layout.statusBarHeight ?? 20.0) + 10.0
-            
-    //         self.titleNode.attributedText = Font.helveticaNeue(strings.Login_PhoneTitle.uppercased(), 34)
-    //         self.titleActivateAreaNode.accessibilityLabel = self.titleNode.attributedText?.string ?? ""
-    //         let titleSize = self.titleNode.measure(CGSize(width: maximumWidth, height: .greatestFiniteMagnitude))
-    //         let titleFrame = CGRect(
-    //             origin: CGPoint(x: floorToScreenPixels((layout.size.width - titleSize.width) / 2.0), y: currentY),
-    //             size: titleSize
-    //         )
-    //         transition.updateFrame(node: self.titleNode, frame: titleFrame)
-    //         currentY = titleFrame.maxY
-            
-    //         let noticeSize = self.noticeNode.measure(CGSize(width: maximumWidth, height: .greatestFiniteMagnitude))
-    //         let noticeFrame = CGRect(
-    //             origin: CGPoint(x: floorToScreenPixels((layout.size.width - noticeSize.width) / 2.0), y: currentY + 8.0),
-    //             size: noticeSize
-    //         )
-    //         transition.updateFrame(node: self.noticeNode, frame: noticeFrame)
-    //         currentY = noticeFrame.maxY
-            
-    //         let phoneAndCountryHeight: CGFloat = 115.0
-    //         let phoneAndCountryFrame = CGRect(
-    //             x: floorToScreenPixels((layout.size.width - maximumWidth) / 2.0),
-    //             y: currentY + 30.0,
-    //             width: maximumWidth,
-    //             height: phoneAndCountryHeight
-    //         )
-    //         transition.updateFrame(node: self.phoneAndCountryNode, frame: phoneAndCountryFrame)
-    //         currentY = phoneAndCountryFrame.maxY
-            
-    //         let contactSyncSize = self.contactSyncNode.updateLayout(width: maximumWidth)
-    //         if self.hasOtherAccounts {
-    //             self.contactSyncNode.isHidden = false
-    //             let contactSyncFrame = CGRect(
-    //                 x: floorToScreenPixels((layout.size.width - maximumWidth) / 2.0),
-    //                 y: currentY + 14.0,
-    //                 width: maximumWidth,
-    //                 height: contactSyncSize.height
-    //             )
-    //             transition.updateFrame(node: self.contactSyncNode, frame: contactSyncFrame)
-    //             currentY = contactSyncFrame.maxY
-    //         } else {
-    //             self.contactSyncNode.isHidden = true
-    //         }
-            
-    //         let eulaSize = self.eulaCheckboxNode.updateLayout(width: maximumWidth)
-    //         let eulaFrame = CGRect(
-    //             x: floorToScreenPixels((layout.size.width - maximumWidth) / 2.0),
-    //             y: currentY + 14.0,
-    //             width: maximumWidth,
-    //             height: eulaSize.height
-    //         )
-    //         transition.updateFrame(node: self.eulaCheckboxNode, frame: eulaFrame)
-    //         currentY = eulaFrame.maxY
-            
-    //         let proceedWidth = maximumWidth - horizontalInset * 2.0
-    //         let proceedHeight = self.proceedNode.updateLayout(width: proceedWidth, transition: transition)
-    //         let proceedFrame = CGRect(
-    //             x: floorToScreenPixels((layout.size.width - proceedWidth) / 2.0),
-    //             y: currentY + 12.0,
-    //             width: proceedWidth,
-    //             height: proceedHeight
-    //         )
-    //         transition.updateFrame(node: self.proceedNode, frame: proceedFrame)
-    //         currentY = proceedFrame.maxY
-            
-    //         let separatorSize = self.separatorNode.updateLayout(width: maximumWidth - horizontalInset * 2.0)
-    //         let separatorFrame = CGRect(
-    //             x: floorToScreenPixels((layout.size.width - (maximumWidth - horizontalInset * 2.0)) / 2.0),
-    //             y: currentY + 20.0,
-    //             width: separatorSize.width,
-    //             height: separatorSize.height
-    //         )
-    //         transition.updateFrame(node: self.separatorNode, frame: separatorFrame)
-    //         currentY = separatorFrame.maxY
-            
-    //         let authButtonsSize = self.authButtonsNode.updateLayout(width: maximumWidth - horizontalInset * 2.0)
-    //         let authButtonsFrame = CGRect(
-    //             x: floorToScreenPixels((layout.size.width - (maximumWidth - horizontalInset * 2.0)) / 2.0),
-    //             y: currentY + 12.0,
-    //             width: authButtonsSize.width,
-    //             height: authButtonsSize.height
-    //         )
-    //         transition.updateFrame(node: self.authButtonsNode, frame: authButtonsFrame)
-    //         currentY = authButtonsFrame.maxY
-            
-    //         self.titleActivateAreaNode.frame = self.titleNode.frame
-    //         self.noticeActivateAreaNode.accessibilityLabel = self.noticeNode.attributedText?.string ?? ""
-    //         self.noticeActivateAreaNode.frame = self.noticeNode.frame
-// MARK: LEGACY ————
         }
         let attributedText = NSMutableAttributedString(attributedString: parseMarkdownIntoAttributedString(self.strings.Login_PhoneWithPasskeySubtitle, attributes: MarkdownAttributes(
             body: MarkdownAttributeSet(font: Font.regular(17.0), textColor: self.theme.list.itemPrimaryTextColor),
@@ -940,110 +832,9 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
         
         var insets = layout.insets(options: [])
         insets.top = layout.statusBarHeight ?? 20.0
-        //
-        //        if let inputHeight = layout.inputHeight, !inputHeight.isZero {
-        //            insets.bottom = max(inputHeight, insets.bottom)
-        //        }
-        //
-        //        let maximumWidth: CGFloat = min(430.0, layout.size.width)
-        //        let horizontalInset: CGFloat = 24.0
-        //
-        //        var currentY: CGFloat = insets.top + (layout.statusBarHeight ?? 20.0) + 10.0
-        //
-        //        self.titleNode.attributedText = NSAttributedString(string: (self.account == nil ? strings.Login_NewNumber : strings.Login_PhoneTitle).uppercased(), font: Font.bold(34.0), textColor: .white)
-        //        self.titleActivateAreaNode.accessibilityLabel = self.titleNode.attributedText?.string ?? ""
-        //        let titleSize = self.titleNode.measure(CGSize(width: maximumWidth, height: .greatestFiniteMagnitude))
-        //        let titleFrame = CGRect(
-        //            origin: CGPoint(x: floorToScreenPixels((layout.size.width - titleSize.width) / 2.0), y: currentY),
-        //            size: titleSize
-        //        )
-        //        transition.updateFrame(node: self.titleNode, frame: titleFrame)
-        //        currentY = titleFrame.maxY
-        //
-        //        let noticeSize = self.noticeNode.measure(CGSize(width: maximumWidth, height: .greatestFiniteMagnitude))
-        //        let noticeFrame = CGRect(
-        //            origin: CGPoint(x: floorToScreenPixels((layout.size.width - noticeSize.width) / 2.0), y: currentY + 8.0),
-        //            size: noticeSize
-        //        )
-        //        transition.updateFrame(node: self.noticeNode, frame: noticeFrame)
-        //        currentY = noticeFrame.maxY
-        //
-        //        let phoneAndCountryHeight: CGFloat = 115.0
-        //        let phoneAndCountryFrame = CGRect(
-        //            x: floorToScreenPixels((layout.size.width - maximumWidth) / 2.0),
-        //            y: currentY + 30.0,
-        //            width: maximumWidth,
-        //            height: phoneAndCountryHeight
-        //        )
-        //        transition.updateFrame(node: self.phoneAndCountryNode, frame: phoneAndCountryFrame)
-        //        currentY = phoneAndCountryFrame.maxY
-        //
-        //        let contactSyncSize = self.contactSyncNode.updateLayout(width: maximumWidth)
-        //        if self.hasOtherAccounts {
-        //            self.contactSyncNode.isHidden = false
-        //            let contactSyncFrame = CGRect(
-        //                x: floorToScreenPixels((layout.size.width - maximumWidth) / 2.0),
-        //                y: currentY + 14.0,
-        //                width: maximumWidth,
-        //                height: contactSyncSize.height
-        //            )
-        //            transition.updateFrame(node: self.contactSyncNode, frame: contactSyncFrame)
-        //            currentY = contactSyncFrame.maxY
-        //        } else {
-        //            self.contactSyncNode.isHidden = true
-        //        }
-        //
-        //        let eulaSize = self.eulaCheckboxNode.updateLayout(width: maximumWidth)
-        //        let eulaFrame = CGRect(
-        //            x: floorToScreenPixels((layout.size.width - maximumWidth) / 2.0),
-        //            y: currentY + 14.0,
-        //            width: maximumWidth,
-        //            height: eulaSize.height
-        //        )
-        //        transition.updateFrame(node: self.eulaCheckboxNode, frame: eulaFrame)
-        //        currentY = eulaFrame.maxY
-        //
-        //        let proceedWidth = maximumWidth - horizontalInset * 2.0
-        //        let proceedHeight = self.proceedNode.updateLayout(width: proceedWidth, transition: transition)
-        //        let proceedFrame = CGRect(
-        //            x: floorToScreenPixels((layout.size.width - proceedWidth) / 2.0),
-        //            y: currentY + 12.0,
-        //            width: proceedWidth,
-        //            height: proceedHeight
-        //        )
-        //        transition.updateFrame(node: self.proceedNode, frame: proceedFrame)
-        //        currentY = proceedFrame.maxY
-        //
-        //        let separatorSize = self.separatorNode.updateLayout(width: maximumWidth - horizontalInset * 2.0)
-        //        let separatorFrame = CGRect(
-        //            x: floorToScreenPixels((layout.size.width - (maximumWidth - horizontalInset * 2.0)) / 2.0),
-        //            y: currentY + 20.0,
-        //            width: separatorSize.width,
-        //            height: separatorSize.height
-        //        )
-        //        transition.updateFrame(node: self.separatorNode, frame: separatorFrame)
-        //        currentY = separatorFrame.maxY
-        //
-        //        let authButtonsSize = self.authButtonsNode.updateLayout(width: maximumWidth - horizontalInset * 2.0)
-        //        let authButtonsFrame = CGRect(
-        //            x: floorToScreenPixels((layout.size.width - (maximumWidth - horizontalInset * 2.0)) / 2.0),
-        //            y: currentY + 12.0,
-        //            width: authButtonsSize.width,
-        //            height: authButtonsSize.height
-        //        )
-        //        transition.updateFrame(node: self.authButtonsNode, frame: authButtonsFrame)
-        //        currentY = authButtonsFrame.maxY
-        //
-        //        self.titleActivateAreaNode.frame = self.titleNode.frame
-        //        self.noticeActivateAreaNode.accessibilityLabel = self.noticeNode.attributedText?.string ?? ""
-        //        self.noticeActivateAreaNode.frame = self.noticeNode.frame
-        //    }
         
         let additionalBottomInset: CGFloat = layout.size.width > 320.0 ? 80.0 : 10.0
-        
-        // MARK: MASTER
-        //         self.titleNode.attributedText = NSAttributedString(string: self.account == nil ? self.strings.Login_NewNumber : self.strings.Login_PhoneTitle, font: Font.bold(28.0), textColor: self.theme.list.itemPrimaryTextColor)
-        // MARK: LEGACY
+
         self.titleNode.attributedText = Font.helveticaNeue((self.account == nil ? strings.Login_NewNumber : strings.Login_PhoneTitle).uppercased(), 34)
         
         self.titleActivateAreaNode.accessibilityLabel = self.titleNode.attributedText?.string ?? ""
@@ -1152,14 +943,7 @@ final class AuthorizationSequencePhoneEntryControllerNode: ASDisplayNode {
     }
     
     @objc private func debugQrTap(_ recognizer: UITapGestureRecognizer) {
-        //        if self.qrNode == nil {
-        //            let qrNode = ASImageNode()
-        //            qrNode.frame = CGRect(origin: CGPoint(x: 16.0, y: 64.0 + 16.0), size: CGSize(width: 200.0, height: 200.0))
-        //            self.qrNode = qrNode
-        //            self.addSubnode(qrNode)
-        //
-        //            self.refreshQrToken()
-        //        }
+
     }
     
     private func refreshQrToken() {

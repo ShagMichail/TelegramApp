@@ -173,9 +173,9 @@ final class AuthorizationSequenceApplyAsController: ViewController {
         
         self.controllerNode.selectCountryCode = { [weak self] in
             if let strongSelf = self {
-                let controller = AuthorizationSequenceCountrySelectionController(strings: strongSelf.presentationData.strings, theme: strongSelf.presentationData.theme, displayCodes: false)
+                let controller = AuthorizationSequenceCountrySelectionController(strings: strongSelf.presentationData.strings, theme: strongSelf.presentationData.theme, displayCodes: false, glass: true)
                 controller.completeWithCountryCode = { _, countryId, name in
-                    
+
                     if let strongSelf = self {
                         strongSelf.controllerNode.updateCountry(countryId: countryId, countryName: name)
                     }

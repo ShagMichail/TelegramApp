@@ -20,44 +20,49 @@ private func loadCountryCodes() -> [(String, Int)] {
     guard let data = String(data: stringData, encoding: .utf8) else {
         return []
     }
-    
+
     let delimiter = ";"
-    let endOfLine = "\n"
-    
+    let endOfLine = "\r\n"
+
     var result: [(String, Int)] = []
-    
+
     var currentLocation = data.startIndex
-    
+
     while true {
         guard let codeRange = data.range(of: delimiter, options: [], range: currentLocation ..< data.endIndex) else {
             break
         }
-        
+
         let countryCode = String(data[currentLocation ..< codeRange.lowerBound])
-        
+
         guard let idRange = data.range(of: delimiter, options: [], range: codeRange.upperBound ..< data.endIndex) else {
             break
         }
-        
+
         let countryId = String(data[codeRange.upperBound ..< idRange.lowerBound])
-        
+
         guard let patternRange = data.range(of: delimiter, options: [], range: idRange.upperBound ..< data.endIndex) else {
             break
         }
-                
+
         let maybeNameRange = data.range(of: endOfLine, options: [], range: patternRange.upperBound ..< data.endIndex)
-        
+
         if let countryCodeInt = Int(countryCode) {
             result.append((countryId, countryCodeInt))
         }
-        
+
         if let maybeNameRange = maybeNameRange {
             currentLocation = maybeNameRange.upperBound
         } else {
-            break
+            let maybeNameRangeWithLf = data.range(of: "\n", options: [], range: patternRange.upperBound ..< data.endIndex)
+            if let maybeNameRangeWithLf = maybeNameRangeWithLf {
+                currentLocation = maybeNameRangeWithLf.upperBound
+            } else {
+                break
+            }
         }
     }
-    
+
     return result
 }
 
@@ -66,20 +71,32 @@ private let countryCodes: [(String, Int)] = loadCountryCodes()
 public func localizedCountryNamesAndCodes(strings: PresentationStrings) -> [((String, String), String, [Int])] {
     let locale = localeWithStrings(strings)
     var result: [((String, String), String, [Int])] = []
-    for country in AuthorizationSequenceCountrySelectionController.countries() {
-        if country.hidden || country.id == "FT" {
-            continue
-        }
-        if let englishCountryName = usEnglishLocale.localizedString(forRegionCode: country.id), let countryName = locale.localizedString(forRegionCode: country.id) {
-            var codes: [Int] = []
-            for codeValue in country.countryCodes {
-                if let code = Int(codeValue.code) {
-                    codes.append(code)
-                }
+    
+    let serverCountries = AuthorizationSequenceCountrySelectionController.countries()
+    
+    if !serverCountries.isEmpty {
+        for country in serverCountries {
+            if country.hidden || country.id == "FT" {
+                continue
             }
-            result.append(((englishCountryName, countryName), country.id, codes))
+            if let englishCountryName = usEnglishLocale.localizedString(forRegionCode: country.id), let countryName = locale.localizedString(forRegionCode: country.id) {
+                var codes: [Int] = []
+                for codeValue in country.countryCodes {
+                    if let code = Int(codeValue.code) {
+                        codes.append(code)
+                    }
+                }
+                result.append(((englishCountryName, countryName), country.id, codes))
+            }
+        }
+    } else {
+        for (countryId, code) in countryCodes {
+            if let englishCountryName = usEnglishLocale.localizedString(forRegionCode: countryId), let countryName = locale.localizedString(forRegionCode: countryId) {
+                result.append(((englishCountryName, countryName), countryId, [code]))
+            }
         }
     }
+    
     return result
 }
 
@@ -190,36 +207,36 @@ public func searchCountries(items: [((String, String), String, [Int])], query: S
 final class AuthorizationSequenceCountrySelectionControllerNode: ASDisplayNode, UITableViewDelegate, UITableViewDataSource {
     let itemSelected: (((String, String), String, Int)) -> Void
     var deactivateSearch: () -> Void = {}
-    
+
     private let theme: PresentationTheme
     private let strings: PresentationStrings
     private let displayCodes: Bool
     private let glass: Bool
     private let needsSubtitle: Bool
-    
+
     private let tableView: UITableView
     private let searchTableView: UITableView
-    
+
     private let sections: [(String, [((String, String), String, Int)])]
     private let sectionTitles: [String]
-    
+
     private var searchResults: [((String, String), String, Int)] = []
     private let countryNamesAndCodes: [((String, String), String, [Int])]
-    
+
     private let topEdgeEffectView: EdgeEffectView
-    
+
     private var searchInput: ComponentView<Empty>?
-    var isSearching = true
-    
+    var isSearching = false
+
     private var validLayout: ContainerViewLayout?
-    
+
     init(theme: PresentationTheme, strings: PresentationStrings, displayCodes: Bool, glass: Bool, itemSelected: @escaping (((String, String), String, Int)) -> Void) {
         self.theme = theme
         self.strings = strings
         self.displayCodes = displayCodes
         self.glass = glass
         self.itemSelected = itemSelected
-        
+
         self.needsSubtitle = strings.baseLanguageCode != "en"
         
         self.tableView = UITableView(frame: CGRect(), style: glass ? .insetGrouped : .plain)
@@ -253,40 +270,46 @@ final class AuthorizationSequenceCountrySelectionControllerNode: ASDisplayNode, 
         self.sectionTitles = sections.map { $0.0 }
         
         self.topEdgeEffectView = EdgeEffectView()
-        
+
         super.init()
-        
+
         self.setViewBlock({
             return UITracingLayerView()
         })
-        
+
         if glass {
-            self.backgroundColor = theme.list.blocksBackgroundColor
-            self.tableView.backgroundColor = theme.list.blocksBackgroundColor
-            self.searchTableView.backgroundColor = theme.list.blocksBackgroundColor
+            self.backgroundColor = DivoGlassColors.background
+            self.tableView.backgroundColor = DivoGlassColors.background
+            self.searchTableView.backgroundColor = DivoGlassColors.background
         } else {
             self.backgroundColor = theme.list.plainBackgroundColor
-            
+
             self.tableView.backgroundColor = self.theme.list.plainBackgroundColor
             self.tableView.separatorColor = self.theme.list.itemPlainSeparatorColor
             self.tableView.backgroundView = UIView()
             self.tableView.sectionIndexColor = self.theme.list.itemAccentColor
-            
+
             self.searchTableView.backgroundColor = self.theme.list.plainBackgroundColor
             self.searchTableView.separatorColor = self.theme.list.itemPlainSeparatorColor
             self.searchTableView.backgroundView = UIView()
             self.searchTableView.sectionIndexColor = self.theme.list.itemAccentColor
-            }
-    
+        }
+
         self.tableView.delegate = self
         self.tableView.dataSource = self
-        
+
+        self.tableView.sectionIndexColor = DivoGlassColors.sectionIndex
+        self.tableView.sectionIndexBackgroundColor = .clear
+
         self.searchTableView.delegate = self
         self.searchTableView.dataSource = self
-        
+
         self.view.addSubview(self.tableView)
         self.view.addSubview(self.searchTableView)
-        
+
+        self.tableView.isHidden = false
+        self.searchTableView.isHidden = true
+
         if glass {
             self.view.addSubview(self.topEdgeEffectView)
         }
@@ -294,19 +317,22 @@ final class AuthorizationSequenceCountrySelectionControllerNode: ASDisplayNode, 
         
     func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
         self.validLayout = layout
-        self.tableView.contentInset = UIEdgeInsets(top: navigationBarHeight, left: 0.0, bottom: layout.intrinsicInsets.bottom, right: 0.0)
-        self.searchTableView.contentInset = UIEdgeInsets(top: navigationBarHeight, left: 0.0, bottom: layout.intrinsicInsets.bottom, right: 0.0)
+        
+        let searchInputHeight: CGFloat = self.glass ? 70.0 : 0.0
+        let bottomInset: CGFloat = layout.intrinsicInsets.bottom + searchInputHeight
+        
+        self.tableView.contentInset = UIEdgeInsets(top: navigationBarHeight, left: 0.0, bottom: bottomInset, right: 0.0)
+        self.searchTableView.contentInset = UIEdgeInsets(top: navigationBarHeight, left: 0.0, bottom: bottomInset, right: 0.0)
+        
         transition.updateFrame(view: self.tableView, frame: CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: CGSize(width: layout.size.width, height: layout.size.height)))
         transition.updateFrame(view: self.searchTableView, frame: CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: CGSize(width: layout.size.width, height: layout.size.height)))
-        
+
         if self.glass {
             let edgeEffectHeight: CGFloat = 88.0
             let topEdgeEffectFrame = CGRect(origin: CGPoint(x: 0.0, y: 0.0), size: CGSize(width: layout.size.width, height: edgeEffectHeight))
             transition.updateFrame(view: self.topEdgeEffectView, frame: topEdgeEffectFrame)
             self.topEdgeEffectView.update(content: .clear, blur: true, alpha: 1.0, rect: topEdgeEffectFrame, edge: .top, edgeSize: topEdgeEffectFrame.height, transition: ComponentTransition(transition))
-        }
-        
-        if self.glass && self.isSearching {
+            
             let searchInput: ComponentView<Empty>
             if let current = self.searchInput {
                 searchInput = current
@@ -314,7 +340,7 @@ final class AuthorizationSequenceCountrySelectionControllerNode: ASDisplayNode, 
                 searchInput = ComponentView()
                 self.searchInput = searchInput
             }
-            
+
             let searchInputSize = searchInput.update(
                 transition: .immediate,
                 component: AnyComponent(
@@ -361,17 +387,17 @@ final class AuthorizationSequenceCountrySelectionControllerNode: ASDisplayNode, 
             }
         }
     }
-    
+
     func animateIn() {
         self.layer.animatePosition(from: CGPoint(x: self.layer.position.x, y: self.layer.position.y + self.layer.bounds.size.height), to: self.layer.position, duration: 0.5, timingFunction: kCAMediaTimingFunctionSpring)
     }
-    
+
     func animateOut(completion: @escaping () -> Void) {
         self.layer.animatePosition(from: self.layer.position, to: CGPoint(x: self.layer.position.x, y: self.layer.position.y + self.layer.bounds.size.height), duration: 0.2, timingFunction: CAMediaTimingFunctionName.easeInEaseOut.rawValue, removeOnCompletion: false, completion: { _ in
             completion()
         })
     }
-    
+
     func updateSearchQuery(_ query: String) {
         if query.isEmpty {
             self.searchResults = []
@@ -407,7 +433,7 @@ final class AuthorizationSequenceCountrySelectionControllerNode: ASDisplayNode, 
             return nil
         }
     }
-    
+
     func tableView(_ tableView: UITableView, willDisplayHeaderView view: UIView, forSection section: Int) {
         (view as? UITableViewHeaderFooterView)?.tintColor = self.theme.chatList.sectionHeaderFillColor
         (view as? UITableViewHeaderFooterView)?.textLabel?.textColor = self.theme.chatList.sectionHeaderTextColor
@@ -444,7 +470,7 @@ final class AuthorizationSequenceCountrySelectionControllerNode: ASDisplayNode, 
             cell.accessoryView = label
             cell.selectedBackgroundView = UIView()
         }
-        
+
         var countryName: String
         var cleanCountryName: String
         let originalCountryName: String
@@ -460,20 +486,20 @@ final class AuthorizationSequenceCountrySelectionControllerNode: ASDisplayNode, 
             originalCountryName = self.searchResults[indexPath.row].0.0
             code = "+\(self.searchResults[indexPath.row].2)"
         }
-                
+
         cell.accessibilityLabel = cleanCountryName
         cell.accessibilityValue = code
-        
+
         cell.textLabel?.text = countryName
         cell.detailTextLabel?.text = originalCountryName
         if self.displayCodes, let label = cell.accessoryView as? UILabel {
             label.text = code
             label.sizeToFit()
-            label.textColor = self.theme.list.itemSecondaryTextColor
+            label.textColor = DivoGlassColors.primaryText
         }
-        cell.textLabel?.textColor = self.theme.list.itemPrimaryTextColor
-        cell.detailTextLabel?.textColor = self.theme.list.itemPrimaryTextColor
-        cell.backgroundColor = self.theme.list.plainBackgroundColor
+        cell.textLabel?.textColor = DivoGlassColors.primaryText
+        cell.detailTextLabel?.textColor = DivoGlassColors.primaryText
+        cell.backgroundColor = DivoGlassColors.cellBackground
         cell.selectedBackgroundView?.backgroundColor = self.theme.list.itemHighlightedBackgroundColor
         return cell
     }
