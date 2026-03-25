@@ -148,13 +148,13 @@ private final class AuthorizationSequenceCountrySelectionNavigationContentNode: 
         self.cancel = cancel
 
         let darkSearchTheme = SearchBarNodeTheme(
-            background: UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.0),
+            background: DivoGlassColors.background,
             separator: .clear,
-            inputFill: UIColor.white.withAlphaComponent(0.1),
+            inputFill: DivoGlassColors.inputFill,
             primaryText: theme.chat.inputPanel.panelControlColor,
             placeholder: theme.chat.inputPanel.inputPlaceholderColor,
-            inputIcon: UIColor.white.withAlphaComponent(0.5),
-            inputClear: UIColor.white.withAlphaComponent(0.5),
+            inputIcon: DivoGlassColors.inputIcon,
+            inputClear: DivoGlassColors.inputIcon,
             accent: theme.chat.inputPanel.panelControlAccentColor,
             keyboard: theme.rootController.keyboardColor
         )
@@ -352,11 +352,11 @@ public final class AuthorizationSequenceCountrySelectionController: ViewControll
 
         let darkNavTheme = NavigationBarTheme(
             overallDarkAppearance: true,
-            buttonColor: .white,
-            disabledButtonColor: UIColor(rgb: 0x525252),
-            primaryTextColor: .white,
-            backgroundColor: UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.0), // Фон навбара
-            opaqueBackgroundColor: UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.0),
+            buttonColor: DivoGlassColors.primaryText,
+            disabledButtonColor: DivoGlassColors.disabledButton,
+            primaryTextColor: DivoGlassColors.primaryText,
+            backgroundColor: DivoGlassColors.background,
+            opaqueBackgroundColor: DivoGlassColors.background,
             enableBackgroundBlur: false,
             separatorColor: .clear,
             badgeBackgroundColor: .clear,

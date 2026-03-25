@@ -62,7 +62,7 @@ private final class PhoneAndCountryNode: ASDisplayNode {
         let countryButtonHighlightedBackground = generateImage(CGSize(width: 70.0, height: 67.0), rotatedContext: { size, context in
             let arrowSize: CGFloat = 10.0
             context.clear(CGRect(origin: CGPoint(), size: size))
-            context.setFillColor(UIColor.white.withAlphaComponent(0.16).cgColor)
+            context.setFillColor(DivoGlassColors.highlightedBackground.cgColor)
             context.fill(CGRect(origin: CGPoint(), size: CGSize(width: size.width, height: size.height - arrowSize)))
             context.move(to: CGPoint(x: size.width, y: size.height - arrowSize))
             context.addLine(to: CGPoint(x: size.width - 1.0, y: size.height - arrowSize))
@@ -156,7 +156,7 @@ private final class PhoneAndCountryNode: ASDisplayNode {
                     if name == "FT" {
                         localizedName = strongSelf.strings.Login_AnonymousNumbers
                     }
-                    strongSelf.countryButton.setTitle("\(flagString) \(localizedName)", with: Font.regular(20.0), with: .white, for: [])
+                    strongSelf.countryButton.setTitle("\(flagString) \(localizedName)", with: Font.regular(20.0), with: DivoGlassColors.primaryText, for: [])
                     strongSelf.hasCountry = true
                     
                     if strongSelf.phoneInputNode.mask == nil {
@@ -168,7 +168,7 @@ private final class PhoneAndCountryNode: ASDisplayNode {
                     if countryId == "FT" {
                         localizedName = strongSelf.strings.Login_AnonymousNumbers
                     }
-                    strongSelf.countryButton.setTitle("\(flagString) \(localizedName)", with: Font.regular(20.0), with: .white, for: [])
+                    strongSelf.countryButton.setTitle("\(flagString) \(localizedName)", with: Font.regular(20.0), with: DivoGlassColors.primaryText, for: [])
                     strongSelf.hasCountry = true
                     
                     if strongSelf.phoneInputNode.mask == nil {

@@ -278,9 +278,9 @@ final class AuthorizationSequenceCountrySelectionControllerNode: ASDisplayNode, 
         })
 
         if glass {
-            self.backgroundColor = UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.00) //theme.list.blocksBackgroundColor
-            self.tableView.backgroundColor = UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.00) //theme.list.blocksBackgroundColor
-            self.searchTableView.backgroundColor = UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.00) //theme.list.blocksBackgroundColor
+            self.backgroundColor = DivoGlassColors.background
+            self.tableView.backgroundColor = DivoGlassColors.background
+            self.searchTableView.backgroundColor = DivoGlassColors.background
         } else {
             self.backgroundColor = theme.list.plainBackgroundColor
 
@@ -298,7 +298,7 @@ final class AuthorizationSequenceCountrySelectionControllerNode: ASDisplayNode, 
         self.tableView.delegate = self
         self.tableView.dataSource = self
 
-        self.tableView.sectionIndexColor = .white
+        self.tableView.sectionIndexColor = DivoGlassColors.sectionIndex
         self.tableView.sectionIndexBackgroundColor = .clear
 
         self.searchTableView.delegate = self
@@ -495,11 +495,11 @@ final class AuthorizationSequenceCountrySelectionControllerNode: ASDisplayNode, 
         if self.displayCodes, let label = cell.accessoryView as? UILabel {
             label.text = code
             label.sizeToFit()
-            label.textColor = .white
+            label.textColor = DivoGlassColors.primaryText
         }
-        cell.textLabel?.textColor = .white
-        cell.detailTextLabel?.textColor = .white
-        cell.backgroundColor = .white.withAlphaComponent(0.2)
+        cell.textLabel?.textColor = DivoGlassColors.primaryText
+        cell.detailTextLabel?.textColor = DivoGlassColors.primaryText
+        cell.backgroundColor = DivoGlassColors.cellBackground
         cell.selectedBackgroundView?.backgroundColor = self.theme.list.itemHighlightedBackgroundColor
         return cell
     }
