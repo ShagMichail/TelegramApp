@@ -874,9 +874,16 @@ final class PublicProfileScreenNode: ASDisplayNode {
             addWorkHistoryButton.widthAnchor.constraint(equalToConstant: 160),
         ])
         
+        addWorkHistoryButton.addTarget(self, action: #selector(addWorkHistoryTapped), for: .touchUpInside)
+
         contentViewStack.setCustomSpacing(12, after: addWorkHistoryContainer)
     }
-    
+
+    @objc private func addWorkHistoryTapped() {
+        let controller = AddWorkExperienceController(context: self.context)
+        self.controller?.push(controller)
+    }
+
     private func setupSocialMediaContainer() {
         contentViewStack.addArrangedSubview(titleEditContainer)
         titleEditContainer.addSubview(titleEditStack)
