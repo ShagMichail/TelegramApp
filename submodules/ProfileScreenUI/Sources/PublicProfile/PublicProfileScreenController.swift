@@ -47,6 +47,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
     private var customBackSwipeGestureRecognizer: UIScreenEdgePanGestureRecognizer?
     
     private let model: ProfileModel
+    private var userID: Int = -1
     private var userDetailModel: UserDetail? = nil
     private var userProfileData: UserProfileData? = nil
     private let context: AccountContext
@@ -368,6 +369,9 @@ public final class PublicProfileScreenController: TelegramBaseController {
                 await MainActor.run {
                     self.userDetailModel = response.data
                     self.controllerNode.updateWithUserDetail(response.data, self.isMyProfile)
+                    self.userID = response.data.id
+                    self.loadGalleryPage(userId: self.userID, offset: 0)
+                    self.loadVideoGalleryPage(userId: self.userID, offset: 0)
                 }
             } catch {
                 self.debugLog("[DivoAPI] getUserProfile error: \(error)")
@@ -377,16 +381,8 @@ public final class PublicProfileScreenController: TelegramBaseController {
     
     private func getUserGalleryProfile() {
         guard !galleryLoaded else { return }
-        if !isMyProfile {
-            guard let userId = model.userId else { return }
-            galleryLoaded = true
-            controllerNode.resetGalleryPagination()
-            loadGalleryPage(userId: userId, offset: 0)
-        } else {
-            galleryLoaded = true
-            controllerNode.resetGalleryPagination()
-            loadGalleryPage(userId: 0, offset: 0)
-        }
+        galleryLoaded = true
+        controllerNode.resetGalleryPagination()
     }
     
     @objc func moreMenu() {
@@ -400,11 +396,7 @@ extension PublicProfileScreenController {
         controllerNode.setGalleryLoading(true)
 
         var body: GalleryListRequest
-        if !isMyProfile {
-            body = GalleryListRequest(offset: offset, limit: 6, userId: userId)
-        } else {
-            body = GalleryListRequest(offset: offset, limit: 6, userId: 31999)
-        }
+        body = GalleryListRequest(offset: offset, limit: 6, userId: userId)
 
         Task {
             do {
@@ -422,11 +414,9 @@ extension PublicProfileScreenController {
                     self.controllerNode.appendGalleryPhotos(response.data, isMyProfile: isMy)
                     self.currentGalleryPhotos.append(contentsOf: newPhotos)
                     
-                    // 🚀 ЗАЩИТА: Обновляем только если есть что-то новое, иначе просто снимаем флаг загрузки
                     if !newPhotos.isEmpty {
                         self.activeGalleryController?.updateData(photos: self.currentGalleryPhotos, videos: self.currentGalleryVideos)
                     } else {
-                        // Сообщаем галерее, что загрузка окончена (чтобы она сняла блок)
                         self.activeGalleryController?.finishLoadingWithoutNewData()
                     }
                 }
@@ -447,19 +437,23 @@ extension PublicProfileScreenController {
         
         if tabIndex == 0 {
             guard !currentGalleryPhotos.isEmpty, itemIndex < currentGalleryPhotos.count else { return }
+            
             galleryController = ProfileGalleryController(
                 context: self.context,
                 photos: currentGalleryPhotos,
                 initialIndex: itemIndex,
-                isVideoGallery: false
+                isVideoGallery: false,
+                isOwnProfile: self.isMyProfile
             )
         } else if tabIndex == 1 {
             guard !currentGalleryVideos.isEmpty, itemIndex < currentGalleryVideos.count else { return }
+            
             galleryController = ProfileGalleryController(
                 context: self.context,
                 videos: currentGalleryVideos,
                 initialIndex: itemIndex,
-                isVideoGallery: true
+                isVideoGallery: true,
+                isOwnProfile: self.isMyProfile
             )
         } else {
             return
@@ -474,6 +468,18 @@ extension PublicProfileScreenController {
             }
         }
         
+        galleryController.onDeletePublication = { [weak self] deletedId in
+            guard let self = self else { return }
+            if tabIndex == 0 {
+                self.currentGalleryPhotos.removeAll { $0.id == deletedId }
+                self.controllerNode.removePhoto(withId: deletedId)
+                
+            } else if tabIndex == 1 {
+                self.currentGalleryVideos.removeAll { $0.id == deletedId }
+                self.controllerNode.removeVideo(withId: deletedId)
+            }
+        }
+        
         self.activeGalleryController = galleryController
         self.push(galleryController)
     }
@@ -484,12 +490,9 @@ extension PublicProfileScreenController {
 extension PublicProfileScreenController {
     func loadVideoGalleryPage(userId: Int, offset: Int) {
         controllerNode.setVideoGalleryLoading(true)
+
         var body: GalleryListRequest
-        if !isMyProfile {
-            body = GalleryListRequest(offset: offset, limit: 6, userId: userId)
-        } else {
-            body = GalleryListRequest(offset: offset, limit: 6, userId: 31999)
-        }
+        body = GalleryListRequest(offset: offset, limit: 6, userId: userId)
         
         Task {
             do {
@@ -516,7 +519,6 @@ extension PublicProfileScreenController {
                     )
                     self.currentGalleryVideos.append(contentsOf: newVideos)
                     
-                    // 🚀 ЗАЩИТА: Обновляем только если пришло новое видео
                     if !newVideos.isEmpty {
                         self.activeGalleryController?.updateData(photos: self.currentGalleryPhotos, videos: self.currentGalleryVideos)
                     } else {
@@ -995,10 +997,10 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
 
     private func uploadAndAddPhoto(_ image: UIImage) {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
-
+        
         Task {
             await MainActor.run {
-                self.controllerNode.setGalleryLoading(true)
+                self.controllerNode.setGalleryLoading(true, true)
             }
             
             do {
@@ -1008,34 +1010,35 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                     fileName: "photo.jpg",
                     mimeType: "image/jpeg"
                 )
-
+                
                 guard let fileUuid = uploadResponse.data?.uuid else {
                     throw DivoAPIError.unknown
                 }
-
+                
                 let body = AddGalleryRequest(uuid: fileUuid)
-
+                
                 let addResponse: AddGalleryResponse = try await DivoAPIClient.shared.request(
                     path: "/user-gallery/add",
                     method: "POST",
                     body: body
                 )
-
+                
                 await MainActor.run {
                     self.controllerNode.setGalleryLoading(false)
-
+                    
                     if let newPhoto = addResponse.data {
                         self.controllerNode.insertNewPhoto(newPhoto)
+                        self.currentGalleryPhotos.insert(newPhoto, at: 0)
                     } else {
                         self.galleryLoaded = false
                         self.getUserGalleryProfile()
                     }
                 }
-
+                
             } catch {
                 print("❌ [UPLOAD PHOTO] Ошибка: \(error)")
                 await MainActor.run {
-                    self.controllerNode.setGalleryLoading(false)
+                    self.controllerNode.showGalleryError("Upload failed: \(error.localizedDescription)")
                 }
             }
         }
@@ -1050,12 +1053,12 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
         }
         
         print("🎬 [UPLOAD VIDEO] Video size: \(videoData.count) bytes")
-
+        
         Task {
             await MainActor.run {
-                self.controllerNode.setVideoGalleryLoading(true)
+                self.controllerNode.setVideoGalleryLoading(true, true)
             }
-
+            
             do {
                 let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
                     path: "/file/upload-file",
@@ -1063,13 +1066,13 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                     fileName: "video.mov",
                     mimeType: "video/quicktime"
                 )
-
+                
                 guard let fileUuid = uploadResponse.data?.uuid else {
                     throw DivoAPIError.unknown
                 }
-
+                
                 print("🎬 [UPLOAD VIDEO] File uploaded successfully, uuid: \(fileUuid)")
-
+                
                 let body = AddPublicationRequest(
                     title: "My Video",
                     description: "Video description",
@@ -1078,7 +1081,7 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                         VideoFileData(order: 0, fileUuid: fileUuid)
                     ]
                 )
-
+                
                 let addResponse: AddPublicationResponse = try await DivoAPIClient.shared.request(
                     path: "/publication/create",
                     method: "POST",
@@ -1087,7 +1090,7 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                 
                 await MainActor.run {
                     self.controllerNode.setVideoGalleryLoading(false)
-
+                    
                     if let newVideo = addResponse.data {
                         let video = UserPhoto(
                             id: newVideo.id ?? 0,
@@ -1102,17 +1105,36 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                             preview: nil
                         )
                         self.controllerNode.insertNewVideo(video)
+                        self.currentGalleryVideos.insert(
+                            UserVideoItem(
+                                id: video.id,
+                                title: "",
+                                description: "",
+                                type: "",
+                                likesCount: 0,
+                                isLikedByUser: false,
+                                files: [UserVideoFile(
+                                    order: nil,
+                                    fileName: video.photo.fileName,
+                                    fullUrl: video.photo.fullUrl,
+                                    fileUuid: video.photo.fileUuid,
+                                    fileExtension: video.photo.fileExtension,
+                                    description: nil
+                                )]
+                            ),
+                            at: 0
+                        )
                     }
                 }
-
+                
                 print("🎬 [UPLOAD VIDEO] Publication added successfully")
-
+                
                 try? FileManager.default.removeItem(at: videoURL)
-
+                
             } catch {
                 print("❌ [UPLOAD VIDEO] Ошибка: \(error)")
                 await MainActor.run {
-                    self.controllerNode.setVideoGalleryLoading(false)
+                    self.controllerNode.showVideoGalleryError("Upload failed: \(error.localizedDescription)")
                 }
                 try? FileManager.default.removeItem(at: videoURL)
             }

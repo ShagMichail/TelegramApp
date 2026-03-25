@@ -949,17 +949,18 @@ final class PublicProfileScreenNode: ASDisplayNode {
         galleryHeightConstraint = galleryCollectionView.heightAnchor.constraint(equalToConstant: 1)
         galleryHeightConstraint.isActive = true
         
-        photoTabContainer.addSubview(galleryStatusView)
         photoTabContainer.addSubview(galleryCollectionView)
+        photoTabContainer.addSubview(galleryStatusView)
+
         NSLayoutConstraint.activate([
+            galleryCollectionView.topAnchor.constraint(equalTo: photoTabContainer.topAnchor),
+            galleryCollectionView.leadingAnchor.constraint(equalTo: photoTabContainer.leadingAnchor),
+            galleryCollectionView.trailingAnchor.constraint(equalTo: photoTabContainer.trailingAnchor),
+
             galleryStatusView.heightAnchor.constraint(equalToConstant: 160),
             galleryStatusView.topAnchor.constraint(equalTo: photoTabContainer.topAnchor),
             galleryStatusView.leadingAnchor.constraint(equalTo: photoTabContainer.leadingAnchor, constant: 16),
             galleryStatusView.trailingAnchor.constraint(equalTo: photoTabContainer.trailingAnchor, constant: -16),
-            
-            galleryCollectionView.topAnchor.constraint(equalTo: photoTabContainer.topAnchor),
-            galleryCollectionView.leadingAnchor.constraint(equalTo: photoTabContainer.leadingAnchor),
-            galleryCollectionView.trailingAnchor.constraint(equalTo: photoTabContainer.trailingAnchor)
         ])
         galleryCollectionView.isHidden = true
         galleryStatusView.isHidden = false
@@ -971,8 +972,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoHeightConstraint = videoGalleryCollectionView.heightAnchor.constraint(equalToConstant: 1)
         videoHeightConstraint.isActive = true
         
-        videoTabContainer.addSubview(videoGalleryStatusView)
         videoTabContainer.addSubview(videoGalleryCollectionView)
+        videoTabContainer.addSubview(videoGalleryStatusView)
+
         NSLayoutConstraint.activate([
             videoGalleryStatusView.heightAnchor.constraint(equalToConstant: 160),
             videoGalleryStatusView.topAnchor.constraint(equalTo: videoTabContainer.topAnchor),
@@ -1923,6 +1925,32 @@ final class PublicProfileScreenNode: ASDisplayNode {
             })
         }
     }
+
+    func removePhoto(withId id: Int) {
+        guard let index = galleryPhotos.firstIndex(where: { $0.id == id }) else { return }
+        
+        galleryPhotos.remove(at: index)
+        galleryCurrentOffset = max(0, galleryCurrentOffset - 1)
+        
+        let indexPath = IndexPath(item: index, section: 0)
+        
+        galleryCollectionView.performBatchUpdates({
+            galleryCollectionView.deleteItems(at: [indexPath])
+            
+            // Пересчитываем высоту коллекции, если ряд исчез
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
+            }
+        }, completion: {[weak self] _ in
+            guard let self = self else { return }
+            // Если удалили последнее фото, показываем заглушку
+            if self.galleryPhotos.isEmpty {
+                self.galleryStatusView.isHidden = false
+                self.galleryCollectionView.isHidden = true
+            }
+        })
+    }
     
     // Сброс пагинации галереи
     func resetGalleryPagination() {
@@ -1938,9 +1966,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     // Флаг загрузки галереи
-    func setGalleryLoading(_ loading: Bool) {
+    func setGalleryLoading(_ loading: Bool, _ uploadNew: Bool = false) {
         galleryIsLoading = loading
-        galleryStatusView.isHidden = !loading
+        if uploadNew {
+            galleryStatusView.isHidden = false
+        } else {
+            galleryStatusView.isHidden = !galleryPhotos.isEmpty ? true : !loading && galleryPhotos.isEmpty
+        }
         galleryStatusView.loadingSpinner(isLoading: loading)
     }
     
@@ -1972,9 +2004,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     // Загрузка видео галереи
     func loadVideoGallery() {
         guard let userId = model.userId else { return }
-
-        // Первый запрос всегда offset=0. Ставим флаг загрузки и фиксируем offset,
-        // чтобы быстрый скролл не инициировал второй параллельный запрос.
+        
         videoGalleryIsLoading = true
         videoGalleryRequestedOffsets.insert(0)
         videoGalleryLastRequestedOffset = 0
@@ -1986,13 +2016,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
 
     func appendVideoGalleryItems(_ items: [UserVideoItem], pagination: Meta, isMyProfile: Bool) {
         let previousCount = videoGalleryItems.count
-
+        
         let photoItems: [UserPhoto] = items.compactMap { item in
             let videoFile = item.files.first(where: { MediaFormatValidator.isVideo($0.fileExtension) })
             guard let videoFile else { return nil }
-
+            
             let previewFile = item.files.first(where: { MediaFormatValidator.isImage($0.fileExtension) })
-
+            
             let previewUserFile: UserFile? = previewFile.map {
                 UserFile(
                     fileName: $0.fileName,
@@ -2001,7 +2031,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
                     fileUuid: $0.fileUuid
                 )
             }
-
+            
             return UserPhoto(
                 id: item.id,
                 photo: UserFile(
@@ -2015,12 +2045,12 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 preview: previewUserFile
             )
         }
-
+        
         let existingIds = Set(videoGalleryItems.map { $0.id })
         let uniquePhotoItems = photoItems.filter { !existingIds.contains($0.id) }
-
+        
         videoGalleryItems.append(contentsOf: uniquePhotoItems)
-
+        
         videoGalleryTotalCount = pagination.totalCount
         let nextOffset: Int
         if let lastRequested = videoGalleryLastRequestedOffset, pagination.currentOffset == lastRequested {
@@ -2029,10 +2059,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
             nextOffset = pagination.currentOffset
         }
         videoGalleryCurrentOffset = nextOffset
-
+        
         videoGalleryHasMore = videoGalleryItems.count < pagination.totalCount
         videoGalleryIsLoading = false
-
+        
         if previousCount == 0 {
             let hasVideos = !self.videoGalleryItems.isEmpty
             self.videoGalleryStatusView.isHidden = hasVideos
@@ -2110,25 +2140,46 @@ final class PublicProfileScreenNode: ASDisplayNode {
             })
         }
     }
+
+    func removeVideo(withId id: Int) {
+        guard let index = videoGalleryItems.firstIndex(where: { $0.id == id }) else { return }
+        
+        videoGalleryItems.remove(at: index)
+        videoGalleryCurrentOffset = max(0, videoGalleryCurrentOffset - 1)
+        
+        let indexPath = IndexPath(item: index, section: 0)
+        
+        videoGalleryCollectionView.performBatchUpdates({
+            videoGalleryCollectionView.deleteItems(at: [indexPath])
+            
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 1 { updateCollectionsContainerHeight(animated: true) }
+            }
+        }, completion: { [weak self] _ in
+            guard let self = self else { return }
+            if self.videoGalleryItems.isEmpty {
+                self.videoGalleryStatusView.isHidden = false
+                self.videoGalleryCollectionView.isHidden = true
+            }
+        })
+    }
     
     // Загрузка следующей страницы видео
     func loadNextVideoGalleryPage() {
         guard !videoGalleryIsLoading && videoGalleryHasMore, let userId = model.userId else { return }
-
-        // Гейт от повторного запроса той же страницы.
-        // Это защищает от ситуаций, когда несколько scroll событий подряд вызывают пагинацию.
         let offset = videoGalleryCurrentOffset
         guard !videoGalleryRequestedOffsets.contains(offset) else { return }
         videoGalleryRequestedOffsets.insert(offset)
         videoGalleryLastRequestedOffset = offset
-
+        
         videoGalleryIsLoading = true
         
         if let controller = self.controller as? PublicProfileScreenController {
             controller.loadVideoGalleryPage(userId: userId, offset: offset)
         }
     }
-
+    
     /// Вызвать при ошибке запроса, чтобы разрешить повторную попытку загрузки этой страницы.
     func videoGalleryRequestDidFail(offset: Int) {
         videoGalleryIsLoading = false
@@ -2152,10 +2203,59 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     // Флаг загрузки галереи видео
-    func setVideoGalleryLoading(_ loading: Bool) {
+    func setVideoGalleryLoading(_ loading: Bool, _ uploadNew: Bool = false) {
         videoGalleryIsLoading = loading
-        videoGalleryStatusView.isHidden = !loading
+        if uploadNew {
+            videoGalleryStatusView.isHidden = false
+        } else {
+            videoGalleryStatusView.isHidden = !videoGalleryItems.isEmpty ? true : !loading && videoGalleryItems.isEmpty
+        }
         videoGalleryStatusView.loadingSpinner(isLoading: loading)
+    }
+
+    // MARK: - Error Handling for Galleries
+
+    func showGalleryError(_ message: String) {
+        galleryIsLoading = false
+        galleryStatusView.isHidden = false
+        
+        // Показываем текст ошибки (без спиннера)
+        galleryStatusView.configure(isLoading: false, text: message, isMyProfile: false)
+        
+        // Через 3 секунды убираем ошибку
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            guard let self = self else { return }
+            
+            if self.galleryPhotos.isEmpty {
+                // Если фотографий вообще нет, возвращаем стандартный текст-заглушку
+                let defaultText = self.model.isMyProfile ? "Upload your photos" : "No photos yet"
+                self.galleryStatusView.configure(isLoading: false, text: defaultText, isMyProfile: self.model.isMyProfile)
+            } else {
+                self.galleryStatusView.isHidden = true
+                let defaultText = self.model.isMyProfile ? "Upload your photos" : "No photos yet"
+                self.galleryStatusView.configure(isLoading: false, text: defaultText, isMyProfile: self.model.isMyProfile)
+            }
+        }
+    }
+
+    func showVideoGalleryError(_ message: String) {
+        videoGalleryIsLoading = false
+        videoGalleryStatusView.isHidden = false
+        
+        videoGalleryStatusView.configure(isLoading: false, text: message, isMyProfile: false)
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            guard let self = self else { return }
+            
+            if self.videoGalleryItems.isEmpty {
+                let defaultText = self.model.isMyProfile ? "Upload your videos" : "No videos yet"
+                self.videoGalleryStatusView.configure(isLoading: false, text: defaultText, isMyProfile: self.model.isMyProfile)
+            } else {
+                self.videoGalleryStatusView.isHidden = true
+                let defaultText = self.model.isMyProfile ? "Upload your videos" : "No videos yet"
+                self.videoGalleryStatusView.configure(isLoading: false, text: defaultText, isMyProfile: self.model.isMyProfile)
+            }
+        }
     }
     
     

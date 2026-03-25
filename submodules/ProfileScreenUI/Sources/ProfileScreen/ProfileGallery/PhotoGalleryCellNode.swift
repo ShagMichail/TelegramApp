@@ -98,7 +98,7 @@ final class PhotoGalleryCellNode: UICollectionViewCell, UIScrollViewDelegate {
             self.spinner.stopAnimating()
         }
     }
-
+    
     func viewForZooming(in scrollView: UIScrollView) -> UIView? {
         return self.imageView
     }
@@ -109,7 +109,6 @@ final class PhotoGalleryCellNode: UICollectionViewCell, UIScrollViewDelegate {
         self.imageView.center = CGPoint(x: scrollView.contentSize.width * 0.5 + offsetX,
                                         y: scrollView.contentSize.height * 0.5 + offsetY)
     }
-
 
     // MARK: - @objc
     
