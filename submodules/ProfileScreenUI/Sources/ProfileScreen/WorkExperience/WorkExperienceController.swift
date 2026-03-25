@@ -25,7 +25,6 @@ public final class WorkExperienceController: TelegramBaseController {
     private let model: ProfileModel
     private let context: AccountContext
     private let supportPeerDisposable = MetaDisposable()
-    private let deleteWorkHistoryDisposable = MetaDisposable()
     private let createWorkExperienceDisposable = MetaDisposable()
 
     private var presentationData: PresentationData
@@ -61,7 +60,6 @@ public final class WorkExperienceController: TelegramBaseController {
 
     deinit {
         self.supportPeerDisposable.dispose()
-        self.deleteWorkHistoryDisposable.dispose()
         self.createWorkExperienceDisposable.dispose()
     }
 
@@ -75,9 +73,11 @@ public final class WorkExperienceController: TelegramBaseController {
 
         self.title = "Work experience"
 
-        let addItem = UIBarButtonItem(image: UIImage(bundleImageName: "Models/addIcon"), style: .plain, target: self, action: #selector(self.addPressed))
-        addItem.tintColor = UIColor(rgb: 0xBC8461)
-        self.navigationItem.rightBarButtonItem = addItem
+        if model.isMyProfile {
+            let addItem = UIBarButtonItem(image: UIImage(bundleImageName: "Models/addIcon"), style: .plain, target: self, action: #selector(self.addPressed))
+            addItem.tintColor = UIColor(rgb: 0xBC8461)
+            self.navigationItem.rightBarButtonItem = addItem
+        }
     }
 
     @objc private func addPressed() {
@@ -86,10 +86,7 @@ public final class WorkExperienceController: TelegramBaseController {
 
     private func addWorkExperience() {
         let controller = AddWorkExperienceController(context: self.context)
-
-        if let navigationController = self.context.sharedContext.mainWindow?.viewController as? NavigationController {
-            navigationController.pushViewController(controller)
-        }
+        self.push(controller)
     }
 
     @objc private func backPressed() {
@@ -102,17 +99,43 @@ public final class WorkExperienceController: TelegramBaseController {
     }
 
     private func getWorkHistory() {
-        guard let userId = model.userId else { return }
+        controllerNode.setLoading(true)
+        guard let userId = model.userId else {
+            controllerNode.setLoading(false)
+            return
+        }
         Task {
+            // Try structured API first
+            var structuredItems: [WorkHistoryItem] = []
             do {
-                let response: UserDetailResponse = try await DivoAPIClient.shared.request(
+                let response: WorkHistoryResponse = try await DivoAPIClient.shared.request(
+                    path: "/model-work-history?userId=\(userId)"
+                )
+                structuredItems = response.data.items
+            } catch {
+                print("[DivoAPI] model-work-history error: \(error)")
+            }
+
+            if !structuredItems.isEmpty {
+                await MainActor.run {
+                    self.controllerNode.reloadWorkHistory(items: structuredItems)
+                }
+                return
+            }
+
+            // Fallback: parse workExperience text from user profile
+            do {
+                let userResponse: UserDetailResponse = try await DivoAPIClient.shared.request(
                     path: "/user/\(userId)"
                 )
                 await MainActor.run {
-                    self.controllerNode.reloadEvents(model: response.data)
+                    self.controllerNode.reloadLegacyWorkHistory(model: userResponse.data)
                 }
             } catch {
-                print("[DivoAPI] user/\(userId) error: \(error)")
+                await MainActor.run {
+                    self.controllerNode.setLoading(false)
+                }
+                print("[DivoAPI] user/\(userId) fallback error: \(error)")
             }
         }
     }
@@ -125,8 +148,8 @@ public final class WorkExperienceController: TelegramBaseController {
             presentationData: self.presentationData,
             model: model)
 
-        self.controllerNode.showDeleteAlert = { [weak self] text, id in
-            self?.showDeleteAlert(text: text, id: id)
+        self.controllerNode.showItemOptions = { [weak self] item in
+            self?.showItemOptions(item)
         }
 
         self.controllerNode.openAddWorkExperience = { [weak self] in
@@ -137,30 +160,46 @@ public final class WorkExperienceController: TelegramBaseController {
         self.displayNodeDidLoad()
     }
 
-    private func showDeleteAlert(text: String, id: Int) {
-
+    private func showItemOptions(_ item: WorkHistoryItem) {
+        let name = item.agencyDisplayName ?? item.agencyName ?? "Unknown"
         let alertController = textAlertController(
-            context: context, title: nil,
-            text: text, actions: [
-                TextAlertAction(type: .destructiveAction, title: "Yes", action: {
-                    self.deleteWorkHistory(id: id)
+            context: context, title: name,
+            text: "Choose an action", actions: [
+                TextAlertAction(type: .genericAction, title: "Edit", action: {
+                    self.editWorkExperience(item)
                 }),
-                TextAlertAction(type: .defaultAction, title: "No", action: {})
+                TextAlertAction(type: .destructiveAction, title: "Delete", action: {
+                    self.deleteWorkHistory(id: item.id)
+                }),
+                TextAlertAction(type: .defaultAction, title: "Cancel", action: {})
             ])
         present(alertController, in: .window(.root))
     }
 
+    private func editWorkExperience(_ item: WorkHistoryItem) {
+        let controller = AddWorkExperienceController(context: self.context, editItem: item)
+        self.push(controller)
+    }
+
     private func deleteWorkHistory(id: Int) {
-        let supportPeer = Promise<Bool?>()
-        supportPeer.set(context.engine.profileEngine.deleteWorkExperience(id: Int64(id)))
-        self.deleteWorkHistoryDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { getWorkHistory in
-            self.getWorkHistory()
-        }))
+        Task {
+            do {
+                let _: WorkHistoryDeleteResponse = try await DivoAPIClient.shared.request(
+                    path: "/model-work-history/\(id)",
+                    method: "DELETE"
+                )
+                await MainActor.run {
+                    self.getWorkHistory()
+                }
+            } catch {
+                print("[DivoAPI] delete model-work-history/\(id) error: \(error)")
+            }
+        }
     }
 
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
         super.containerLayoutUpdated(layout, transition: transition)
 
-//        self.controllerNode.containerLayoutUpdated(layout, navigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
+        self.controllerNode.containerLayoutUpdated(layout, navigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
     }
 }

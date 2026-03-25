@@ -18,6 +18,7 @@ import Postbox
 
 public class AddWorkExperienceController: ViewController, UINavigationControllerDelegate {
     private let context: AccountContext
+    private let editItem: WorkHistoryItem?
 
     private var createEventNode: AddWorkExperience {
         return self.displayNode as! AddWorkExperience
@@ -26,20 +27,23 @@ public class AddWorkExperienceController: ViewController, UINavigationController
     private var presentationData: PresentationData
     private var presentationDataDisposable: Disposable?
 
-    public init(context: AccountContext) {
+    public init(context: AccountContext, editItem: WorkHistoryItem? = nil) {
         self.context = context
+        self.editItem = editItem
 
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
 
+        let brownColor = UIColor(red: 0.75, green: 0.48, blue: 0.33, alpha: 1.00)
+
         let darkNavigationTheme = NavigationBarTheme(
             overallDarkAppearance: true,
-            buttonColor: .black,
+            buttonColor: brownColor,
             disabledButtonColor: UIColor(rgb: 0x525252),
-            primaryTextColor: .white,
-            backgroundColor: .clear,
-            opaqueBackgroundColor: .clear,
+            primaryTextColor: .black,
+            backgroundColor: .white,
+            opaqueBackgroundColor: .white,
             enableBackgroundBlur: false,
-            separatorColor: .clear,
+            separatorColor: UIColor(rgb: 0xE5E5E5),
             badgeBackgroundColor: .clear,
             badgeStrokeColor: .clear,
             badgeTextColor: .clear)
@@ -50,9 +54,27 @@ public class AddWorkExperienceController: ViewController, UINavigationController
 
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
 
-        self.title = "Create event"
-
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
+
+        let titleLabel = UILabel()
+        titleLabel.attributedText = Font.helveticaNeue(
+            editItem != nil ? "EDIT EXPERIENCE" : "CREATE EXPERIENCE",
+            20,
+            .black
+        )
+        self.navigationItem.titleView = titleLabel
+
+        let navFont = UIFont.systemFont(ofSize: 17, weight: .regular)
+        let navFontAttributes: [NSAttributedString.Key: Any] = [.font: navFont, .kern: -0.4]
+
+        let createItem = UIBarButtonItem(title: "Create", style: .plain, target: self, action: #selector(createPressed))
+        createItem.tintColor = brownColor
+        createItem.setTitleTextAttributes(navFontAttributes, for: .normal)
+        createItem.setTitleTextAttributes(navFontAttributes, for: .highlighted)
+        self.navigationItem.rightBarButtonItem = createItem
+
+        self.navigationItem.backBarButtonItem?.setTitleTextAttributes(navFontAttributes, for: .normal)
+        self.navigationItem.backBarButtonItem?.setTitleTextAttributes(navFontAttributes, for: .highlighted)
 
         self.presentationDataDisposable = (context.sharedContext.presentationData
                                            |> deliverOnMainQueue).start(next: { [weak self] presentationData in
@@ -81,8 +103,6 @@ public class AddWorkExperienceController: ViewController, UINavigationController
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
         self.navigationBar?.updatePresentationData(NavigationBarPresentationData(presentationData: self.presentationData), transition: .immediate)
 
-        self.title = "Create event"
-
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
     }
 
@@ -90,7 +110,7 @@ public class AddWorkExperienceController: ViewController, UINavigationController
         let currentAvatarMixin = Atomic<NSObject?>(value: nil)
         let theme = self.presentationData.theme
 
-        self.displayNode = AddWorkExperience(context: self.context, addPhoto: { [weak self] in
+        self.displayNode = AddWorkExperience(context: self.context, editItem: self.editItem, addPhoto: { [weak self] in
             presentLegacyAvatarPicker(holder: currentAvatarMixin, signup: true, theme: theme, present: { c, a in
                 self?.view.endEditing(true)
                 self?.present(c, in: .window(.root), with: a)
@@ -111,8 +131,15 @@ public class AddWorkExperienceController: ViewController, UINavigationController
         self.createEventNode.showAlert = { [weak self] text in
             self?.showAlert(text: text)
         }
+        self.createEventNode.onSaveSuccess = { [weak self] in
+            self?.navigationController?.popViewController(animated: true)
+        }
 
         self.displayNodeDidLoad()
+    }
+
+    @objc private func createPressed() {
+        self.createEventNode.applyButtonTapped()
     }
 
     private func showAlert(text: String) {

@@ -21,7 +21,7 @@ enum TimeType {
 final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
 
     private let context: AccountContext
-    private let createWorkExperienceDisposable = MetaDisposable()
+    private let editItem: WorkHistoryItem?
     private var startTime: Int32 = 0
     private var endTime: Int32 = 0
 
@@ -69,12 +69,13 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
 
     var scheduleTimeController: ((TimeType) -> Void)?
     var showAlert: ((String) -> Void)?
+    var onSaveSuccess: (() -> Void)?
     private var countryId: String = ""
 
     var currentPhoto: UIImage? = nil {
         didSet {
             if let currentPhoto = self.currentPhoto {
-                self.currentPhotoNode.image = generateImage(CGSize(width: 110.0, height: 110.0), contextGenerator: { size, context in
+                self.currentPhotoNode.image = generateImage(CGSize(width: 94.0, height: 94.0), contextGenerator: { size, context in
                     context.clear(CGRect(origin: CGPoint(), size: size))
                     context.setBlendMode(.copy)
                     context.draw(currentPhoto.cgImage!, in: CGRect(origin: CGPoint(), size: size))
@@ -87,8 +88,9 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
         }
     }
 
-    init(context: AccountContext, addPhoto: @escaping () -> Void) {
+    init(context: AccountContext, editItem: WorkHistoryItem? = nil, addPhoto: @escaping () -> Void) {
         self.context = context
+        self.editItem = editItem
         self.addPhoto = addPhoto
 
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
@@ -101,13 +103,16 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
         let iconColor = UIColor(red: 0.75, green: 0.48, blue: 0.33, alpha: 1.00)
 
         self.addPhotoButton = HighlightableButtonNode()
-        self.addPhotoButton.setImage(
-            generateTintedImage(
-                image: UIImage(bundleImageName: "Avatar/AddAvatarIconLarge"),
-                color: iconColor),
-            for: .normal)
+        if let originalImage = UIImage(bundleImageName: "Avatar/AddAvatarIconLarge"),
+           let tinted = generateTintedImage(image: originalImage, color: iconColor) {
+            let renderer = UIGraphicsImageRenderer(size: CGSize(width: 24, height: 24))
+            let resized = renderer.image { _ in
+                tinted.draw(in: CGRect(origin: .zero, size: CGSize(width: 24, height: 24)))
+            }
+            self.addPhotoButton.setImage(resized, for: .normal)
+        }
 
-        let buttonDiameter: CGFloat = 110.0
+        let buttonDiameter: CGFloat = 94.0
 
         self.addPhotoButton.setBackgroundImage(
             generateFilledCircleImage(diameter: buttonDiameter,
@@ -162,7 +167,8 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
         self.currentlyWorkingContainer.addSubnode(self.currentlyWorkingCheckbox)
         self.currentlyWorkingContainer.addSubnode(self.currentlyWorkingLabel)
 
-        self.applyButton = ButtonWithIconNode(title: "Create New Work Experience", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
+        let buttonTitle = editItem != nil ? "Save Changes" : "Create New Work Experience"
+        self.applyButton = ButtonWithIconNode(title: buttonTitle, icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
         self.applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
 
         super.init()
@@ -186,11 +192,10 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
 
         self.scrollNode.addSubnode(self.currentlyWorkingContainer)
 
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(self.dismissKeyboard))
-        tapGesture.cancelsTouchesInView = false
-        self.scrollNode.view.addGestureRecognizer(tapGesture)
+        self.scrollNode.view.showsVerticalScrollIndicator = false
+        self.scrollNode.view.showsHorizontalScrollIndicator = false
 
-        self.scrollNode.addSubnode(self.applyButton)
+        self.addSubnode(self.applyButton)
 
         self.presentationDataDisposable = (context.sharedContext.presentationData
                                            |> deliverOnMainQueue).start(next: { [weak self] presentationData in
@@ -211,7 +216,6 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
     deinit {
         self.disposable?.dispose()
         self.presentationDataDisposable?.dispose()
-        self.createWorkExperienceDisposable.dispose()
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -223,8 +227,16 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
         let checkboxTapGesture = UITapGestureRecognizer(target: self, action: #selector(currentlyWorkingTapped))
         self.currentlyWorkingContainer.view.addGestureRecognizer(checkboxTapGesture)
 
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(self.dismissKeyboard))
+        tapGesture.cancelsTouchesInView = false
+        self.view.addGestureRecognizer(tapGesture)
+
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow), name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide), name: UIResponder.keyboardWillHideNotification, object: nil)
+
+        if let item = editItem {
+            prefillEditData(item)
+        }
     }
 
     func textFieldShouldBeginEditing(_ textField: UITextField) -> Bool {
@@ -242,9 +254,7 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
         self.addPhoto()
     }
 
-    @objc private func applyButtonTapped() {
-        print("applyButton Tapped!")
-
+    @objc func applyButtonTapped() {
         let agencyName = nameEventTextField.textField.text ?? ""
 
         guard startTime > 0 else {
@@ -252,39 +262,83 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
             return
         }
 
-        if let currentPhoto = currentPhoto {
-            let _ = uploadPhotoToCloud(context: context, image: currentPhoto).start(next: { [weak self] id in
-                if let id = id {
-                    self?.createWorkExperience(agencyName: agencyName, photoId: id)
-                }
-            })
+        saveWorkExperience(agencyName: agencyName)
+    }
+
+    private func saveWorkExperience(agencyName: String) {
+        let isCurrent = currentlyWorkingCheckbox.isSelected
+
+        let body = CreateWorkHistoryRequest(
+            agencyId: nil,
+            agencyName: agencyName.isEmpty ? nil : agencyName,
+            startDate: Self.formatDateForAPI(timestamp: startTime),
+            endDate: isCurrent ? nil : (endTime > 0 ? Self.formatDateForAPI(timestamp: endTime) : nil),
+            isCurrent: isCurrent
+        )
+
+        let path: String
+        if let editItem = editItem {
+            path = "/model-work-history/\(editItem.id)"
         } else {
-            createWorkExperience(agencyName: agencyName)
+            path = "/model-work-history"
+        }
+
+        print("[DivoAPI] save work-history request: path=\(path), body=agencyName:\(body.agencyName ?? "nil"), startDate:\(body.startDate), endDate:\(body.endDate ?? "nil"), isCurrent:\(body.isCurrent)")
+        Task {
+            do {
+                let response: WorkHistorySaveResponse = try await DivoAPIClient.shared.request(
+                    path: path,
+                    method: "POST",
+                    body: body
+                )
+                let msg = "OK: \(response.message ?? "nil"), errors: \(response.errors ?? [])"
+                print("[DivoAPI] save work-history success: \(msg)")
+                await MainActor.run {
+                    self.showAlert?(msg)
+                }
+            } catch {
+                let errMsg = "Error: \(error)"
+                print("[DivoAPI] save work-history error: \(errMsg)")
+                await MainActor.run {
+                    self.showAlert?(errMsg)
+                }
+                print("[DivoAPI] save work-history error: \(error)")
+            }
         }
     }
 
-    private func createWorkExperience(agencyName: String, photoId: Int64? = nil) {
-        let startTimestamp = TimeInterval(startTime)
-        let endTimestamp = TimeInterval(endTime)
+    private func prefillEditData(_ item: WorkHistoryItem) {
+        nameEventTextField.textField.text = item.agencyDisplayName ?? item.agencyName
 
-        let supportPeer = Promise<String?>()
-        supportPeer.set(context.engine.profileEngine.createWorkExperience(
-            agencyName: agencyName,
-            startDate: Int32(startTimestamp),
-            endDate: endTimestamp > 0 ? Int32(endTimestamp) : nil,
-            photoId: photoId
-        ))
-        self.createWorkExperienceDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { peerId in
-            print("createWorkExperienceDisposable", peerId ?? "")
-            self.showAlert?("WorkExperience Added")
-        }))
+        let inputFormatter = DateFormatter()
+        inputFormatter.dateFormat = "yyyy-MM-dd"
+        inputFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateFormat = "d MMM yyyy"
+        displayFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+        if let startStr = item.startDate, let startDate = inputFormatter.date(from: startStr) {
+            startTime = Int32(startDate.timeIntervalSince1970)
+            startDateTextField.textField.text = displayFormatter.string(from: startDate)
+        }
+
+        if item.isCurrent == true {
+            currentlyWorkingCheckbox.isSelected = true
+            endTimeLabel.isHidden = true
+            endTimeTextField.isHidden = true
+        } else if let endStr = item.endDate, let endDate = inputFormatter.date(from: endStr) {
+            endTime = Int32(endDate.timeIntervalSince1970)
+            endTimeTextField.textField.text = displayFormatter.string(from: endDate)
+        }
     }
 
-    private func uploadPhotoToCloud(context: AccountContext, image: UIImage) -> Signal<Int64?, NoError> {
-        guard let data = image.jpegData(compressionQuality: 0.9) else {
-            return .single(nil)
-        }
-        return context.engine.engineDivo.uploadedPhoto(resource: data)
+    private static func formatDateForAPI(timestamp: Int32) -> String {
+        let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter.string(from: date)
     }
 
     @objc private func currentlyWorkingTapped() {
@@ -358,7 +412,7 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
 
     func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, actualNavigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
 
-        let avatarSize: CGSize = CGSize(width: 100.0, height: 100.0)
+        let avatarSize: CGSize = CGSize(width: 94.0, height: 94.0)
 
         let avatarX: CGFloat = floor((layout.size.width - avatarSize.width) / 2.0)
         self.addPhotoButton.frame = CGRect(origin: CGPoint(x: avatarX, y: 20), size: avatarSize)
@@ -373,7 +427,7 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
 
         self.scrollNode.frame = CGRect(origin: CGPoint(x: 0.0, y: topInset), size: CGSize(width: layout.size.width, height: layout.size.height - topInset))
 
-        var currentY: CGFloat = 140.0
+        var currentY: CGFloat = 120.0
 
         let eventInfoBySize = self.eventInfoLabel.measure(CGSize(width: layout.size.width - sidePadding * 2, height: .greatestFiniteMagnitude))
         self.eventInfoLabel.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: eventInfoBySize)
@@ -421,14 +475,13 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
 
         currentY += rowHeight + sectionSpacing
 
+        self.scrollNode.view.contentSize = CGSize(width: layout.size.width, height: currentY + 20.0)
+
         let buttonWidth = layout.size.width - sidePadding * 2
         let buttonHeight: CGFloat = 50.0
-
-        self.applyButton.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: buttonWidth, height: buttonHeight))
-
-        currentY += buttonHeight + sectionSpacing
-
-        self.scrollNode.view.contentSize = CGSize(width: layout.size.width, height: currentY + 20.0)
+        let safeBottom = layout.intrinsicInsets.bottom
+        let bottomPadding: CGFloat = safeBottom > 0 ? 8 : 16
+        self.applyButton.frame = CGRect(origin: CGPoint(x: sidePadding, y: layout.size.height - buttonHeight - safeBottom - bottomPadding), size: CGSize(width: buttonWidth, height: buttonHeight))
 
         self.readyValue = true
     }

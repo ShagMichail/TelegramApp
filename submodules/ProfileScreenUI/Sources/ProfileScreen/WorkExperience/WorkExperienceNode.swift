@@ -17,7 +17,7 @@ final class WorkExperience: ASDisplayNode {
     private let context: AccountContext
     private var presentationData: PresentationData
     private var containerLayout: (ContainerViewLayout, CGFloat)?
-    var showDeleteAlert: ((String, Int) -> Void)?
+    var showItemOptions: ((WorkHistoryItem) -> Void)?
     var openAddWorkExperience: (() -> Void)?
 
     private let collectionView: UICollectionView = {
@@ -42,6 +42,11 @@ final class WorkExperience: ASDisplayNode {
     private let addExperienceButton: ASControlNode
 
     private var items: [WorkExperienceItem] = []
+    private var rawItems: [WorkHistoryItem] = []
+    private var hasStructuredData = false
+    private var isLoading = true
+    private let shimmerCount = 4
+    private var collectionViewTopConstraint: NSLayoutConstraint?
 
     init(controller: ViewController, context: AccountContext, presentationData: PresentationData, model: ProfileModel) {
         self.controller = controller
@@ -58,33 +63,70 @@ final class WorkExperience: ASDisplayNode {
         self.addSubnode(self.addExperienceButton)
     }
 
-    public func reloadEvents(model: UserDetail) {
+    func setLoading(_ loading: Bool) {
+        self.isLoading = loading
+        updateEmptyState()
+        self.collectionView.reloadData()
+    }
+
+    public func reloadWorkHistory(items: [WorkHistoryItem]) {
+        self.isLoading = false
+        self.rawItems = items
+        self.hasStructuredData = true
+        self.items = items.map { item in
+            let logoURL: URL?
+            if let urlStr = item.agencyPhoto?.fullUrl, let url = URL(string: urlStr) {
+                logoURL = url
+            } else {
+                logoURL = nil
+            }
+            return WorkExperienceItem(
+                id: item.id,
+                companyName: item.agencyDisplayName ?? item.agencyName ?? "Unknown Agency",
+                period: Self.formatWorkPeriod(startDate: item.startDate, endDate: item.endDate, isCurrent: item.isCurrent),
+                logoURL: logoURL
+            )
+        }
+        updateEmptyState()
+        self.collectionView.reloadData()
+    }
+
+    public func reloadLegacyWorkHistory(model: UserDetail) {
+        self.isLoading = false
+        self.rawItems = []
+        self.hasStructuredData = false
         let experienceString = model.model?.workExperience ?? ""
         let experienceNames = experienceString
-                .split(separator: ",")
-                .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
+            .split(separator: ",")
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
 
-        let items = experienceNames.enumerated().map { index, name in
-            return WorkExperienceItem(
+        self.items = experienceNames.enumerated().map { index, name in
+            WorkExperienceItem(
                 id: index,
                 companyName: name,
                 period: "Past Experience",
-                logoName: nil
-
+                logoURL: nil
             )
         }
-
-        self.items = items
         updateEmptyState()
         self.collectionView.reloadData()
     }
 
     private func updateEmptyState() {
-        let isEmpty = items.isEmpty
-        emptyStateContainer.isHidden = !isEmpty
-        addExperienceButton.isHidden = !isEmpty
-        collectionView.isHidden = isEmpty
+        if isLoading {
+            emptyStateContainer.isHidden = true
+            addExperienceButton.isHidden = true
+            collectionView.isHidden = false
+        } else if items.isEmpty {
+            emptyStateContainer.isHidden = false
+            addExperienceButton.isHidden = !model.isMyProfile
+            collectionView.isHidden = true
+        } else {
+            emptyStateContainer.isHidden = true
+            addExperienceButton.isHidden = true
+            collectionView.isHidden = false
+        }
     }
 
     override func didLoad() {
@@ -96,8 +138,11 @@ final class WorkExperience: ASDisplayNode {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(collectionView)
 
+        let topConstraint = collectionView.topAnchor.constraint(equalTo: view.topAnchor, constant: 0)
+        self.collectionViewTopConstraint = topConstraint
+
         NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 40),
+            topConstraint,
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
@@ -146,31 +191,91 @@ final class WorkExperience: ASDisplayNode {
             buttonView.heightAnchor.constraint(equalToConstant: 56)
         ])
 
+        view.bringSubviewToFront(buttonView)
+
         updateEmptyState()
 
         self.addExperienceButton.addTarget(self, action: #selector(self.addWorkExperience), forControlEvents: .touchUpInside)
     }
 
-    @objc private  func addWorkExperience() {
+    @objc private func addWorkExperience() {
         openAddWorkExperience?()
     }
 
     func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
         self.containerLayout = (layout, navigationBarHeight)
-        transition.updateFrame(view: collectionView, frame: CGRect(origin: .zero, size: layout.size))
-        collectionView.collectionViewLayout.invalidateLayout()
+        self.collectionViewTopConstraint?.constant = navigationBarHeight + 12
+    }
+
+    // MARK: - Period Formatting
+
+    private static func formatWorkPeriod(startDate: String?, endDate: String?, isCurrent: Bool?) -> String {
+        let inputFormatter = DateFormatter()
+        inputFormatter.dateFormat = "yyyy-MM-dd"
+        inputFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+        guard let startStr = startDate, let start = inputFormatter.date(from: startStr) else {
+            return "—"
+        }
+
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateFormat = "MMMM yyyy"
+        displayFormatter.locale = Locale(identifier: "en_US")
+
+        let startString = displayFormatter.string(from: start)
+        let endString: String
+        let end: Date
+
+        if isCurrent == true {
+            end = Date()
+            endString = "Present"
+        } else if let endStr = endDate, let endDate = inputFormatter.date(from: endStr) {
+            end = endDate
+            endString = displayFormatter.string(from: endDate)
+        } else {
+            end = Date()
+            endString = "Present"
+        }
+
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month], from: start, to: end)
+        let years = components.year ?? 0
+        let months = components.month ?? 0
+
+        var durationString = ""
+        if years > 0 {
+            durationString += "\(years) year\(years > 1 ? "s" : "")"
+        }
+        if months > 0 {
+            if !durationString.isEmpty {
+                durationString += " "
+            }
+            durationString += "\(months) month\(months > 1 ? "s" : "")"
+        }
+        if durationString.isEmpty {
+            durationString = "1 month"
+        }
+
+        return "\(startString) - \(endString) · \(durationString)"
     }
 }
 
 extension WorkExperience: UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        if isLoading && items.isEmpty {
+            return shimmerCount
+        }
         return items.count
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ExperienceCell", for: indexPath) as! ExperienceCell
-        cell.delegate = self
-        cell.configure(with: items[indexPath.item], context: context)
+        if isLoading && items.isEmpty {
+            cell.configureAsShimmer()
+        } else {
+            cell.delegate = self
+            cell.configure(with: items[indexPath.item], showOptions: model.isMyProfile && hasStructuredData)
+        }
         return cell
     }
 
@@ -181,8 +286,8 @@ extension WorkExperience: UICollectionViewDataSource, UICollectionViewDelegateFl
 
 extension WorkExperience: ExperienceCellDelegate {
     func experienceCell(_ cell: ExperienceCell, didTapOptionsButton button: UIButton) {
-        guard let indexPath = collectionView.indexPath(for: cell) else { return }
-            let item = items[indexPath.item]
-        showDeleteAlert?("Delete? Company: \(item.companyName), Period: \(item.period)", item.id)
+        guard let indexPath = collectionView.indexPath(for: cell),
+              indexPath.item < rawItems.count else { return }
+        showItemOptions?(rawItems[indexPath.item])
     }
 }
