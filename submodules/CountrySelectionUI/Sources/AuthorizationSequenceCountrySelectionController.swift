@@ -22,38 +22,38 @@ private func loadCountryCodes() -> [Country] {
     guard let data = String(data: stringData, encoding: .utf8) else {
         return []
     }
-    
+
     let delimiter = ";"
     let endOfLine = "\r\n"
-    
+
     var result: [Country] = []
     var countriesByPrefix: [String: (Country, Country.CountryCode)] = [:]
-    
+
     var currentLocation = data.startIndex
-    
+
     let locale = Locale(identifier: "en-US")
-    
+
     while true {
         guard let codeRange = data.range(of: delimiter, options: [], range: currentLocation ..< data.endIndex) else {
             break
         }
-        
+
         let countryCode = String(data[currentLocation ..< codeRange.lowerBound])
-        
+
         guard let idRange = data.range(of: delimiter, options: [], range: codeRange.upperBound ..< data.endIndex) else {
             break
         }
-        
+
         let countryId = String(data[codeRange.upperBound ..< idRange.lowerBound])
-        
+
         guard let patternRange = data.range(of: delimiter, options: [], range: idRange.upperBound ..< data.endIndex) else {
             break
         }
-        
+
         let pattern = String(data[idRange.upperBound ..< patternRange.lowerBound])
-        
+
         let maybeNameRange = data.range(of: endOfLine, options: [], range: patternRange.upperBound ..< data.endIndex)
-        
+
         let countryName = locale.localizedString(forIdentifier: countryId) ?? ""
         if let _ = Int(countryCode) {
             let code = Country.CountryCode(code: countryCode, prefixes: [], patterns: !pattern.isEmpty ? [pattern] : [])
@@ -61,16 +61,21 @@ private func loadCountryCodes() -> [Country] {
             result.append(country)
             countriesByPrefix["\(code.code)"] = (country, code)
         }
-        
+
         if let maybeNameRange = maybeNameRange {
             currentLocation = maybeNameRange.upperBound
         } else {
-            break
+            let maybeNameRangeWithLf = data.range(of: "\n", options: [], range: patternRange.upperBound ..< data.endIndex)
+            if let maybeNameRangeWithLf = maybeNameRangeWithLf {
+                currentLocation = maybeNameRangeWithLf.upperBound
+            } else {
+                break
+            }
         }
     }
-    
+
     countryCodesByPrefix = countriesByPrefix
-    
+
     return result
 }
 
@@ -141,8 +146,20 @@ private final class AuthorizationSequenceCountrySelectionNavigationContentNode: 
         self.strings = strings
         
         self.cancel = cancel
+
+        let darkSearchTheme = SearchBarNodeTheme(
+            background: UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.0),
+            separator: .clear,
+            inputFill: UIColor.white.withAlphaComponent(0.1),
+            primaryText: theme.chat.inputPanel.panelControlColor,
+            placeholder: theme.chat.inputPanel.inputPlaceholderColor,
+            inputIcon: UIColor.white.withAlphaComponent(0.5),
+            inputClear: UIColor.white.withAlphaComponent(0.5),
+            accent: theme.chat.inputPanel.panelControlAccentColor,
+            keyboard: theme.rootController.keyboardColor
+        )
         
-        self.searchBar = SearchBarNode(theme: SearchBarNodeTheme(theme: theme), presentationTheme: theme, strings: strings, fieldStyle: .modern)
+        self.searchBar = SearchBarNode(theme: darkSearchTheme, presentationTheme: theme, strings: strings, fieldStyle: .modern)
         let placeholderText = strings.Common_Search
         let searchBarFont = Font.regular(17.0)
         
@@ -315,33 +332,46 @@ public final class AuthorizationSequenceCountrySelectionController: ViewControll
     private let strings: PresentationStrings
     private let displayCodes: Bool
     private let glass: Bool
-    
-    
+
     private var closeButtonNode: BarComponentHostNode?
     private var searchButtonNode: BarComponentHostNode?
     private var navigationContentNode: AuthorizationSequenceCountrySelectionNavigationContentNode?
-    
+
     private var controllerNode: AuthorizationSequenceCountrySelectionControllerNode {
         return self.displayNode as! AuthorizationSequenceCountrySelectionControllerNode
     }
-    
+
     public var completeWithCountryCode: ((Int, String, String) -> Void)?
     public var dismissed: (() -> Void)?
-    
+
     public init(strings: PresentationStrings, theme: PresentationTheme, displayCodes: Bool = true, glass: Bool = false) {
         self.theme = theme
         self.strings = strings
         self.displayCodes = displayCodes
         self.glass = glass
-        
-        super.init(navigationBarPresentationData: NavigationBarPresentationData(theme: NavigationBarTheme(rootControllerTheme: theme, hideBackground: glass, hideSeparator: glass, style: glass ? .glass : .legacy), strings: NavigationBarStrings(presentationStrings: strings)))
-        
+
+        let darkNavTheme = NavigationBarTheme(
+            overallDarkAppearance: true,
+            buttonColor: .white,
+            disabledButtonColor: UIColor(rgb: 0x525252),
+            primaryTextColor: .white,
+            backgroundColor: UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.0), // Фон навбара
+            opaqueBackgroundColor: UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.0),
+            enableBackgroundBlur: false,
+            separatorColor: .clear,
+            badgeBackgroundColor: .clear,
+            badgeStrokeColor: .clear,
+            badgeTextColor: .clear
+        )
+
+        super.init(navigationBarPresentationData: NavigationBarPresentationData(theme: darkNavTheme, strings: NavigationBarStrings(presentationStrings: strings)))
+
         self._hasGlassStyle = glass
-        
+
         self.navigationPresentation = .modal
-        
+
         self.statusBar.statusBarStyle = theme.rootController.statusBarStyle.style
-        
+
         if glass {
             self.title = strings.Login_SelectCountry
         } else {
@@ -365,23 +395,33 @@ public final class AuthorizationSequenceCountrySelectionController: ViewControll
     }
     
     override public func loadDisplayNode() {
-        self.displayNode = AuthorizationSequenceCountrySelectionControllerNode(theme: self.theme, strings: self.strings, displayCodes: self.displayCodes, glass: self.glass, itemSelected: { [weak self] args in
-            let ((name, _), countryId, code) = args
-            self?.completeWithCountryCode?(code, countryId, name)
-            self?.dismiss()
-        })
+        self.displayNode = AuthorizationSequenceCountrySelectionControllerNode(
+            theme: self.theme,
+            strings: self.strings,
+            displayCodes: self.displayCodes,
+            glass: self.glass,
+            itemSelected: { [weak self] args in
+                let ((name, _), countryId, code) = args
+                self?.completeWithCountryCode?(code, countryId, name)
+                self?.dismiss()
+            }
+        )
         self.controllerNode.deactivateSearch = { [weak self] in
             self?.controllerNode.isSearching = false
-            self?.requestLayout(transition: .animated(duration: 0.5, curve: .spring))
+            if !(self?.glass ?? false) {
+                self?.requestLayout(transition: .animated(duration: 0.5, curve: .spring))
+            }
         }
         self.displayNodeDidLoad()
     }
     
     override public func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        
-        Queue.mainQueue().justDispatch {
-            self.navigationContentNode?.activate()
+
+        if !self.glass {
+            Queue.mainQueue().justDispatch {
+                self.navigationContentNode?.activate()
+            }
         }
     }
     
