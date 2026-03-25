@@ -537,332 +537,99 @@ extension PublicProfileScreenController {
     }
 }
 
-// Загрузка каналов телеграмма
+// Загрузка каналов — TODO: заменить моки на Telegram MTProto API
 extension PublicProfileScreenController {
     func loadTelegramChannels() {
-        guard let userId = model.userId else {
-            debugLog("❌ [CHANNELS] userId is nil")
-            return
-        }
-
-        debugLog("📢 [CHANNELS] Starting load for userId: \(userId)")
-
         let mockChannels: [ProfileChannelItem] = [
-            ProfileChannelItem(
-                peer: "vogue",
-                title: "Vogue",
-                followersCount: 1250000,
-                isPremium: true,
-                customAvatarURL: nil
-            ),
-            ProfileChannelItem(
-                peer: "model_agency_nyc",
-                title: "Model Agency NYC",
-                followersCount: 85000,
-                isPremium: false,
-                customAvatarURL: nil
-            ),
-            ProfileChannelItem(
-                peer: "fashionweek",
-                title: "Fashion Week",
-                followersCount: 2300000,
-                isPremium: true,
-                customAvatarURL: nil
-            ),
-            ProfileChannelItem(
-                peer: "photography_daily",
-                title: "Photography Daily",
-                followersCount: 450000,
-                isPremium: false,
-                customAvatarURL: nil
-            ),
-            ProfileChannelItem(
-                peer: "style_beauty",
-                title: "Style & Beauty",
-                followersCount: 670000,
-                isPremium: true,
-                customAvatarURL: nil
-            ),
-            ProfileChannelItem(
-                peer: "style_beauty",
-                title: "Style & Beauty",
-                followersCount: 670000,
-                isPremium: true,
-                customAvatarURL: nil
-            ),
-            ProfileChannelItem(
-                peer: "style_beauty",
-                title: "Style & Beauty",
-                followersCount: 670000,
-                isPremium: true,
-                customAvatarURL: nil
-            ),
-            ProfileChannelItem(
-                peer: "style_beauty",
-                title: "Style & Beauty",
-                followersCount: 670000,
-                isPremium: true,
-                customAvatarURL: nil
-            ),
-            ProfileChannelItem(
-                peer: "style_beauty",
-                title: "Style & Beauty",
-                followersCount: 670000,
-                isPremium: true,
-                customAvatarURL: nil
-            ),
-            ProfileChannelItem(
-                peer: "style_beauty",
-                title: "Style & Beauty",
-                followersCount: 670000,
-                isPremium: true,
-                customAvatarURL: nil
-            ),
-            ProfileChannelItem(
-                peer: "style_beauty",
-                title: "Style & Beauty",
-                followersCount: 670000,
-                isPremium: true,
-                customAvatarURL: nil
-            ),
-            ProfileChannelItem(
-                peer: "style_beauty",
-                title: "Style & Beauty",
-                followersCount: 670000,
-                isPremium: true,
-                customAvatarURL: nil
-            )
+            ProfileChannelItem(peer: "vogue", title: "Vogue Inside", followersCount: 1342, isPremium: false, customAvatarURL: nil),
+            ProfileChannelItem(peer: "capsule", title: "Capsule Wardrobe", followersCount: 500, isPremium: true, customAvatarURL: nil),
+            ProfileChannelItem(peer: "mode_mood", title: "Mode & Mood", followersCount: 34912, isPremium: true, customAvatarURL: nil),
+            ProfileChannelItem(peer: "street_luxe", title: "Street Luxe", followersCount: 176, isPremium: false, customAvatarURL: nil),
+            ProfileChannelItem(peer: "trend_lab", title: "Trend Lab", followersCount: 42, isPremium: false, customAvatarURL: nil),
+            ProfileChannelItem(peer: "haute_daily", title: "Haute Daily", followersCount: 5986, isPremium: false, customAvatarURL: nil),
+            ProfileChannelItem(peer: "minimal_chic", title: "Minimal & Chic", followersCount: 1906, isPremium: false, customAvatarURL: nil),
+            ProfileChannelItem(peer: "fashion_drops", title: "Fashion Drops", followersCount: 3091, isPremium: false, customAvatarURL: nil)
         ]
-        
-        debugLog("📢 [CHANNELS] Created \(mockChannels.count) mock channels")
-        
         DispatchQueue.main.async { [weak self] in
-            self?.debugLog("📢 [CHANNELS] Calling updateChannelsList with \(mockChannels.count) items")
             self?.controllerNode.updateChannelsList(mockChannels)
         }
     }
 }
 
-// Загрузка моделей, состоящих в агенстве
+// Загрузка моделей, состоящих в агентстве
 extension PublicProfileScreenController {
     func loadModels() {
-        guard let userId = model.userId else {
-            debugLog("❌ [MODELS] userId is nil")
+        guard let agencyId = userDetailModel?.agency?.id else {
+            debugLog("❌ [MODELS] agencyId is nil")
+            DispatchQueue.main.async { [weak self] in
+                self?.controllerNode.updateModelsList([])
+            }
             return
         }
 
-        debugLog("📢 [MODELS] Starting load for userId: \(userId)")
-
-        let mockModels: [ModelItem] = [
-            ModelItem(
-                name: "Vogue",
-                role: "Model",
-                isPremium: true,
-                customAvatarURL: nil,
-                localAvatarName: "Models/image5"
-            ),
-            ModelItem(
-                name: "Vogue",
-                role: "Model",
-                isPremium: true,
-                customAvatarURL: nil,
-                localAvatarName: "Models/image5"
-            ),
-            ModelItem(
-                name: "Vogue",
-                role: "Model",
-                isPremium: false,
-                customAvatarURL: nil,
-                localAvatarName: "Models/image5"
-            ),
-            ModelItem(
-                name: "Vogue",
-                role: "Model",
-                isPremium: false,
-                customAvatarURL: nil,
-                localAvatarName: "Models/image5"
-            ),
-            ModelItem(
-                name: "Vogue",
-                role: "Model",
-                isPremium: false,
-                customAvatarURL: nil,
-                localAvatarName: "Models/image5"
-            ),
-            ModelItem(
-                name: "Vogue",
-                role: "Model",
-                isPremium: true,
-                customAvatarURL: nil,
-                localAvatarName: "Models/image5"
-            ),
-            ModelItem(
-                name: "Vogue",
-                role: "Model",
-                isPremium: true,
-                customAvatarURL: nil,
-                localAvatarName: "Models/image5"
-            ),
-            ModelItem(
-                name: "Vogue",
-                role: "Model",
-                isPremium: true,
-                customAvatarURL: nil,
-                localAvatarName: "Models/image5"
-            ),
-            ModelItem(
-                name: "Vogue",
-                role: "Model",
-                isPremium: false,
-                customAvatarURL: nil,
-                localAvatarName: "Models/image5"
-            ),
-            ModelItem(
-                name: "Vogue",
-                role: "Model",
-                isPremium: false,
-                customAvatarURL: nil,
-                localAvatarName: "Models/image5"
-            ),
-            ModelItem(
-                name: "Vogue",
-                role: "Model",
-                isPremium: true,
-                customAvatarURL: nil,
-                localAvatarName: "Models/image5"
-            ),
-            ModelItem(
-                name: "Vogue",
-                role: "Model",
-                isPremium: false,
-                customAvatarURL: nil,
-                localAvatarName: "Models/image5"
-            )
-        ]
-        
-        debugLog("📢 [MODELS] Created \(mockModels.count) mock models")
-        
-        DispatchQueue.main.async { [weak self] in
-            self?.debugLog("📢 [MODELS] Calling updateModelsList with \(mockModels.count) items")
-            self?.controllerNode.updateModelsList(mockModels)
+        Task { @MainActor in
+            do {
+                let body = AgencyModelsListRequest(offset: 0, limit: 50)
+                let response: AgencyModelsResponse = try await DivoAPIClient.shared.request(
+                    path: "/agency/\(agencyId)/models/list",
+                    method: "POST",
+                    body: body
+                )
+                let items = response.data?.items ?? []
+                let models = items.map { item -> ModelItem in
+                    return ModelItem(
+                        name: item.name ?? "Unknown",
+                        role: "Model",
+                        isPremium: false,
+                        customAvatarURL: item.photo?.fullUrl,
+                        localAvatarName: nil
+                    )
+                }
+                self.controllerNode.updateModelsList(models)
+            } catch {
+                print("❌ [MODELS] Error: \(error)")
+                self.controllerNode.updateModelsList([])
+            }
         }
     }
 }
 
-// Загрузка событий
+// Загрузка событий через feedline/search (event/list недоступен для всех ролей)
 extension PublicProfileScreenController {
     func loadEvents() {
         guard let userId = model.userId else {
-            debugLog("❌ [EVENTS] userId is nil")
+            controllerNode.updateEventsList([])
             return
         }
 
-        debugLog("📢 [EVENTS] Starting load for userId: \(userId)")
-
-        let mockEvents: [EventItem] = [
-            EventItem(
-                name: "EventItem",
-                data: "June 24",
-                time: "5:00 PM",
-                countryFlag: "🇺🇸",
-                city: "New York",
-                customAvatarURL: nil
-            ),
-            EventItem(
-                name: "EventItem",
-                data: "June 24",
-                time: "5:00 PM",
-                countryFlag: "🇺🇸",
-                city: "New York",
-                customAvatarURL: nil
-            ),
-            EventItem(
-                name: "EventItem",
-                data: "June 24",
-                time: "5:00 PM",
-                countryFlag: "🇺🇸",
-                city: "New York",
-                customAvatarURL: nil
-            ),
-            EventItem(
-                name: "EventItem",
-                data: "June 24",
-                time: "5:00 PM",
-                countryFlag: "🇺🇸",
-                city: "New York",
-                customAvatarURL: nil
-            ),
-            EventItem(
-                name: "EventItem",
-                data: "June 24",
-                time: "5:00 PM",
-                countryFlag: "🇺🇸",
-                city: "New York",
-                customAvatarURL: nil
-            ),
-            EventItem(
-                name: "EventItem",
-                data: "June 24",
-                time: "5:00 PM",
-                countryFlag: "🇺🇸",
-                city: "New York",
-                customAvatarURL: nil
-            ),
-            EventItem(
-                name: "EventItem",
-                data: "June 24",
-                time: "5:00 PM",
-                countryFlag: "🇺🇸",
-                city: "New York",
-                customAvatarURL: nil
-            ),
-            EventItem(
-                name: "EventItem",
-                data: "June 24",
-                time: "5:00 PM",
-                countryFlag: "🇺🇸",
-                city: "New York",
-                customAvatarURL: nil
-            ),
-            EventItem(
-                name: "EventItem",
-                data: "June 24",
-                time: "5:00 PM",
-                countryFlag: "🇺🇸",
-                city: "New York",
-                customAvatarURL: nil
-            ),
-            EventItem(
-                name: "EventItem",
-                data: "June 24",
-                time: "5:00 PM",
-                countryFlag: "🇺🇸",
-                city: "New York",
-                customAvatarURL: nil
-            ),
-            EventItem(
-                name: "EventItem",
-                data: "June 24",
-                time: "5:00 PM",
-                countryFlag: "🇺🇸",
-                city: "New York",
-                customAvatarURL: nil
-            ),
-            EventItem(
-                name: "EventItem",
-                data: "June 24",
-                time: "5:00 PM",
-                countryFlag: "🇺🇸",
-                city: "New York",
-                customAvatarURL: nil
-            )
-        ]
-        
-        debugLog("📢 [EVENTS] Created \(mockEvents.count) mock events")
-        
-        DispatchQueue.main.async { [weak self] in
-            self?.debugLog("📢 [EVENTS] Calling updateEventsList with \(mockEvents.count) items")
-            self?.controllerNode.updateEventsList(mockEvents)
+        Task { @MainActor in
+            do {
+                let body = FeedlineSearchEventsRequest(offset: 0, limit: 50, isEvents: true)
+                let response: FeedlineResponse = try await DivoAPIClient.shared.request(
+                    path: "/feedline/search",
+                    method: "POST",
+                    body: body
+                )
+                let items = response.data.items.filter { $0.user.id == userId }
+                let events = items.map { item -> EventItem in
+                    let desc = item.description ?? ""
+                    let avatarURL: String? = item.files.first.flatMap {
+                        CDNURLHelper.convertToCDNURL($0.fullUrl)?.absoluteString
+                    }
+                    return EventItem(
+                        name: item.title,
+                        data: desc,
+                        time: "",
+                        countryFlag: "",
+                        city: "",
+                        customAvatarURL: avatarURL
+                    )
+                }
+                self.controllerNode.updateEventsList(events)
+            } catch {
+                print("❌ [EVENTS] Error: \(error)")
+                self.controllerNode.updateEventsList([])
+            }
         }
     }
 }

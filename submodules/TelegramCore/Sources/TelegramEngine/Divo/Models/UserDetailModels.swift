@@ -262,6 +262,34 @@ public struct GenderOption: Codable {
     public let title: String
 }
 
+public struct AgencyListRequest: Encodable {
+    public let offset: Int
+    public let limit: Int
+    public let title: String?
+
+    public init(offset: Int, limit: Int, title: String?) {
+        self.offset = offset
+        self.limit = limit
+        self.title = title
+    }
+}
+
+public struct AgencyListResponse: Decodable {
+    public let message: String?
+    public let data: AgencyListData
+    public let errors: [String]?
+}
+
+public struct AgencyListData: Decodable {
+    public let items: [AgencyItem]
+    public let pagination: Pagination
+}
+
+public struct AgencyItem: Decodable {
+    public let id: Int
+    public let title: String
+}
+
 public struct AppearanceDictionaryResponse: Codable {
     public let data: AppearanceDictionaryData
 }
@@ -353,4 +381,82 @@ public struct AddGalleryResponse: Decodable {
     public let message: String?
     public let data: UserPhoto?
     public let errors: String?
+}
+
+// MARK: - Agency Models List
+
+public struct AgencyModelsResponse: Decodable {
+    public let message: String?
+    public let data: AgencyModelsData?
+}
+
+public struct AgencyModelsData: Decodable {
+    public let items: [AgencyModelItem]
+    public let pagination: AgencyModelsPagination?
+}
+
+public struct AgencyModelItem: Decodable {
+    public let id: Int
+    public let name: String?
+    public let birthday: String?
+    public let photo: UserFile?
+    public let city: UserCity?
+    public let userId: Int?
+}
+
+public struct AgencyModelsPagination: Decodable {
+    public let meta: AgencyModelsPaginationMeta?
+}
+
+public struct AgencyModelsPaginationMeta: Decodable {
+    public let limit: Int?
+    public let currentOffset: Int?
+    public let totalCount: Int?
+}
+
+// MARK: - Events List
+
+public struct EventListResponse: Decodable {
+    public let message: String?
+    public let data: EventListData?
+}
+
+public struct EventListData: Decodable {
+    public let items: [EventListItem]
+    public let pagination: AgencyModelsPagination?
+}
+
+public struct EventListItem: Decodable {
+    public let id: Int
+    public let title: String?
+    public let description: String?
+    public let date: String?
+    public let dateTo: String?
+    public let address: EventAddress?
+    public let files: [UserFile]?
+}
+
+public struct EventAddress: Decodable {
+    public let street: String?
+    public let house: String?
+    public let formatted: String?
+    public let city: UserCity?
+}
+
+public struct AgencyModelsListRequest: Encodable {
+    public let offset: Int
+    public let limit: Int
+    public init(offset: Int, limit: Int) {
+        self.offset = offset
+        self.limit = limit
+    }
+}
+
+public struct EventListRequest: Encodable {
+    public let offset: Int
+    public let limit: Int
+    public init(offset: Int, limit: Int) {
+        self.offset = offset
+        self.limit = limit
+    }
 }

@@ -605,9 +605,14 @@ final class PublicProfileScreenNode: ASDisplayNode {
         super.init()
         
         self.view.backgroundColor = .black
-        
+
+        if model.role == "agency_employee" {
+            self.modelRole = "agency_employee"
+        }
+
         setupContent()
         configureNodes()
+        segmentedBar.configure(isAgency: model.role == "agency_employee", isMyProfile: model.isMyProfile, animated: false)
         loadSimilarProfiles()
     }
     
@@ -2276,6 +2281,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
         let hasItems = !items.isEmpty
         self.channelGalleryStatusView.isHidden = hasItems
         self.channelGalleryCollectionView.isHidden = !hasItems
+        if !hasItems {
+            self.channelGalleryStatusView.configure(isLoading: false, text: "No channels yet", isMyProfile: false)
+        }
         self.channelGalleryCollectionView.reloadData()
         
         if let layout = self.containerLayout?.0 {
@@ -2316,6 +2324,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
         let hasItems = !items.isEmpty
         self.modelGalleryStatusView.isHidden = hasItems
         self.modelGalleryCollectionView.isHidden = !hasItems
+        if !hasItems {
+            self.modelGalleryStatusView.configure(isLoading: false, text: "No models yet", isMyProfile: false)
+        }
         self.modelGalleryCollectionView.reloadData()
         
         if let layout = self.containerLayout?.0 {
@@ -2354,6 +2365,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
         let hasItems = !items.isEmpty
         self.eventGalleryStatusView.isHidden = hasItems
         self.eventGalleryCollectionView.isHidden = !hasItems
+        if !hasItems {
+            self.eventGalleryStatusView.configure(isLoading: false, text: "No events yet", isMyProfile: false)
+        }
         self.eventGalleryCollectionView.reloadData()
         
         if let layout = self.containerLayout?.0 {
@@ -2752,7 +2766,7 @@ extension PublicProfileScreenNode: UIScrollViewDelegate {
 // MARK: - ProfileInfoViewDelegate
 
 extension PublicProfileScreenNode: ProfileInfoViewDelegate {
-    func profileInfoViewDidUpdateContentHeight() {
+    func profileInfoViewDidUpdateContentHeight(animated: Bool) {
         UIView.performWithoutAnimation {
             self.setNeedsLayout()
             self.layoutIfNeeded()

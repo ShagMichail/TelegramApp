@@ -345,8 +345,9 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         guard selectedTabIndex < tabsStackView.arrangedSubviews.count,
               let selectedButton = tabsStackView.arrangedSubviews[selectedTabIndex] as? UIButton else { return }
 
+        tabsStackView.layoutIfNeeded()
+
         let indicatorHeight: CGFloat = 2
-        let gap: CGFloat = 10
         let textSize: CGSize
         if let title = selectedButton.titleLabel?.text, let font = selectedButton.titleLabel?.font {
             textSize = (title as NSString).size(withAttributes: [.font: font])
@@ -355,14 +356,13 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         }
 
         let buttonFrame = selectedButton.convert(selectedButton.bounds, to: tabsScrollView)
-        let textY = buttonFrame.midY - textSize.height / 2.0
-        let textX = buttonFrame.midX - textSize.width / 2.0
+        let indicatorWidth = ceil(textSize.width) + 4
+        let indicatorX = buttonFrame.midX - indicatorWidth / 2.0
 
-        let padding: CGFloat = 2
         tabIndicatorView.frame = CGRect(
-            x: floor(textX) - padding,
-            y: floor(textY + textSize.height + gap),
-            width: ceil(textSize.width) + padding * 2,
+            x: floor(indicatorX),
+            y: buttonFrame.maxY - indicatorHeight - 2,
+            width: indicatorWidth,
             height: indicatorHeight
         )
         tabsScrollView.bringSubviewToFront(tabIndicatorView)
@@ -658,6 +658,41 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         }
 
         self.cards[idx] = card
+    }
+
+    func cardCell(_ cell: CardCollectionViewCell, didTapFollowForUserId userId: Int, isFollowed: Bool) {
+        guard let indexPath = mainCollectionView.indexPath(for: cell) else { return }
+        let idx = indexPath.item
+        guard idx < self.cards.count else { return }
+        self.cards[idx].isFollowed = isFollowed
+
+        let path = isFollowed ? "/follower/follow" : "/follower/unfollow"
+        let body = FollowRequest(id: userId)
+
+        Task { @MainActor in
+            do {
+                let _: FollowResponse = try await DivoAPIClient.shared.request(
+                    path: path,
+                    method: "POST",
+                    body: body
+                )
+                if !isFollowed && self.selectedTabIndex == 0 {
+                    self.cards.remove(at: idx)
+                    self.mainCollectionView.deleteItems(at: [indexPath])
+                } else {
+                    let message = isFollowed ? "Subscribed!" : "Unsubscribed"
+                    let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "OK", style: .default))
+                    self.controller?.view.window?.rootViewController?.present(alert, animated: true)
+                }
+            } catch {
+                self.cards[idx].isFollowed = !isFollowed
+                if let cell = self.mainCollectionView.cellForItem(at: indexPath) as? CardCollectionViewCell {
+                    cell.configure(with: self.cards[idx], delegate: self)
+                }
+                print("❌ [FOLLOW] Error: \(error)")
+            }
+        }
     }
 
     // MARK: - Loading Placeholder
