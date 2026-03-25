@@ -1,6 +1,7 @@
 import UIKit
 import PhotosUI
 import UniformTypeIdentifiers
+import AVFoundation
 import AsyncDisplayKit
 import Display
 import TelegramCore
@@ -47,6 +48,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
     private var customBackSwipeGestureRecognizer: UIScreenEdgePanGestureRecognizer?
     
     private let model: ProfileModel
+    private var userID: Int = -1
     private var userDetailModel: UserDetail? = nil
     private var userProfileData: UserProfileData? = nil
     private let context: AccountContext
@@ -175,40 +177,22 @@ public final class PublicProfileScreenController: TelegramBaseController {
 
     @available(iOS 14, *)
     private func navigateToAddPhoto() {
-        PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] status in
-            guard status == .authorized else {
-                return
-            }
-
-            DispatchQueue.main.async {
-                var configuration = PHPickerConfiguration()
-                configuration.filter = .images
-                configuration.selectionLimit = 1
-
-                let picker = PHPickerViewController(configuration: configuration)
-                picker.delegate = self
-                self?.present(picker, animated: true)
-            }
-        }
+        var configuration = PHPickerConfiguration()
+        configuration.filter = .images
+        configuration.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = self
+        self.present(picker, animated: true)
     }
 
     @available(iOS 14, *)
     private func navigateToAddVideo() {
-        PHPhotoLibrary.requestAuthorization(for: .readWrite) { status in
-            guard status == .authorized else {
-                return
-            }
-
-            DispatchQueue.main.async {
-                var configuration = PHPickerConfiguration()
-                configuration.filter = .videos
-                configuration.selectionLimit = 1
-
-                let picker = PHPickerViewController(configuration: configuration)
-                picker.delegate = self
-                self.present(picker, animated: true)
-            }
-        }
+        var configuration = PHPickerConfiguration()
+        configuration.filter = .videos
+        configuration.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = self
+        self.present(picker, animated: true)
     }
 
     private func navigateToEditProfile() {
@@ -311,14 +295,14 @@ public final class PublicProfileScreenController: TelegramBaseController {
             getEngagementTotals()
         }
         getUserGalleryProfile()
+        controllerNode.retryVisibleVideoThumbnails()
     }
 
     private func getEngagementTotals() {
-        guard let userId = model.userId else { return }
-        
+        guard isMyProfile || model.userId != nil else { return }
         Task {
             do {
-                let path = isMyProfile ? "/user/engagement?offset=0&limit=1" : "/user/engagement?offset=0&limit=1&userId=\(userId)"
+                let path = isMyProfile ? "/user/engagement?offset=0&limit=1" : "/user/engagement?offset=0&limit=1&userId=\(model.userId!)"
                 
                 let response: UserEngagementResponse = try await DivoAPIClient.shared.request(
                     path: path,
@@ -368,6 +352,9 @@ public final class PublicProfileScreenController: TelegramBaseController {
                 await MainActor.run {
                     self.userDetailModel = response.data
                     self.controllerNode.updateWithUserDetail(response.data, self.isMyProfile)
+                    self.userID = response.data.id
+                    self.loadGalleryPage(userId: self.userID, offset: 0)
+                    self.loadVideoGalleryPage(userId: self.userID, offset: 0)
                 }
             } catch {
                 self.debugLog("[DivoAPI] getUserProfile error: \(error)")
@@ -377,20 +364,33 @@ public final class PublicProfileScreenController: TelegramBaseController {
     
     private func getUserGalleryProfile() {
         guard !galleryLoaded else { return }
-        if !isMyProfile {
-            guard let userId = model.userId else { return }
-            galleryLoaded = true
-            controllerNode.resetGalleryPagination()
-            loadGalleryPage(userId: userId, offset: 0)
-        } else {
-            galleryLoaded = true
-            controllerNode.resetGalleryPagination()
-            loadGalleryPage(userId: 0, offset: 0)
-        }
+        galleryLoaded = true
+        controllerNode.resetGalleryPagination()
     }
     
     @objc func moreMenu() {
 
+    }
+
+    func showErrorAlert(_ message: String) {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        self.present(alert, animated: true)
+    }
+
+    private static func userFacingMessage(from error: Error) -> String {
+        if case DivoAPIError.httpError(_, let body) = error, !body.isEmpty {
+            if let data = body.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let message = json["message"] as? String {
+                return message
+            }
+            return body
+        }
+        if (error as NSError).domain == NSURLErrorDomain {
+            return "No internet connection. Please try again."
+        }
+        return "Something went wrong. Please try again."
     }
 }
 
@@ -400,11 +400,7 @@ extension PublicProfileScreenController {
         controllerNode.setGalleryLoading(true)
 
         var body: GalleryListRequest
-        if !isMyProfile {
-            body = GalleryListRequest(offset: offset, limit: 6, userId: userId)
-        } else {
-            body = GalleryListRequest(offset: offset, limit: 6, userId: 31999)
-        }
+        body = GalleryListRequest(offset: offset, limit: 6, userId: userId)
 
         Task {
             do {
@@ -422,11 +418,9 @@ extension PublicProfileScreenController {
                     self.controllerNode.appendGalleryPhotos(response.data, isMyProfile: isMy)
                     self.currentGalleryPhotos.append(contentsOf: newPhotos)
                     
-                    // 🚀 ЗАЩИТА: Обновляем только если есть что-то новое, иначе просто снимаем флаг загрузки
                     if !newPhotos.isEmpty {
                         self.activeGalleryController?.updateData(photos: self.currentGalleryPhotos, videos: self.currentGalleryVideos)
                     } else {
-                        // Сообщаем галерее, что загрузка окончена (чтобы она сняла блок)
                         self.activeGalleryController?.finishLoadingWithoutNewData()
                     }
                 }
@@ -447,19 +441,23 @@ extension PublicProfileScreenController {
         
         if tabIndex == 0 {
             guard !currentGalleryPhotos.isEmpty, itemIndex < currentGalleryPhotos.count else { return }
+            
             galleryController = ProfileGalleryController(
                 context: self.context,
                 photos: currentGalleryPhotos,
                 initialIndex: itemIndex,
-                isVideoGallery: false
+                isVideoGallery: false,
+                isOwnProfile: self.isMyProfile
             )
         } else if tabIndex == 1 {
             guard !currentGalleryVideos.isEmpty, itemIndex < currentGalleryVideos.count else { return }
+            
             galleryController = ProfileGalleryController(
                 context: self.context,
                 videos: currentGalleryVideos,
                 initialIndex: itemIndex,
-                isVideoGallery: true
+                isVideoGallery: true,
+                isOwnProfile: self.isMyProfile
             )
         } else {
             return
@@ -474,6 +472,18 @@ extension PublicProfileScreenController {
             }
         }
         
+        galleryController.onDeletePublication = { [weak self] deletedId in
+            guard let self = self else { return }
+            if tabIndex == 0 {
+                self.currentGalleryPhotos.removeAll { $0.id == deletedId }
+                self.controllerNode.removePhoto(withId: deletedId)
+                
+            } else if tabIndex == 1 {
+                self.currentGalleryVideos.removeAll { $0.id == deletedId }
+                self.controllerNode.removeVideo(withId: deletedId)
+            }
+        }
+        
         self.activeGalleryController = galleryController
         self.push(galleryController)
     }
@@ -484,12 +494,9 @@ extension PublicProfileScreenController {
 extension PublicProfileScreenController {
     func loadVideoGalleryPage(userId: Int, offset: Int) {
         controllerNode.setVideoGalleryLoading(true)
+
         var body: GalleryListRequest
-        if !isMyProfile {
-            body = GalleryListRequest(offset: offset, limit: 6, userId: userId)
-        } else {
-            body = GalleryListRequest(offset: offset, limit: 6, userId: 31999)
-        }
+        body = GalleryListRequest(offset: offset, limit: 6, userId: userId)
         
         Task {
             do {
@@ -516,7 +523,6 @@ extension PublicProfileScreenController {
                     )
                     self.currentGalleryVideos.append(contentsOf: newVideos)
                     
-                    // 🚀 ЗАЩИТА: Обновляем только если пришло новое видео
                     if !newVideos.isEmpty {
                         self.activeGalleryController?.updateData(photos: self.currentGalleryPhotos, videos: self.currentGalleryVideos)
                     } else {
@@ -656,12 +662,12 @@ extension PublicProfileScreenController {
     }
     
     private func loadInteractionData(type: InteractionListType, offset: Int, completion: @escaping ([InteractionUser], Bool) -> Void) {
-        guard let userId = model.userId else { return }
+        guard self.userID != -1 else { return }
         
         let limit = 20
         Task {
             do {
-                let path = isMyProfile ? "/user/engagement?offset=\(offset)&limit=\(limit)" : "/user/engagement?offset=\(offset)&limit=\(limit)&userId=\(userId)"
+                let path = isMyProfile ? "/user/engagement?offset=\(offset)&limit=\(limit)" : "/user/engagement?offset=\(offset)&limit=\(limit)&userId=\(self.userID)"
                 let response: UserEngagementResponse = try await DivoAPIClient.shared.request(path: path, method: "GET")
                 
                 var apiItems: [EngagementItem] = []
@@ -763,11 +769,11 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
     private func uploadAndAddPhoto(_ image: UIImage) {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
 
+        Task { @MainActor in
+            self.controllerNode.startPhotoUpload(image: image)
+        }
+
         Task {
-            await MainActor.run {
-                self.controllerNode.setGalleryLoading(true)
-            }
-            
             do {
                 let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
                     path: "/file/upload-file",
@@ -789,40 +795,38 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                 )
 
                 await MainActor.run {
-                    self.controllerNode.setGalleryLoading(false)
-
                     if let newPhoto = addResponse.data {
-                        self.controllerNode.insertNewPhoto(newPhoto)
+                        self.controllerNode.finishPhotoUpload(photo: newPhoto)
+                        self.currentGalleryPhotos.insert(newPhoto, at: 0)
                     } else {
+                        self.controllerNode.cancelPhotoUpload()
                         self.galleryLoaded = false
                         self.getUserGalleryProfile()
                     }
                 }
 
             } catch {
-                print("❌ [UPLOAD PHOTO] Ошибка: \(error)")
                 await MainActor.run {
-                    self.controllerNode.setGalleryLoading(false)
+                    self.controllerNode.cancelPhotoUpload()
+                    self.showErrorAlert(Self.userFacingMessage(from: error))
                 }
             }
         }
     }
 
     private func uploadAndAddVideo(_ videoURL: URL) {
-        print("🎬 [UPLOAD VIDEO] Starting upload for: \(videoURL)")
-        
         guard let videoData = try? Data(contentsOf: videoURL) else {
             print("❌ [UPLOAD VIDEO] Failed to read video data")
             return
         }
-        
-        print("🎬 [UPLOAD VIDEO] Video size: \(videoData.count) bytes")
+
+        let thumbnail = generateVideoThumbnailSync(from: videoURL)
+
+        Task { @MainActor in
+            self.controllerNode.startVideoUpload(thumbnail: thumbnail)
+        }
 
         Task {
-            await MainActor.run {
-                self.controllerNode.setVideoGalleryLoading(true)
-            }
-
             do {
                 let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
                     path: "/file/upload-file",
@@ -830,13 +834,13 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                     fileName: "video.mov",
                     mimeType: "video/quicktime"
                 )
-
+                
                 guard let fileUuid = uploadResponse.data?.uuid else {
                     throw DivoAPIError.unknown
                 }
-
+                
                 print("🎬 [UPLOAD VIDEO] File uploaded successfully, uuid: \(fileUuid)")
-
+                
                 let body = AddPublicationRequest(
                     title: "My Video",
                     description: "Video description",
@@ -845,7 +849,7 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                         VideoFileData(order: 0, fileUuid: fileUuid)
                     ]
                 )
-
+                
                 let addResponse: AddPublicationResponse = try await DivoAPIClient.shared.request(
                     path: "/publication/create",
                     method: "POST",
@@ -853,8 +857,6 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                 )
                 
                 await MainActor.run {
-                    self.controllerNode.setVideoGalleryLoading(false)
-
                     if let newVideo = addResponse.data {
                         let video = UserPhoto(
                             id: newVideo.id ?? 0,
@@ -868,21 +870,50 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                             isLikedByUser: false,
                             preview: nil
                         )
-                        self.controllerNode.insertNewVideo(video)
+                        self.controllerNode.finishVideoUpload(video: video)
+                        self.currentGalleryVideos.insert(
+                            UserVideoItem(
+                                id: video.id,
+                                title: "",
+                                description: "",
+                                type: "",
+                                likesCount: 0,
+                                isLikedByUser: false,
+                                files: [UserVideoFile(
+                                    order: nil,
+                                    fileName: video.photo.fileName,
+                                    fullUrl: video.photo.fullUrl,
+                                    fileUuid: video.photo.fileUuid,
+                                    fileExtension: video.photo.fileExtension,
+                                    description: nil
+                                )]
+                            ),
+                            at: 0
+                        )
+                    } else {
+                        self.controllerNode.cancelVideoUpload()
                     }
                 }
-
-                print("🎬 [UPLOAD VIDEO] Publication added successfully")
 
                 try? FileManager.default.removeItem(at: videoURL)
 
             } catch {
-                print("❌ [UPLOAD VIDEO] Ошибка: \(error)")
                 await MainActor.run {
-                    self.controllerNode.setVideoGalleryLoading(false)
+                    self.controllerNode.cancelVideoUpload()
+                    self.showErrorAlert(Self.userFacingMessage(from: error))
                 }
                 try? FileManager.default.removeItem(at: videoURL)
             }
         }
+    }
+
+    private func generateVideoThumbnailSync(from url: URL) -> UIImage? {
+        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 480, height: 480)
+        let time = CMTime(seconds: 0.1, preferredTimescale: 600)
+        guard let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) else { return nil }
+        return UIImage(cgImage: cgImage)
     }
 }

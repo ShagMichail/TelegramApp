@@ -19,17 +19,17 @@ final class VideoGalleryCellNode: UICollectionViewCell {
     private var statusObservation: NSKeyValueObservation?
     private var displayLink: CADisplayLink?
     private var pendingVideoURL: URL?
-
+    
     private weak var nativeControlsView: UIView?
-
-
+    
+    
     // MARK: - Init
-
+    
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupViews()
     }
-
+    
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
@@ -37,36 +37,34 @@ final class VideoGalleryCellNode: UICollectionViewCell {
     deinit {
         displayLink?.invalidate()
     }
-
-
-    // MARK: - Override 
+    
+    
+    // MARK: - Override
     
     override func prepareForReuse() {
         super.prepareForReuse()
         resetPlayer()
     }
-
-
+    
+    
     // MARK: - Internal
-
+    
     func configure(with file: UserVideoFile) {
         resetPlayer()
         guard let urlString = file.fullUrl, let url = URL(string: urlString) else { return }
-        // Только запоминаем URL — плеер создаём лениво в play(),
-        // чтобы не нагружать главный поток при быстром скролле.
         pendingVideoURL = url
     }
-
+    
     func play() {
         if player == nil, let url = pendingVideoURL {
             setupPlayer(with: url)
         }
         player?.play()
     }
-
+    
     func pause() { player?.pause() }
     
-
+    
     // MARK: - Private
     
     private func setupViews() {
@@ -90,12 +88,12 @@ final class VideoGalleryCellNode: UICollectionViewCell {
             playerViewController.view.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             playerViewController.view.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             playerViewController.view.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-
+            
             loadingSpinner.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             loadingSpinner.centerYAnchor.constraint(equalTo: contentView.centerYAnchor)
         ])
     }
-
+    
     private func getAppleControlsView() -> UIView? {
         if let cached = nativeControlsView, cached.superview != nil {
             return cached
@@ -117,15 +115,15 @@ final class VideoGalleryCellNode: UICollectionViewCell {
         }
         return nil
     }
-
+    
     private func setupPlayer(with url: URL) {
         loadingSpinner.startAnimating()
-
+        
         playerItem = AVPlayerItem(url: url)
         player = AVPlayer(playerItem: playerItem)
         player?.isMuted = false
         playerViewController.player = player
-
+        
         statusObservation = playerItem?.observe(\.status, options: [.new]) { [weak self] item, _ in
             DispatchQueue.main.async {
                 if item.status == .readyToPlay || item.status == .failed {
@@ -133,26 +131,26 @@ final class VideoGalleryCellNode: UICollectionViewCell {
                 }
             }
         }
-
+        
         NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: playerItem, queue: .main) { [weak self] _ in
             self?.player?.seek(to: .zero)
             self?.player?.play()
         }
     }
-
+    
     private func resetPlayer() {
         statusObservation?.invalidate()
         statusObservation = nil
-
+        
         NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: playerItem)
-
+        
         player?.pause()
         player = nil
         playerItem = nil
         pendingVideoURL = nil
         playerViewController.player = nil
         loadingSpinner.stopAnimating()
-
+        
         nativeControlsView = nil
     }
 }

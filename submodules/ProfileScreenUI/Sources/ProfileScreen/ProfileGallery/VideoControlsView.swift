@@ -34,7 +34,7 @@ final class VideoControlsView: UIView {
         label.text = "0:00"
         return label
     }()
-
+    
     private let muteButton: UIButton = {
         let button = UIButton(type: .custom)
         button.setImage(UIImage(systemName: "speaker.slash.fill"), for: .normal)
@@ -49,8 +49,8 @@ final class VideoControlsView: UIView {
     
     private var currentDuration: Float = 0
     private var currentProgress: Float = 0
-
-
+    
+    
     // MARK: - Init
     
     override init(frame: CGRect) {
@@ -59,31 +59,31 @@ final class VideoControlsView: UIView {
         self.layer.cornerRadius = 8
         self.clipsToBounds = true
         self.isUserInteractionEnabled = true
-
+        
         self.addSubview(self.playPauseButton)
         self.addSubview(self.slider)
         self.addSubview(self.timeLabel)
         self.addSubview(self.muteButton)
-
+        
         NSLayoutConstraint.activate([
             self.playPauseButton.leadingAnchor.constraint(equalTo: self.leadingAnchor, constant: 8),
             self.playPauseButton.centerYAnchor.constraint(equalTo: self.centerYAnchor),
             self.playPauseButton.widthAnchor.constraint(equalToConstant: 32),
             self.playPauseButton.heightAnchor.constraint(equalToConstant: 32),
-
+            
             self.slider.leadingAnchor.constraint(equalTo: self.playPauseButton.trailingAnchor, constant: 8),
             self.slider.trailingAnchor.constraint(equalTo: self.timeLabel.leadingAnchor, constant: -8),
             self.slider.centerYAnchor.constraint(equalTo: self.centerYAnchor),
-
+            
             self.timeLabel.trailingAnchor.constraint(equalTo: self.muteButton.leadingAnchor, constant: -8),
             self.timeLabel.centerYAnchor.constraint(equalTo: self.centerYAnchor),
             self.timeLabel.widthAnchor.constraint(equalToConstant: 50),
-
+            
             self.muteButton.trailingAnchor.constraint(equalTo: self.trailingAnchor, constant: -8),
             self.muteButton.centerYAnchor.constraint(equalTo: self.centerYAnchor),
             self.muteButton.widthAnchor.constraint(equalToConstant: 32),
         ])
-
+        
         self.playPauseButton.addTarget(self, action: #selector(self.playPausePressed), for: .touchUpInside)
         self.slider.addTarget(self, action: #selector(self.sliderChanged), for: .valueChanged)
         
@@ -95,9 +95,9 @@ final class VideoControlsView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
     
-
+    
     // MARK: - Override
-
+    
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let hitView = super.hitTest(point, with: event)
         
@@ -107,10 +107,10 @@ final class VideoControlsView: UIView {
         
         return hitView
     }
-
+    
     
     // MARK: - Internal
-
+    
     func setMuted(_ muted: Bool) {
         let imageName = muted ? "speaker.slash.fill" : "speaker.wave.2.fill"
         self.muteButton.setImage(UIImage(systemName: imageName), for: .normal)
@@ -131,7 +131,7 @@ final class VideoControlsView: UIView {
             self.updateTimeLabel()
         }
     }
-
+    
     func setCurrentTime(_ currentTime: Float) {
         guard self.currentDuration > 0 && !self.currentDuration.isNaN else { return }
         
@@ -144,9 +144,9 @@ final class VideoControlsView: UIView {
         self.updateTimeLabel(currentTime: clampedCurrent)
     }
     
-
+    
     // MARK: - Private
-
+    
     private func updateTimeLabel(currentTime: Float? = nil) {
         let current = currentTime ?? (self.currentProgress * self.currentDuration)
         let total = self.currentDuration
@@ -167,9 +167,9 @@ final class VideoControlsView: UIView {
         }
     }
     
-
+    
     // MARK: - @objc
-
+    
     @objc private func playPausePressed() {
         self.onPlayPause?()
     }
@@ -180,7 +180,7 @@ final class VideoControlsView: UIView {
         self.onSeek?(value)
         self.updateTimeLabel()
     }
-
+    
     @objc private func mutePressed() {
         self.onMuteToggle?()
     }

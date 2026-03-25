@@ -31,6 +31,16 @@ final class VideoGalleryCell: UICollectionViewCell {
         return firstFrameCache.object(forKey: urlString as NSString)
     }
 
+    private static let previewFrameCache = NSCache<NSString, UIImage>()
+
+    static func cachedPreviewFrame(for urlString: String) -> UIImage? {
+        return previewFrameCache.object(forKey: urlString as NSString)
+    }
+
+    static func cachePreviewFrame(_ image: UIImage, for urlString: String) {
+        previewFrameCache.setObject(image, forKey: urlString as NSString)
+    }
+
     private let thumbnailImageView: UIImageView = {
         let iv = UIImageView()
         iv.contentMode = .scaleAspectFill
@@ -230,6 +240,21 @@ final class VideoGalleryCell: UICollectionViewCell {
     override func didMoveToWindow() {
         super.didMoveToWindow()
         layoutIfNeeded()
+    }
+
+    func configureUploading(thumbnail: UIImage?) {
+        configurationId &+= 1
+        fallbackContainer.isHidden = true
+        if let thumbnail = thumbnail {
+            thumbnailImageView.image = thumbnail
+            thumbnailImageView.alpha = 0.6
+            shimmerContainer.isHidden = true
+            hasVisualContent = true
+        } else {
+            shimmerContainer.isHidden = false
+            shimmerContainer.alpha = 1.0
+            shimmerContainer.startShimmering()
+        }
     }
 
     func configure(with videoUrl: String, previewUrl: String? = nil, title: String? = nil) {
@@ -510,6 +535,21 @@ final class VideoGalleryCell: UICollectionViewCell {
                 }
             }
             return
+        }
+
+        if let previewImage = Self.previewFrameCache.object(forKey: cacheKey) {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                guard self.configurationId == configurationId, self.currentVideoUrl == videoUrl else { return }
+                if !self.hasVisualContent {
+                    self.thumbnailImageView.image = previewImage
+                    self.hasVisualContent = true
+                    self.hideFallback()
+                    if !self.shimmerContainer.isHidden {
+                        self.hideShimmer()
+                    }
+                }
+            }
         }
 
         guard !isGeneratingThumbnail else {

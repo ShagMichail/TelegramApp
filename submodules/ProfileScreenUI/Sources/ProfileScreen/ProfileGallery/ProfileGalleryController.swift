@@ -6,7 +6,6 @@ import TelegramBaseController
 import TelegramCore
 import TelegramPresentationData
 import AccountContext
-import PhotoResources
 
 public class ProfileGalleryController: TelegramBaseController {
     private var galleryNode: ProfileGalleryControllerNode {
@@ -19,7 +18,9 @@ public class ProfileGalleryController: TelegramBaseController {
     private let context: AccountContext
     private let initialIndex: Int
     private let isVideoGallery: Bool
-    
+    private let isOwnProfile: Bool
+    private var isDeleting = false
+
     public var requestMoreData: (() -> Void)? {
         didSet {
             if self.isNodeLoaded {
@@ -28,12 +29,15 @@ public class ProfileGalleryController: TelegramBaseController {
         }
     }
     
+    public var onDeletePublication: ((Int) -> Void)?
+    
     public init(
         context: AccountContext,
         photos: [UserPhoto] = [],
         videos: [UserVideoItem] = [],
         initialIndex: Int = 0,
-        isVideoGallery: Bool = false
+        isVideoGallery: Bool = false,
+        isOwnProfile: Bool = false
     ) {
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
@@ -41,6 +45,7 @@ public class ProfileGalleryController: TelegramBaseController {
         self.videos = videos
         self.initialIndex = initialIndex
         self.isVideoGallery = isVideoGallery
+        self.isOwnProfile = isOwnProfile
         
         let darkNavigationTheme = NavigationBarTheme(
             overallDarkAppearance: true,
@@ -64,6 +69,12 @@ public class ProfileGalleryController: TelegramBaseController {
         
         let totalCount = isVideoGallery ? videos.count : photos.count
         self.title = "\(initialIndex + 1) of \(totalCount)"
+        
+        if isOwnProfile {
+            let editButtonImg = generateTintedImage(image: UIImage(bundleImageName: "Profile/MoreActionIcon"), color: .white)
+            let editButton = UIBarButtonItem(image: editButtonImg, style: .plain, target: self, action: #selector(self.editMenu))
+            self.navigationItem.rightBarButtonItem = editButton
+        }
     }
     
     required public init(coder aDecoder: NSCoder) {
@@ -72,19 +83,15 @@ public class ProfileGalleryController: TelegramBaseController {
     
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        // При открытии галереи с видео переключаемся на .playback,
-        // чтобы звук воспроизводился корректно через динамик.
         if isVideoGallery {
             try? AVAudioSession.sharedInstance().setCategory(.playback)
             try? AVAudioSession.sharedInstance().setActive(true)
         }
     }
-
+    
     override public func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         self.galleryNode.pauseAllVideos()
-        // Восстанавливаем .ambient чтобы после закрытия галереи
-        // фоновая музыка других приложений возобновилась.
         if isVideoGallery {
             try? AVAudioSession.sharedInstance().setCategory(.ambient, options: .mixWithOthers)
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
@@ -99,6 +106,7 @@ public class ProfileGalleryController: TelegramBaseController {
             videos: self.videos,
             initialIndex: self.initialIndex,
             isVideoGallery: self.isVideoGallery,
+            isOwnProfile: self.isOwnProfile,
             controller: self
         )
         self.displayNode.backgroundColor = .black
@@ -111,7 +119,78 @@ public class ProfileGalleryController: TelegramBaseController {
         self.displayNodeDidLoad()
     }
     
-    public func updateData(photos: [UserPhoto], videos:[UserVideoItem]) {
+    @objc func editMenu() {
+        guard let publicationId = self.galleryNode.getCurrentPublicationId() else { return }
+        let actionSheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+        
+        let deleteAction = UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
+            self?.performDeletePublication(id: publicationId)
+        }
+        
+        let cancelAction = UIAlertAction(title: "Cancel", style: .cancel, handler: nil)
+        
+        actionSheet.addAction(deleteAction)
+        actionSheet.addAction(cancelAction)
+        
+        if let popoverController = actionSheet.popoverPresentationController {
+            popoverController.barButtonItem = self.navigationItem.rightBarButtonItem
+        }
+        
+        self.present(actionSheet, animated: true, completion: nil)
+    }
+    
+    private func performDeletePublication(id: Int) {
+        guard !isDeleting else { return }
+        isDeleting = true
+        Task { @MainActor in
+            defer { self.isDeleting = false }
+            do {
+                let path = self.isVideoGallery ? "/publication/\(id)" : "/user-gallery/\(id)"
+                
+                let response: DeletePublicationResponse = try await DivoAPIClient.shared.request(
+                    path: path,
+                    method: "DELETE"
+                )
+                
+                if response.errors == nil {
+                    self.onDeletePublication?(id)
+                    
+                    self.galleryNode.removePublication(withId: id)
+                    
+                    if self.isVideoGallery {
+                        self.videos.removeAll { $0.id == id }
+                    } else {
+                        self.photos.removeAll { $0.id == id }
+                    }
+                    
+                    let totalCount = self.isVideoGallery ? self.videos.count : self.photos.count
+                    if totalCount > 0 {
+                        let currentIndex = min(self.galleryNode.currentIndex, totalCount - 1)
+                        self.title = "\(currentIndex + 1) of \(totalCount)"
+                    } else {
+                        if let nav = self.navigationController as? NavigationController {
+                            _ = nav.popViewController(animated: true)
+                        } else {
+                            self.dismiss()
+                        }
+                    }
+                } else {
+                    self.showAlert(text: response.errors?.first ?? "Failed to delete")
+                }
+            } catch {
+                print("❌ Error deleting publication: \(error)")
+                self.showAlert(text: error.localizedDescription)
+            }
+        }
+    }
+    
+    private func showAlert(text: String) {
+        let alert = UIAlertController(title: "Error", message: text, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
+        self.present(alert, animated: true)
+    }
+    
+    public func updateData(photos: [UserPhoto], videos: [UserVideoItem]) {
         self.photos = photos
         self.videos = videos
         

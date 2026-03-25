@@ -65,6 +65,16 @@ public struct UserVideoItem: Decodable {
     public let likesCount: Int
     public let isLikedByUser: Bool
     public let files: [UserVideoFile]
+
+    public init(id: Int, title: String?, description: String?, type: String?, likesCount: Int, isLikedByUser: Bool, files: [UserVideoFile]) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.type = type
+        self.likesCount = likesCount
+        self.isLikedByUser = isLikedByUser
+        self.files = files
+    }
 }
 
 public struct UserVideoFile: Decodable {
@@ -78,6 +88,15 @@ public struct UserVideoFile: Decodable {
     private enum CodingKeys: String, CodingKey {
         case order, fileName, fullUrl, fileUuid, description
         case fileExtension = "extension"
+    }
+
+    public init(order: Int?, fileName: String?, fullUrl: String?, fileUuid: String?, fileExtension: String?, description: String?) {
+        self.order = order
+        self.fileName = fileName
+        self.fullUrl = fullUrl
+        self.fileUuid = fileUuid
+        self.fileExtension = fileExtension
+        self.description = description
     }
 }
 
@@ -138,9 +157,15 @@ public struct UserPublicationFiles: Decodable {
     public let fileUuid: String?
     public let extensionType: String?
     public let description: String?
-    
+
     private enum CodingKeys: String, CodingKey {
         case order, fileName, fullUrl, fileUuid, description
         case extensionType = "extension"
     }
+}
+
+public struct DeletePublicationResponse: Decodable {
+    public let message: String?
+    public let data: String?
+    public let errors: [String]?
 }

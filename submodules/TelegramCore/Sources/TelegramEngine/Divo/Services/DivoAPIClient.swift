@@ -43,7 +43,9 @@ public final class DivoAPIClient {
         }
 
         guard (200...299).contains(http.statusCode) else {
-            throw DivoAPIError.httpError(statusCode: http.statusCode)
+            let body = String(data: data, encoding: .utf8) ?? ""
+            print("❌ API Error [\(http.statusCode)] \(url.absoluteString): \(body)")
+            throw DivoAPIError.httpError(statusCode: http.statusCode, body: body)
         }
 
         return try JSONDecoder().decode(T.self, from: data)
@@ -86,22 +88,22 @@ public final class DivoAPIClient {
         }
         
         guard (200...299).contains(http.statusCode) else {
-            let errorMsg = String(data: data, encoding: .utf8) ?? ""
-            print("❌ Upload Error Data: \(errorMsg)")
-            throw DivoAPIError.httpError(statusCode: http.statusCode)
+            let body = String(data: data, encoding: .utf8) ?? ""
+            print("❌ Upload Error [\(http.statusCode)]: \(body)")
+            throw DivoAPIError.httpError(statusCode: http.statusCode, body: body)
         }
-        
+
         return try JSONDecoder().decode(T.self, from: data)
     }
 }
 
 public enum DivoAPIError: Error, LocalizedError {
-    case httpError(statusCode: Int)
+    case httpError(statusCode: Int, body: String = "")
     case unknown
 
     public var errorDescription: String? {
         switch self {
-        case .httpError(let code): return "HTTP \(code)"
+        case .httpError(let code, _): return "HTTP \(code)"
         case .unknown: return "Unknown API error"
         }
     }

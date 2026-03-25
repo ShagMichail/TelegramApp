@@ -382,6 +382,8 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private var galleryHasMore: Bool = true
     private var galleryInitialized: Bool = false
     private var galleryImageNames: [String] = []
+    private var uploadingPhotoImage: UIImage?
+    private var uploadingVideoImage: UIImage?
     
     private lazy var galleryCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -954,17 +956,18 @@ final class PublicProfileScreenNode: ASDisplayNode {
         galleryHeightConstraint = galleryCollectionView.heightAnchor.constraint(equalToConstant: 1)
         galleryHeightConstraint.isActive = true
         
-        photoTabContainer.addSubview(galleryStatusView)
         photoTabContainer.addSubview(galleryCollectionView)
+        photoTabContainer.addSubview(galleryStatusView)
+
         NSLayoutConstraint.activate([
+            galleryCollectionView.topAnchor.constraint(equalTo: photoTabContainer.topAnchor),
+            galleryCollectionView.leadingAnchor.constraint(equalTo: photoTabContainer.leadingAnchor),
+            galleryCollectionView.trailingAnchor.constraint(equalTo: photoTabContainer.trailingAnchor),
+
             galleryStatusView.heightAnchor.constraint(equalToConstant: 160),
             galleryStatusView.topAnchor.constraint(equalTo: photoTabContainer.topAnchor),
             galleryStatusView.leadingAnchor.constraint(equalTo: photoTabContainer.leadingAnchor, constant: 16),
             galleryStatusView.trailingAnchor.constraint(equalTo: photoTabContainer.trailingAnchor, constant: -16),
-            
-            galleryCollectionView.topAnchor.constraint(equalTo: photoTabContainer.topAnchor),
-            galleryCollectionView.leadingAnchor.constraint(equalTo: photoTabContainer.leadingAnchor),
-            galleryCollectionView.trailingAnchor.constraint(equalTo: photoTabContainer.trailingAnchor)
         ])
         galleryCollectionView.isHidden = true
         galleryStatusView.isHidden = false
@@ -976,8 +979,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoHeightConstraint = videoGalleryCollectionView.heightAnchor.constraint(equalToConstant: 1)
         videoHeightConstraint.isActive = true
         
-        videoTabContainer.addSubview(videoGalleryStatusView)
         videoTabContainer.addSubview(videoGalleryCollectionView)
+        videoTabContainer.addSubview(videoGalleryStatusView)
+
         NSLayoutConstraint.activate([
             videoGalleryStatusView.heightAnchor.constraint(equalToConstant: 160),
             videoGalleryStatusView.topAnchor.constraint(equalTo: videoTabContainer.topAnchor),
@@ -1756,19 +1760,17 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 }
             }
         }
-        
+
         let stats = detail.statistic
-        // Обновляем экшен-блок без пересоздания subviews, чтобы не было «дерганья» после загрузки
         UIView.performWithoutAnimation {
             setupCounterView(likesView, count: "\(stats?.followersCount ?? 0)", name: "Like", iconName: "Instant View/Favorite")
             setupCounterView(viewsView, count: "\(stats?.viewsCount ?? 0)", name: "Viewed", iconName: "Instant View/Visibility")
             setupCounterView(savesView, count: "\(stats?.followingCount ?? 0)", name: "Save", iconName: "Instant View/Bookmark")
             self.counterActionsContainer.layoutIfNeeded()
         }
-        // что такое Save в модели?
-        
+
         var socialLinks: [String] = []
-    
+
         // Собираем все непустые ссылки в один массив
         if let tiktok = detail.model?.tiktokUrl, !tiktok.isEmpty { socialLinks.append(tiktok) }
         if let youtube = detail.model?.youtubeUrl, !youtube.isEmpty { socialLinks.append(youtube) }
@@ -1897,28 +1899,34 @@ final class PublicProfileScreenNode: ASDisplayNode {
         galleryCollectionView.layoutIfNeeded()
     }
 
-    // Добавление одной новой фотографии в начало (после успешной загрузки)
-    func insertNewPhoto(_ photo: UserPhoto) {
+    // MARK: - Tab Switching
+
+    func switchToTab(_ index: Int) {
+        segmentedBar.selectIndex(index)
+    }
+
+    // MARK: - Photo Upload with Placeholder
+
+    func startPhotoUpload(image: UIImage) {
+        switchToTab(0)
+        uploadingPhotoImage = image
+        let placeholder = UserPhoto(id: -1, photo: UserFile(fileName: "", fullUrl: nil, fileExtension: "", fileUuid: ""), likesCount: 0, isLikedByUser: false, preview: nil)
+
         let wasEmpty = galleryPhotos.isEmpty
-        
-        galleryPhotos.insert(photo, at: 0)
-        
+        galleryPhotos.insert(placeholder, at: 0)
         galleryCurrentOffset += 1
-        
+
         if wasEmpty {
             galleryStatusView.isHidden = true
             galleryCollectionView.isHidden = false
             galleryCollectionView.reloadData()
-            
             if let layout = self.containerLayout?.0 {
                 updateAllCollectionViewHeights(layout: layout)
                 if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
             }
         } else {
             galleryCollectionView.performBatchUpdates({
-                let indexPath = IndexPath(item: 0, section: 0)
-                galleryCollectionView.insertItems(at: [indexPath])
-                
+                galleryCollectionView.insertItems(at: [IndexPath(item: 0, section: 0)])
                 if let layout = self.containerLayout?.0 {
                     updateAllCollectionViewHeights(layout: layout)
                     if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
@@ -1927,6 +1935,92 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 self.galleryCollectionView.scrollToItem(at: IndexPath(item: 0, section: 0), at: .left, animated: true)
             })
         }
+    }
+
+    func finishPhotoUpload(photo: UserPhoto) {
+        uploadingPhotoImage = nil
+        if !galleryPhotos.isEmpty && galleryPhotos[0].id == -1 {
+            galleryPhotos[0] = photo
+            galleryCollectionView.reloadItems(at: [IndexPath(item: 0, section: 0)])
+        }
+    }
+
+    func cancelPhotoUpload() {
+        uploadingPhotoImage = nil
+        guard !galleryPhotos.isEmpty && galleryPhotos[0].id == -1 else { return }
+        galleryPhotos.remove(at: 0)
+        galleryCurrentOffset = max(0, galleryCurrentOffset - 1)
+        galleryCollectionView.performBatchUpdates({
+            galleryCollectionView.deleteItems(at: [IndexPath(item: 0, section: 0)])
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
+            }
+        }, completion: { [weak self] _ in
+            guard let self = self else { return }
+            if self.galleryPhotos.isEmpty {
+                self.galleryStatusView.isHidden = false
+                self.galleryCollectionView.isHidden = true
+            }
+        })
+    }
+
+    // Добавление одной новой фотографии в начало (после успешной загрузки)
+    func insertNewPhoto(_ photo: UserPhoto) {
+        let wasEmpty = galleryPhotos.isEmpty
+
+        galleryPhotos.insert(photo, at: 0)
+
+        galleryCurrentOffset += 1
+
+        if wasEmpty {
+            galleryStatusView.isHidden = true
+            galleryCollectionView.isHidden = false
+            galleryCollectionView.reloadData()
+
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
+            }
+        } else {
+            galleryCollectionView.performBatchUpdates({
+                let indexPath = IndexPath(item: 0, section: 0)
+                galleryCollectionView.insertItems(at: [indexPath])
+
+                if let layout = self.containerLayout?.0 {
+                    updateAllCollectionViewHeights(layout: layout)
+                    if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
+                }
+            }, completion: { _ in
+                self.galleryCollectionView.scrollToItem(at: IndexPath(item: 0, section: 0), at: .left, animated: true)
+            })
+        }
+    }
+
+    func removePhoto(withId id: Int) {
+        guard let index = galleryPhotos.firstIndex(where: { $0.id == id }) else { return }
+        
+        galleryPhotos.remove(at: index)
+        galleryCurrentOffset = max(0, galleryCurrentOffset - 1)
+        
+        let indexPath = IndexPath(item: index, section: 0)
+        
+        galleryCollectionView.performBatchUpdates({
+            galleryCollectionView.deleteItems(at: [indexPath])
+            
+            // Пересчитываем высоту коллекции, если ряд исчез
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
+            }
+        }, completion: {[weak self] _ in
+            guard let self = self else { return }
+            // Если удалили последнее фото, показываем заглушку
+            if self.galleryPhotos.isEmpty {
+                self.galleryStatusView.isHidden = false
+                self.galleryCollectionView.isHidden = true
+            }
+        })
     }
     
     // Сброс пагинации галереи
@@ -1943,9 +2037,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     // Флаг загрузки галереи
-    func setGalleryLoading(_ loading: Bool) {
+    func setGalleryLoading(_ loading: Bool, _ uploadNew: Bool = false) {
         galleryIsLoading = loading
-        galleryStatusView.isHidden = !loading
+        if uploadNew {
+            galleryStatusView.isHidden = false
+        } else {
+            galleryStatusView.isHidden = !galleryPhotos.isEmpty ? true : !loading && galleryPhotos.isEmpty
+        }
         galleryStatusView.loadingSpinner(isLoading: loading)
     }
     
@@ -1977,9 +2075,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     // Загрузка видео галереи
     func loadVideoGallery() {
         guard let userId = model.userId else { return }
-
-        // Первый запрос всегда offset=0. Ставим флаг загрузки и фиксируем offset,
-        // чтобы быстрый скролл не инициировал второй параллельный запрос.
+        
         videoGalleryIsLoading = true
         videoGalleryRequestedOffsets.insert(0)
         videoGalleryLastRequestedOffset = 0
@@ -1991,13 +2087,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
 
     func appendVideoGalleryItems(_ items: [UserVideoItem], pagination: Meta, isMyProfile: Bool) {
         let previousCount = videoGalleryItems.count
-
+        
         let photoItems: [UserPhoto] = items.compactMap { item in
             let videoFile = item.files.first(where: { MediaFormatValidator.isVideo($0.fileExtension) })
             guard let videoFile else { return nil }
-
+            
             let previewFile = item.files.first(where: { MediaFormatValidator.isImage($0.fileExtension) })
-
+            
             let previewUserFile: UserFile? = previewFile.map {
                 UserFile(
                     fileName: $0.fileName,
@@ -2006,7 +2102,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
                     fileUuid: $0.fileUuid
                 )
             }
-
+            
             return UserPhoto(
                 id: item.id,
                 photo: UserFile(
@@ -2020,12 +2116,12 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 preview: previewUserFile
             )
         }
-
+        
         let existingIds = Set(videoGalleryItems.map { $0.id })
         let uniquePhotoItems = photoItems.filter { !existingIds.contains($0.id) }
-
+        
         videoGalleryItems.append(contentsOf: uniquePhotoItems)
-
+        
         videoGalleryTotalCount = pagination.totalCount
         let nextOffset: Int
         if let lastRequested = videoGalleryLastRequestedOffset, pagination.currentOffset == lastRequested {
@@ -2034,10 +2130,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
             nextOffset = pagination.currentOffset
         }
         videoGalleryCurrentOffset = nextOffset
-
+        
         videoGalleryHasMore = videoGalleryItems.count < pagination.totalCount
         videoGalleryIsLoading = false
-
+        
         if previousCount == 0 {
             let hasVideos = !self.videoGalleryItems.isEmpty
             self.videoGalleryStatusView.isHidden = hasVideos
@@ -2084,19 +2180,78 @@ final class PublicProfileScreenNode: ASDisplayNode {
         videoGalleryCollectionView.layoutIfNeeded()
     }
     
-    // Добавление одной новой фотографии в начало (после успешной загрузки)
-    func insertNewVideo(_ video: UserPhoto) {
+    // MARK: - Video Upload with Placeholder
+
+    func startVideoUpload(thumbnail: UIImage?) {
+        switchToTab(1)
+        uploadingVideoImage = thumbnail
+        let placeholder = UserPhoto(id: -1, photo: UserFile(fileName: "", fullUrl: nil, fileExtension: "", fileUuid: ""), likesCount: 0, isLikedByUser: false, preview: nil)
+
         let wasEmpty = videoGalleryItems.isEmpty
-        
-        videoGalleryItems.insert(video, at: 0)
-        
+        videoGalleryItems.insert(placeholder, at: 0)
         videoGalleryCurrentOffset += 1
-        
+
         if wasEmpty {
             videoGalleryStatusView.isHidden = true
             videoGalleryCollectionView.isHidden = false
             videoGalleryCollectionView.reloadData()
-            
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 1 { updateCollectionsContainerHeight(animated: true) }
+            }
+        } else {
+            videoGalleryCollectionView.performBatchUpdates({
+                videoGalleryCollectionView.insertItems(at: [IndexPath(item: 0, section: 0)])
+                if let layout = self.containerLayout?.0 {
+                    updateAllCollectionViewHeights(layout: layout)
+                    if currentTabIndex == 1 { updateCollectionsContainerHeight(animated: true) }
+                }
+            }, completion: { _ in
+                self.videoGalleryCollectionView.scrollToItem(at: IndexPath(item: 0, section: 0), at: .left, animated: true)
+            })
+        }
+    }
+
+    func finishVideoUpload(video: UserPhoto) {
+        uploadingVideoImage = nil
+        if !videoGalleryItems.isEmpty && videoGalleryItems[0].id == -1 {
+            videoGalleryItems[0] = video
+            videoGalleryCollectionView.reloadItems(at: [IndexPath(item: 0, section: 0)])
+        }
+    }
+
+    func cancelVideoUpload() {
+        uploadingVideoImage = nil
+        guard !videoGalleryItems.isEmpty && videoGalleryItems[0].id == -1 else { return }
+        videoGalleryItems.remove(at: 0)
+        videoGalleryCurrentOffset = max(0, videoGalleryCurrentOffset - 1)
+        videoGalleryCollectionView.performBatchUpdates({
+            videoGalleryCollectionView.deleteItems(at: [IndexPath(item: 0, section: 0)])
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 1 { updateCollectionsContainerHeight(animated: true) }
+            }
+        }, completion: { [weak self] _ in
+            guard let self = self else { return }
+            if self.videoGalleryItems.isEmpty {
+                self.videoGalleryStatusView.isHidden = false
+                self.videoGalleryCollectionView.isHidden = true
+            }
+        })
+    }
+
+    func insertNewVideo(_ video: UserPhoto) {
+        let wasEmpty = videoGalleryItems.isEmpty
+
+        videoGalleryItems.insert(video, at: 0)
+
+        videoGalleryCurrentOffset += 1
+
+        if wasEmpty {
+            videoGalleryStatusView.isHidden = true
+            videoGalleryCollectionView.isHidden = false
+            videoGalleryCollectionView.reloadData()
+
             if let layout = self.containerLayout?.0 {
                 updateAllCollectionViewHeights(layout: layout)
                 if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
@@ -2105,7 +2260,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             videoGalleryCollectionView.performBatchUpdates({
                 let indexPath = IndexPath(item: 0, section: 0)
                 videoGalleryCollectionView.insertItems(at: [indexPath])
-                
+
                 if let layout = self.containerLayout?.0 {
                     updateAllCollectionViewHeights(layout: layout)
                     if currentTabIndex == 0 { updateCollectionsContainerHeight(animated: true) }
@@ -2115,25 +2270,46 @@ final class PublicProfileScreenNode: ASDisplayNode {
             })
         }
     }
+
+    func removeVideo(withId id: Int) {
+        guard let index = videoGalleryItems.firstIndex(where: { $0.id == id }) else { return }
+        
+        videoGalleryItems.remove(at: index)
+        videoGalleryCurrentOffset = max(0, videoGalleryCurrentOffset - 1)
+        
+        let indexPath = IndexPath(item: index, section: 0)
+        
+        videoGalleryCollectionView.performBatchUpdates({
+            videoGalleryCollectionView.deleteItems(at: [indexPath])
+            
+            if let layout = self.containerLayout?.0 {
+                updateAllCollectionViewHeights(layout: layout)
+                if currentTabIndex == 1 { updateCollectionsContainerHeight(animated: true) }
+            }
+        }, completion: { [weak self] _ in
+            guard let self = self else { return }
+            if self.videoGalleryItems.isEmpty {
+                self.videoGalleryStatusView.isHidden = false
+                self.videoGalleryCollectionView.isHidden = true
+            }
+        })
+    }
     
     // Загрузка следующей страницы видео
     func loadNextVideoGalleryPage() {
         guard !videoGalleryIsLoading && videoGalleryHasMore, let userId = model.userId else { return }
-
-        // Гейт от повторного запроса той же страницы.
-        // Это защищает от ситуаций, когда несколько scroll событий подряд вызывают пагинацию.
         let offset = videoGalleryCurrentOffset
         guard !videoGalleryRequestedOffsets.contains(offset) else { return }
         videoGalleryRequestedOffsets.insert(offset)
         videoGalleryLastRequestedOffset = offset
-
+        
         videoGalleryIsLoading = true
         
         if let controller = self.controller as? PublicProfileScreenController {
             controller.loadVideoGalleryPage(userId: userId, offset: offset)
         }
     }
-
+    
     /// Вызвать при ошибке запроса, чтобы разрешить повторную попытку загрузки этой страницы.
     func videoGalleryRequestDidFail(offset: Int) {
         videoGalleryIsLoading = false
@@ -2157,13 +2333,16 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
     
     // Флаг загрузки галереи видео
-    func setVideoGalleryLoading(_ loading: Bool) {
+    func setVideoGalleryLoading(_ loading: Bool, _ uploadNew: Bool = false) {
         videoGalleryIsLoading = loading
-        videoGalleryStatusView.isHidden = !loading
+        if uploadNew {
+            videoGalleryStatusView.isHidden = false
+        } else {
+            videoGalleryStatusView.isHidden = !videoGalleryItems.isEmpty ? true : !loading && videoGalleryItems.isEmpty
+        }
         videoGalleryStatusView.loadingSpinner(isLoading: loading)
     }
-    
-    
+
     // MARK: - Channels Gallery Methods
     
     // Загрузка галереи каналов
@@ -2456,28 +2635,32 @@ extension PublicProfileScreenNode: UICollectionViewDataSource {
                 return UICollectionViewCell()
             }
             let photoItem = galleryPhotos[indexPath.item]
-            
-            if let previewUrlString = photoItem.preview?.fullUrl, let url = CDNURLHelper.convertToCDNURL(previewUrlString) {
+
+            if photoItem.id == -1, let localImage = uploadingPhotoImage {
+                cell.configure(with: localImage, isUploading: true)
+            } else if let previewUrlString = photoItem.preview?.fullUrl, let url = CDNURLHelper.convertToCDNURL(previewUrlString) {
                 cell.configure(with: url)
             } else {
                 if let fullUrlString = photoItem.photo.fullUrl, let url = CDNURLHelper.convertToCDNURL(fullUrlString) {
                     cell.configure(with: url)
                 }
             }
-            
+
             return cell
         } else if collectionView == videoGalleryCollectionView {
             guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: VideoGalleryCell.reuseIdentifier, for: indexPath) as? VideoGalleryCell else {
                 return UICollectionViewCell()
             }
             let videoItem = videoGalleryItems[indexPath.item]
-            
-            if let videoUrlString = videoItem.photo.fullUrl {
+
+            if videoItem.id == -1, let localImage = uploadingVideoImage {
+                cell.configureUploading(thumbnail: localImage)
+            } else if let videoUrlString = videoItem.photo.fullUrl {
                 let cdnVideoUrl = CDNURLHelper.convertToCDN(videoUrlString) ?? ""
                 let previewUrl = videoItem.preview?.fullUrl.flatMap { CDNURLHelper.convertToCDN($0) }
                 cell.configure(with: cdnVideoUrl, previewUrl: previewUrl, title: nil)
             }
-            
+
             return cell
         } else if collectionView == channelGalleryCollectionView {
             guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: ChannelListCell.reuseIdentifier, for: indexPath) as? ChannelListCell else {
@@ -2516,8 +2699,10 @@ extension PublicProfileScreenNode: UICollectionViewDelegate {
             // TODO: Открыть профиль выбранного пользователя
             // handleSimilarProfileTap(profile)
         } else if collectionView == galleryCollectionView {
+            guard galleryPhotos[indexPath.item].id != -1 else { return }
             onGalleryItemTapped?(0, indexPath.item)
         } else if collectionView == videoGalleryCollectionView {
+            guard videoGalleryItems[indexPath.item].id != -1 else { return }
             onGalleryItemTapped?(1, indexPath.item)
         }
     }
@@ -2539,6 +2724,17 @@ extension PublicProfileScreenNode: UICollectionViewDelegate {
     }
 }
 
+// MARK: - Video Thumbnail Retry
+
+extension PublicProfileScreenNode {
+    func retryVisibleVideoThumbnails() {
+        for cell in videoGalleryCollectionView.visibleCells {
+            if let videoCell = cell as? VideoGalleryCell {
+                videoCell.willDisplay()
+            }
+        }
+    }
+}
 
 // MARK: - UICollectionViewDelegateFlowLayout
 

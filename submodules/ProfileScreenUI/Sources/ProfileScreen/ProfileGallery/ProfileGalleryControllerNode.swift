@@ -9,12 +9,13 @@ import AccountContext
 import PhotoResources
 
 final class ProfileGalleryControllerNode: ASDisplayNode {
-
+    
     private let context: AccountContext
     private var photos: [UserPhoto]
     private var videos: [UserVideoItem]
     private let initialIndex: Int
     private let isVideoGallery: Bool
+    private let isOwnProfile: Bool
     
     private weak var controller: ViewController?
     
@@ -27,10 +28,8 @@ final class ProfileGalleryControllerNode: ASDisplayNode {
     private var panGesture: UIPanGestureRecognizer!
     private var _currentIndex: Int
     
-    // 🚀 Флаг для блокировки спама запросов
     private var isLoadingMore = false
-
-    /// Дебаунс автозапуска видео после смены страницы.
+    
     private var autoPlayWorkItem: DispatchWorkItem?
     
     var onIndexChanged: ((Int, Int) -> Void)?
@@ -38,7 +37,7 @@ final class ProfileGalleryControllerNode: ASDisplayNode {
     var currentIndex: Int { return _currentIndex }
     
     // MARK: - Init
-
+    
     init(
         context: AccountContext,
         presentationData: PresentationData,
@@ -46,6 +45,7 @@ final class ProfileGalleryControllerNode: ASDisplayNode {
         videos: [UserVideoItem],
         initialIndex: Int,
         isVideoGallery: Bool,
+        isOwnProfile: Bool,
         controller: ViewController
     ) {
         self.context = context
@@ -54,6 +54,7 @@ final class ProfileGalleryControllerNode: ASDisplayNode {
         self.videos = videos
         self.initialIndex = initialIndex
         self.isVideoGallery = isVideoGallery
+        self.isOwnProfile = isOwnProfile
         self.controller = controller
         self._currentIndex = initialIndex
         
@@ -69,9 +70,9 @@ final class ProfileGalleryControllerNode: ASDisplayNode {
         fatalError("init(coder:) has not been implemented")
     }
     
-
+    
     // MARK: - Override
-
+    
     override public func didLoad() {
         super.didLoad()
         self.panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
@@ -80,10 +81,29 @@ final class ProfileGalleryControllerNode: ASDisplayNode {
         self.view.addGestureRecognizer(self.panGesture)
         self.initializeScrollPosition()
     }
-
-
+    
+    func getCurrentPublicationId() -> Int? {
+        let index = self._currentIndex
+        if isVideoGallery {
+            guard index >= 0 && index < videos.count else { return nil }
+            return videos[index].id
+        } else {
+            guard index >= 0 && index < photos.count else { return nil }
+            return photos[index].id
+        }
+    }
+    
+    private func getPublicationId(at index: Int) -> Int {
+        if isVideoGallery {
+            return videos[index].id
+        } else {
+            return photos[index].id
+        }
+    }
+    
+    
     // MARK: - Internal
-
+    
     func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
         
         self.isSyncingScroll = true
@@ -127,48 +147,85 @@ final class ProfileGalleryControllerNode: ASDisplayNode {
         
         self.isSyncingScroll = false
     }
-
+    
     func pauseAllVideos() {
         guard self.isVideoGallery else { return }
         for cell in self.mainCollectionView.visibleCells {
             (cell as? VideoGalleryCellNode)?.pause()
         }
     }
-
+    
     func updateData(photos:[UserPhoto], videos: [UserVideoItem]) {
-        self.isLoadingMore = false // 🚀 Снимаем блокировку запросов
-        
+        self.isLoadingMore = false
+
         let oldPhotosCount = self.photos.count
         let oldVideosCount = self.videos.count
-        
+
         self.photos = photos
         self.videos = videos
-        
+
         let oldCount = self.isVideoGallery ? oldVideosCount : oldPhotosCount
         let newCount = self.isVideoGallery ? videos.count : photos.count
-        
+
         if newCount > oldCount {
             let indexPaths = (oldCount..<newCount).map { IndexPath(item: $0, section: 0) }
-            
+
             self.mainCollectionView.performBatchUpdates({
                 self.mainCollectionView.insertItems(at: indexPaths)
             }, completion: nil)
-            
+
             self.previewCollectionView.performBatchUpdates({
                 self.previewCollectionView.insertItems(at: indexPaths)
             }, completion: nil)
-            
-        } 
-        // 🚀 ВАЖНО: Мы удалили блок else { reloadData() }, чтобы не убивать ячейки и не фризить UI!
-        
+        }
+
         self.updatePreviewSelection()
     }
     
     func finishLoadingWithoutNewData() {
-        self.isLoadingMore = false // 🚀 Разрешаем запрашивать снова при дальнейшем скролле
+        self.isLoadingMore = false
     }
+    
+    func removePublication(withId id: Int) {
+        let indexToRemove: Int
+        
+        if isVideoGallery {
+            guard let index = self.videos.firstIndex(where: { $0.id == id }) else { return }
+            self.videos.remove(at: index)
+            indexToRemove = index
+        } else {
+            guard let index = self.photos.firstIndex(where: { $0.id == id }) else { return }
+            self.photos.remove(at: index)
+            indexToRemove = index
+        }
+        
+        let indexPath = IndexPath(item: indexToRemove, section: 0)
+        
+        let totalCount = isVideoGallery ? self.videos.count : self.photos.count
+        
+        if _currentIndex >= totalCount && totalCount > 0 {
+            _currentIndex = totalCount - 1
+        }
 
-
+        self.previewCollectionView.performBatchUpdates({
+            self.previewCollectionView.deleteItems(at: [indexPath])
+        }, completion: nil)
+        
+        self.mainCollectionView.performBatchUpdates({
+            self.mainCollectionView.deleteItems(at: [indexPath])
+        }, completion: {[weak self] _ in
+            guard let self = self else { return }
+            
+            if totalCount > 0 {
+                let targetOffset = CGPoint(x: CGFloat(self._currentIndex) * self.mainCollectionView.bounds.width, y: 0)
+                self.mainCollectionView.setContentOffset(targetOffset, animated: true)
+                self.updatePreviewSelection()
+                self.playVideo(at: self._currentIndex)
+            }
+        })
+    }
+    
+    
     // MARK: - Private
     
     private func initializeScrollPosition() {
@@ -176,7 +233,7 @@ final class ProfileGalleryControllerNode: ASDisplayNode {
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
             guard let self = self else { return }
-
+            
             let mainOffset = CGPoint(x: CGFloat(self.initialIndex) * self.mainCollectionView.bounds.width, y: 0)
             self.mainCollectionView.setContentOffset(mainOffset, animated: false)
             
@@ -262,7 +319,7 @@ final class ProfileGalleryControllerNode: ASDisplayNode {
             cv.heightAnchor.constraint(equalToConstant: self.previewHeight)
         ])
     }
-
+    
     private func playVideo(at index: Int) {
         guard self.isVideoGallery else { return }
         
@@ -353,12 +410,9 @@ extension ProfileGalleryControllerNode: UICollectionViewDataSource {
                 let video = self.videos[indexPath.item]
                 if let previewFile = video.files.first(where: { MediaFormatValidator.isImage($0.fileExtension) }),
                    let previewUrl = CDNURLHelper.convertToCDN(previewFile.fullUrl) {
-                    // Используем CDN URL — тот же ключ кеша, что и в VideoGalleryCell профиля.
-                    // Благодаря этому ImageLoader отдаёт картинку из кеша при возврате на профиль.
                     cell.configure(with: previewUrl, isVideo: false)
                 } else if let videoFile = video.files.first(where: { MediaFormatValidator.isVideo($0.fileExtension) }),
                           let videoUrl = CDNURLHelper.convertToCDN(videoFile.fullUrl) {
-                    // Превью нет — генерируем первый кадр из видео
                     cell.configure(with: videoUrl, isVideo: true)
                 }
             } else {
@@ -378,17 +432,15 @@ extension ProfileGalleryControllerNode: UICollectionViewDataSource {
 
 extension ProfileGalleryControllerNode: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
-        // Не создаём AVPlayer во время скролла — это вызывает заикание.
-        // Воспроизведение запускается в playCenteredVideo() после остановки скролла.
         if collectionView == self.mainCollectionView && self.isVideoGallery,
-        let videoCell = cell as? VideoGalleryCellNode {
+           let videoCell = cell as? VideoGalleryCellNode {
             videoCell.pause()
         }
     }
-
+    
     func collectionView(_ collectionView: UICollectionView, didEndDisplaying cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
-        if collectionView == self.mainCollectionView && self.isVideoGallery, 
-        let videoCell = cell as? VideoGalleryCellNode {
+        if collectionView == self.mainCollectionView && self.isVideoGallery,
+           let videoCell = cell as? VideoGalleryCellNode {
             videoCell.pause()
         }
     }
@@ -407,7 +459,7 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
             isSyncingScroll = true
             let mainWidth = self.mainCollectionView.bounds.width
             guard mainWidth > 0 else { isSyncingScroll = false; return }
-        
+            
             let progress = self.mainCollectionView.contentOffset.x / mainWidth
             
             if let previewLayout = self.previewCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
@@ -421,7 +473,6 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
             let page = Int(round(progress))
             let totalCount = self.isVideoGallery ? self.videos.count : self.photos.count
             
-            // 🚀 ИСПРАВЛЕНИЕ: Блокируем спам запросов
             if page >= totalCount - 3 && !self.isLoadingMore {
                 self.isLoadingMore = true
                 self.requestMoreData?()
@@ -430,12 +481,10 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
             if page != self.currentIndex && page >= 0 && page < totalCount {
                 self._currentIndex = page
                 self.onIndexChanged?(page, totalCount)
-                // Дебаунс: при смене страницы планируем автозапуск.
-                // Если скролл продолжится — workItem отменится и перезапустится.
                 self.scheduleAutoPlay()
             }
             isSyncingScroll = false
-
+            
         } else if scrollView == self.previewCollectionView {
             isSyncingScroll = true
             if let previewLayout = self.previewCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
@@ -447,13 +496,12 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
                 
                 let page = Int(round(progress))
                 let totalCount = self.isVideoGallery ? self.videos.count : self.photos.count
-
-                // 🚀 ИСПРАВЛЕНИЕ: Блокируем спам запросов
+                
                 if page >= totalCount - 3 && !self.isLoadingMore {
                     self.isLoadingMore = true
                     self.requestMoreData?()
                 }
-            
+                
                 if page != self.currentIndex && page >= 0 && page < totalCount {
                     self._currentIndex = page
                     self.onIndexChanged?(page, totalCount)
@@ -464,7 +512,7 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
             isSyncingScroll = false
         }
     }
-
+    
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         autoPlayWorkItem?.cancel()
         if scrollView == self.mainCollectionView && self.isVideoGallery {
@@ -473,19 +521,19 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
             }
         }
     }
-
+    
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         if scrollView == self.mainCollectionView {
             playCenteredVideo()
         }
     }
-
+    
     func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
         if scrollView == self.mainCollectionView {
             playCenteredVideo()
         }
     }
-
+    
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
         if scrollView == self.mainCollectionView && !decelerate {
             playCenteredVideo()
@@ -502,9 +550,7 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
             }
         }
     }
-
-    /// Дебаунсированный автозапуск: если через 0.3 с скролл не продолжился — запускаем видео.
-    /// Страховка на случай, когда scrollViewDidEndDecelerating/DidEndDragging не срабатывает.
+    
     private func scheduleAutoPlay() {
         autoPlayWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
@@ -513,12 +559,12 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
         autoPlayWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
     }
-
+    
     private func playCenteredVideo() {
         guard self.isVideoGallery else { return }
         
-        let centerPoint = CGPoint(x: mainCollectionView.contentOffset.x + mainCollectionView.bounds.width / 2, 
-                                y: mainCollectionView.bounds.height / 2)
+        let centerPoint = CGPoint(x: mainCollectionView.contentOffset.x + mainCollectionView.bounds.width / 2,
+                                  y: mainCollectionView.bounds.height / 2)
         
         guard let indexPath = mainCollectionView.indexPathForItem(at: centerPoint) else { return }
         
@@ -532,7 +578,7 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
             }
         }
     }
-
+    
     private func updatePreviewCellsScale() {
         let centerX = previewCollectionView.contentOffset.x + previewCollectionView.bounds.width / 2.0
         
@@ -545,7 +591,7 @@ extension ProfileGalleryControllerNode: UICollectionViewDelegate {
             
             cell.transform = CGAffineTransform(scaleX: scale, y: scale)
             cell.alpha = alpha
-
+            
             if scale > 1.20 {
                 cell.layer.borderWidth = 2.0 / scale
                 cell.layer.borderColor = UIColor.white.cgColor

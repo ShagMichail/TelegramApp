@@ -34,7 +34,7 @@ final class DropdownNode: ASDisplayNode {
         self.titleNode.maximumNumberOfLines = 1
         
         self.arrowNode = ASImageNode()
-        self.arrowNode.image = generateTintedImage(image: UIImage(bundleImageName: "Item List/InlineTextDownArrow"), color: .white)
+        self.arrowNode.image = generateTintedImage(image: UIImage(bundleImageName: "Chat/Context Menu/InlineTextDownArrow"), color: .white)
         self.arrowNode.contentMode = .center
         
         self.apperTitleNode = ASTextNode()
