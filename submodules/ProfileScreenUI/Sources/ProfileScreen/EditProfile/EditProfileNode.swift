@@ -41,6 +41,7 @@ final class EditProfileNode: ASDisplayNode {
     }
     
     var saveProfile: ((UpdateBiographyPageRequest) -> Void)?
+    var saveAgencyProfile: ((UpdateDescriprionAgencyRequest) -> Void)?
     var onAvatarTap: (() -> Void)?
     
     
@@ -239,12 +240,32 @@ final class EditProfileNode: ASDisplayNode {
         self.presentationData = presentationData
         self.presentationDataPromise = Promise(self.presentationData)
                 
-        self.nameEventTextField = getTextFiel(title: model?.fullName ?? "Name")
-        if let fullName = model?.fullName {
-            self.nameEventTextField.textField.text = fullName
+        var name = ""
+        var placeholder = ""
+        var bioTitle = ""
+        var bio = ""
+        if model?.role == "agency_employee" {
+            name = model?.agency?.title ?? "Name"
+            placeholder = "Agency name"
+            bioTitle = "Description"
+            bio = model?.agency?.description ?? "Fill in the information about the agency"
+            self.biographyButton.setTitle("DESCRIPTION", for: .normal)
+            self.biographyButton.isUserInteractionEnabled = false
+        } else {
+            name = model?.fullName ?? "Name"
+            placeholder = "Full name"
+            bioTitle = "Biography"
+            bio = model?.model?.description ?? "Fill in the information about you"
+            self.biographyButton.setTitle("BIOGRAPHY", for: .normal)
+            self.biographyButton.isUserInteractionEnabled = true
         }
         
-        self.aboutEventTextField = DivoTextView(title: "Biography", initialText: model?.model?.description ?? "Fill in the information about you")
+        self.nameEventTextField = getTextFiel(title: placeholder)
+        self.nameEventTextField.textField.text = name
+        // Пока непонятно как обновлять название агенства
+        self.nameEventTextField.isUserInteractionEnabled = (model?.role == "agency_employee") ? false : true
+        
+        self.aboutEventTextField = DivoTextView(title: bioTitle, initialText: bio)
 
         let currentGender = model?.gender?.title ?? "Loading..."
         self.genderDropdown = DropdownNode(title: "Gender", placeholder: "Select a Gender", options: [currentGender])
@@ -294,7 +315,13 @@ final class EditProfileNode: ASDisplayNode {
         
         self.biographyButton.addTarget(self, action: #selector(biographyTapped), for: .touchUpInside)
         self.appearanceButton.addTarget(self, action: #selector(appearanceTapped), for: .touchUpInside)
-        self.applyButton.addTarget(self, action: #selector(self.saveButtonPressed), forControlEvents: .touchUpInside)
+
+        if model?.role == "agency_employee" {
+            self.applyButton.addTarget(self, action: #selector(self.saveAgencyButtonPressed), forControlEvents: .touchUpInside)
+        } else {
+            self.applyButton.addTarget(self, action: #selector(self.saveButtonPressed), forControlEvents: .touchUpInside)
+        }
+
         self.applyButtonAppearance.addTarget(self, action: #selector(self.saveButtonPressed), forControlEvents: .touchUpInside)
         self.chancePhotoView.addTarget(self, action: #selector(self.avatarTapped), for: .touchUpInside)
         
@@ -410,24 +437,39 @@ final class EditProfileNode: ASDisplayNode {
         mainStackView.addArrangedSubview(tabsContainer)
         tabsContainer.heightAnchor.constraint(equalToConstant: 26).isActive = true
         
-        tabsContainer.addSubview(biographyButton)
-        tabsContainer.addSubview(appearanceButton)
-        tabsContainer.addSubview(indicatorView)
-        
-        NSLayoutConstraint.activate([
-            biographyButton.leadingAnchor.constraint(equalTo: tabsContainer.leadingAnchor),
-            biographyButton.topAnchor.constraint(equalTo: tabsContainer.topAnchor),
-            biographyButton.bottomAnchor.constraint(equalTo: tabsContainer.bottomAnchor),
-            biographyButton.widthAnchor.constraint(equalTo: tabsContainer.widthAnchor, multiplier: 0.5),
+        if model?.role == "agency_employee" {
+            tabsContainer.addSubview(biographyButton)
+            tabsContainer.addSubview(indicatorView)
             
-            appearanceButton.trailingAnchor.constraint(equalTo: tabsContainer.trailingAnchor),
-            appearanceButton.topAnchor.constraint(equalTo: tabsContainer.topAnchor),
-            appearanceButton.bottomAnchor.constraint(equalTo: tabsContainer.bottomAnchor),
-            appearanceButton.widthAnchor.constraint(equalTo: tabsContainer.widthAnchor, multiplier: 0.5),
+            NSLayoutConstraint.activate([
+                biographyButton.leadingAnchor.constraint(equalTo: tabsContainer.leadingAnchor),
+                biographyButton.topAnchor.constraint(equalTo: tabsContainer.topAnchor),
+                biographyButton.bottomAnchor.constraint(equalTo: tabsContainer.bottomAnchor),
+                biographyButton.widthAnchor.constraint(equalTo: tabsContainer.widthAnchor, multiplier: 1.0),
+                
+                indicatorView.bottomAnchor.constraint(equalTo: tabsContainer.bottomAnchor),
+                indicatorView.heightAnchor.constraint(equalToConstant: 2)
+            ])
+        } else {
+            tabsContainer.addSubview(biographyButton)
+            tabsContainer.addSubview(appearanceButton)
+            tabsContainer.addSubview(indicatorView)
             
-            indicatorView.bottomAnchor.constraint(equalTo: tabsContainer.bottomAnchor),
-            indicatorView.heightAnchor.constraint(equalToConstant: 2)
-        ])
+            NSLayoutConstraint.activate([
+                biographyButton.leadingAnchor.constraint(equalTo: tabsContainer.leadingAnchor),
+                biographyButton.topAnchor.constraint(equalTo: tabsContainer.topAnchor),
+                biographyButton.bottomAnchor.constraint(equalTo: tabsContainer.bottomAnchor),
+                biographyButton.widthAnchor.constraint(equalTo: tabsContainer.widthAnchor, multiplier: 0.5),
+                
+                appearanceButton.trailingAnchor.constraint(equalTo: tabsContainer.trailingAnchor),
+                appearanceButton.topAnchor.constraint(equalTo: tabsContainer.topAnchor),
+                appearanceButton.bottomAnchor.constraint(equalTo: tabsContainer.bottomAnchor),
+                appearanceButton.widthAnchor.constraint(equalTo: tabsContainer.widthAnchor, multiplier: 0.5),
+                
+                indicatorView.bottomAnchor.constraint(equalTo: tabsContainer.bottomAnchor),
+                indicatorView.heightAnchor.constraint(equalToConstant: 2)
+            ])
+        }
         
         indicatorCenterXConstraint = indicatorView.centerXAnchor.constraint(equalTo: biographyButton.centerXAnchor)
         indicatorWidthConstraint = indicatorView.widthAnchor.constraint(equalToConstant: 60)
@@ -661,6 +703,16 @@ final class EditProfileNode: ASDisplayNode {
         
         self.toggleSpinner(active: true)
         self.saveProfile?(data)
+    }
+
+    @objc private func saveAgencyButtonPressed() {
+        let data = UpdateDescriprionAgencyRequest(
+            agencyId: model?.agency?.id,
+            description: self.aboutEventTextField.text
+        )
+            
+        self.toggleSpinner(active: true)
+        self.saveAgencyProfile?(data)
     }
     
     private func calculateBirthdayString(from age: Int) -> String {

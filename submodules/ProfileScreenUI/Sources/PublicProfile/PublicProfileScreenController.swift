@@ -49,6 +49,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
     
     private let model: ProfileModel
     private var userID: Int = -1
+    private var userRole: Role = .model
     private var userDetailModel: UserDetail? = nil
     private var userProfileData: UserProfileData? = nil
     private let context: AccountContext
@@ -70,6 +71,8 @@ public final class PublicProfileScreenController: TelegramBaseController {
     private weak var activeGalleryController: ProfileGalleryController?
 
     private var isMyProfile: Bool
+
+    private var isPickingBackground: Bool = false
     
     internal var currentGalleryPhotos: [UserPhoto] = []
     internal var currentGalleryVideos: [UserVideoItem] = []
@@ -139,7 +142,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
     @objc private func showEditMenuPressed() {
         // debug: removed
         
-        let items: [EditMenuViewController.MenuItem] = [
+        var items: [EditMenuViewController.MenuItem] = [
             .init(title: "Edit Profile", action: { [weak self] in
                 self?.navigateToEditProfile()
             }),
@@ -148,22 +151,27 @@ public final class PublicProfileScreenController: TelegramBaseController {
             }),
             .init(title: "Edit Social Links", action: { [weak self] in
                 self?.navigateToEditSocialLinks()
-            }),
-            .init(title: "Manage Work Experience", action: { [weak self] in
-                self?.navigateToManageExperience()
-            }),
-            .init(title: "Add Photo", action: { [weak self] in
-                if #available(iOS 14, *) {
-                    self?.navigateToAddPhoto()
-                }
-            }),
-            .init(title: "Add Video", action: { [weak self] in
-                if #available(iOS 14, *) {
-                    self?.navigateToAddVideo()
-                }
             })
         ]
         
+        if self.userRole != .agency {
+            items.append(.init(title: "Manage Work Experience", action: { [weak self] in
+                self?.navigateToManageExperience()
+            }))
+        }
+        
+        items.append(.init(title: "Add Photo", action: { [weak self] in
+            if #available(iOS 14, *) {
+                self?.navigateToAddPhoto()
+            }
+        }))
+        
+        items.append(.init(title: "Add Video", action: { [weak self] in
+            if #available(iOS 14, *) {
+                self?.navigateToAddVideo()
+            }
+        }))
+                
         var sourcePoint = CGPoint(x: UIScreen.main.bounds.width - 20, y: 90)
         
         if let (_, navigationBarHeight) = self.containerLayout {
@@ -205,8 +213,22 @@ public final class PublicProfileScreenController: TelegramBaseController {
     }
     
     private func navigateToChangeBackground() {
-        // debug: removed
-        // Открытие пикера или контроллера
+        self.isPickingBackground = true
+        
+        if #available(iOS 14, *) {
+            PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] status in
+                guard status == .authorized else { return }
+                DispatchQueue.main.async {
+                    var configuration = PHPickerConfiguration()
+                    configuration.filter = .images
+                    configuration.selectionLimit = 1
+                    
+                    let picker = PHPickerViewController(configuration: configuration)
+                    picker.delegate = self
+                    self?.present(picker, animated: true)
+                }
+            }
+        }
     }
     
     private func navigateToEditSocialLinks() {
@@ -353,6 +375,13 @@ public final class PublicProfileScreenController: TelegramBaseController {
                     self.userDetailModel = response.data
                     self.controllerNode.updateWithUserDetail(response.data, self.isMyProfile)
                     self.userID = response.data.id
+                    if response.data.role == "agency_employee" {
+                        self.userRole = .agency
+                    } else if response.data.role == "model" {
+                        self.userRole = .model
+                    } else if response.data.role == "new_face" {
+                        self.userRole = .newFace
+                    }
                     self.loadGalleryPage(userId: self.userID, offset: 0)
                     self.loadVideoGalleryPage(userId: self.userID, offset: 0)
                 }
@@ -739,6 +768,31 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
         picker.dismiss(animated: true, completion: nil)
 
         guard let result = results.first else {
+            self.isPickingBackground = false
+            return
+        }
+        
+        if self.isPickingBackground {
+            self.isPickingBackground = false
+            
+            if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
+                result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
+                    guard let self = self, let uiImage = image as? UIImage else { return }
+                    
+                    let normalized = uiImage.fixedOrientation()
+                    
+                    DispatchQueue.main.async {
+                        self.controllerNode.updateBackgroundImage(normalized)
+                        self.controllerNode.setBackgroundLoading(true)
+                    }
+                    
+                    if userRole == .agency {
+                        self.uploadAndSetBackgroundAgency(normalized)
+                    } else {
+                        self.uploadAndSetBackground(normalized)
+                    }
+                }
+            }
             return
         }
 
@@ -915,5 +969,106 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
         let time = CMTime(seconds: 0.1, preferredTimescale: 600)
         guard let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) else { return nil }
         return UIImage(cgImage: cgImage)
+    }
+
+    private func uploadAndSetBackgroundAgency(_ image: UIImage) {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            DispatchQueue.main.async {
+                self.controllerNode.setBackgroundLoading(false)
+            }
+            return
+        }
+        
+        Task {
+            do {
+                let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
+                    path: "/file/upload-file",
+                    fileData: imageData
+                )
+                
+                guard let fileUuid = uploadResponse.data?.uuid else {
+                    throw DivoAPIError.unknown
+                }
+                
+                print("✅ Background uploaded, uuid: \(fileUuid)")
+                
+                let request = UpdateDescriprionAgencyRequest(
+                    agencyId: userDetailModel?.agency?.id,
+                    background: UpdateDescriprionAgencyRequest.AvatarUuid(uuid: fileUuid)
+                )
+
+                let response: UpdateDescriprionAgencyResponse = try await DivoAPIClient.shared.request(
+                    path: "/agency/update",
+                    method: "POST",
+                    body: request
+                )
+                
+                print("✅  [UPLOAD BACKGROUND]: \(response.message ?? "OK")")
+                
+                await MainActor.run {
+                    self.controllerNode.setBackgroundLoading(false)
+                }
+                
+            } catch {
+                print("❌ [UPLOAD BACKGROUND] Ошибка: \(error)")
+                await MainActor.run {
+                    self.controllerNode.setBackgroundLoading(false)
+                    
+                    let alert = UIAlertController(title: "Error", message: "Failed to update background: \(error.localizedDescription)", preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
+                    self.present(alert, animated: true)
+                }
+            }
+        }
+    }
+    
+    private func uploadAndSetBackground(_ image: UIImage) {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            DispatchQueue.main.async {
+                self.controllerNode.setBackgroundLoading(false)
+            }
+            return
+        }
+        
+        Task {
+            do {
+                let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
+                    path: "/file/upload-file",
+                    fileData: imageData
+                )
+                
+                guard let fileUuid = uploadResponse.data?.uuid else {
+                    throw DivoAPIError.unknown
+                }
+                
+                print("✅ Background uploaded, uuid: \(fileUuid)")
+                
+                let request = UpdateBiographyPageRequest(
+                    photo: UpdateBiographyPageRequest.AvatarUuid(uuid: fileUuid)
+                )
+
+                let response: UpdateBiographyPageResponse = try await DivoAPIClient.shared.request(
+                    path: "/user/update-profile",
+                    method: "POST",
+                    body: request
+                )
+                
+                print("✅  [UPLOAD BACKGROUND]: \(response.message ?? "OK")")
+                
+                await MainActor.run {
+                    self.controllerNode.setBackgroundLoading(false)
+                }
+                
+            } catch {
+                print("❌ [UPLOAD BACKGROUND] Ошибка: \(error)")
+                await MainActor.run {
+                    self.controllerNode.setBackgroundLoading(false)
+                    
+                    let alert = UIAlertController(title: "Error", message: "Failed to update background: \(error.localizedDescription)", preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
+                    self.present(alert, animated: true)
+                }
+            }
+        }
     }
 }

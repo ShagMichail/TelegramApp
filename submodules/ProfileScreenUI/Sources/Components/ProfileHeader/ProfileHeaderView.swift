@@ -46,7 +46,7 @@ struct UserProfileViewModel {
             self.jobIcon = .model
         case "agency":
             self.jobIcon = .agency
-        case "new talent":
+        case "new face":
             self.jobIcon = .talent
         default:
             self.jobIcon = .model
