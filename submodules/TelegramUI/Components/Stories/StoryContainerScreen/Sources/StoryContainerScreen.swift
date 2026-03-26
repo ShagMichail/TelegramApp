@@ -2122,7 +2122,7 @@ public class StoryContainerScreen: ViewControllerComponentContainer {
         self.navigationPresentation = .standaloneFlatModal
         self.blocksBackgroundWhenInOverlay = true
         self.automaticallyControlPresentationContextLayout = false
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: [.portrait])
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: [.portrait])
         
         self.context.sharedContext.hasPreloadBlockingContent.set(.single(true))
     }

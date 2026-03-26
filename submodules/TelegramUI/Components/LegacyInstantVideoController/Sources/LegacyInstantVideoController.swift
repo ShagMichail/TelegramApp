@@ -137,7 +137,7 @@ public func legacyInstantVideoController(theme: PresentationTheme, forStory: Boo
     let isSecretChat = peerId.namespace == Namespaces.Peer.SecretChat
     
     let legacyController = InstantVideoController(presentation: .custom, theme: theme)
-    legacyController.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .all)
+    legacyController.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
     legacyController.lockOrientation = true
     legacyController.statusBar.statusBarStyle = .Hide
     let baseController = TGViewController(context: legacyController.context)!

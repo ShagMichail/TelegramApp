@@ -1809,7 +1809,7 @@ public class VideoMessageCameraScreen: ViewController {
         super.init(navigationBarPresentationData: nil)
 
         self.statusBar.statusBarStyle = .Ignore
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         self.navigationPresentation = .flatModal
         

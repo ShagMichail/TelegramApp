@@ -676,7 +676,7 @@ public final class ChatThemeScreen: ViewController {
         
         self.statusBar.statusBarStyle = .Ignore
         
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         self.blocksBackgroundWhenInOverlay = true
         

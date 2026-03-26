@@ -79,7 +79,7 @@ public final class AuthorizationSequenceSplashController: ViewController {
         
         self._hasGlassStyle = true
         
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         self.statusBar.statusBarStyle = theme.intro.statusBarStyle.style
         

@@ -895,7 +895,7 @@ public class Window1 {
                             return
                         }
                         
-                        var supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .all)
+                        var supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
                         let orientationToLock: UIInterfaceOrientationMask
                         if strongSelf.windowLayout.size.width < strongSelf.windowLayout.size.height {
                             orientationToLock = .portrait
@@ -1043,7 +1043,7 @@ public class Window1 {
         if self.tracingStatusBarsInvalidated, let _ = keyboardManager {
             self.tracingStatusBarsInvalidated = false
             
-            var supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .all)
+            var supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
             let orientationToLock: UIInterfaceOrientationMask
             if self.windowLayout.size.width < self.windowLayout.size.height {
                 orientationToLock = .portrait
@@ -1082,7 +1082,7 @@ public class Window1 {
             self.shouldInvalidatePrefersOnScreenNavigationHidden = false
             
             if self.shouldInvalidateSupportedOrientations {
-                var supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .all)
+                var supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
                 let orientationToLock: UIInterfaceOrientationMask
                 if self.windowLayout.size.width < self.windowLayout.size.height {
                     orientationToLock = .portrait

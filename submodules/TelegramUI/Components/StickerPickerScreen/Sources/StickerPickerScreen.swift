@@ -2130,7 +2130,7 @@ public class StickerPickerScreen: ViewController {
         self.displayNode = Node(context: self.context, controller: self, theme: self.theme)
         self.displayNodeDidLoad()
         
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
     }
     
     public override func dismiss(animated flag: Bool, completion: (() -> Void)? = nil) {

@@ -464,7 +464,7 @@ public func storageUsageExceptionsScreen(
     let controller = ItemListController(context: context, state: signal)
     if isModal {
         controller.navigationPresentation = .modal
-        controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
     }
     presentControllerImpl = { [weak controller] c, contextType, a in
         controller?.present(c, in: contextType, with: a)
