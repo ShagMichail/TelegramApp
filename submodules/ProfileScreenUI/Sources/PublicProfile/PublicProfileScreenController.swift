@@ -291,34 +291,76 @@ public final class PublicProfileScreenController: TelegramBaseController {
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         if !profileLoaded {
-            getUserProfile()
-            getEngagementTotals()
+            loadInitialData()
         }
         getUserGalleryProfile()
         controllerNode.retryVisibleVideoThumbnails()
     }
 
-    private func getEngagementTotals() {
-        guard isMyProfile || model.userId != nil else { return }
+    private func loadInitialData() {
+        profileLoaded = true
         Task {
-            do {
-                let path = isMyProfile ? "/user/engagement?offset=0&limit=1" : "/user/engagement?offset=0&limit=1&userId=\(model.userId!)"
-                
-                let response: UserEngagementResponse = try await DivoAPIClient.shared.request(
-                    path: path,
-                    method: "GET"
-                )
-                
-                let likes = response.data?.liked?.pagination?.meta?.totalCount ?? response.data?.liked?.pagination?.total ?? 0
-                let views = response.data?.viewed?.pagination?.meta?.totalCount ?? response.data?.viewed?.pagination?.total ?? 0
-                let saves = response.data?.followed?.pagination?.meta?.totalCount ?? response.data?.followed?.pagination?.total ?? 0
-                
-                await MainActor.run {
-                    self.controllerNode.updateEngagementStats(likes: likes, views: views, saves: saves)
+            async let profileResult = fetchUserProfile()
+            async let engagementResult = fetchEngagementTotals()
+            let (profile, engagement) = await (profileResult, engagementResult)
+            await MainActor.run {
+                guard let detail = profile else {
+                    self.profileLoaded = false
+                    self.showErrorAlert("Failed to load profile. Please try again.")
+                    return
                 }
-            } catch {
-                print("❌ [ENGAGEMENT TOTALS] Error: \(error)")
+                self.userDetailModel = detail
+                self.controllerNode.updateWithUserDetail(detail, self.isMyProfile)
+                self.userID = detail.id
+                if let eng = engagement {
+                    self.controllerNode.updateEngagementStats(likes: eng.likes, views: eng.views, saves: eng.saves)
+                }
+                self.loadGalleryPage(userId: self.userID, offset: 0)
+                self.loadVideoGalleryPage(userId: self.userID, offset: 0)
             }
+        }
+    }
+
+    private struct EngagementTotals {
+        let likes: Int
+        let views: Int
+        let saves: Int
+    }
+
+    private func fetchUserProfile() async -> UserDetail? {
+        do {
+            let requestPath: String
+            if isMyProfile {
+                requestPath = "/user/info"
+            } else {
+                guard let userId = model.userId else { return nil }
+                requestPath = "/user/\(userId)"
+            }
+            let response: UserDetailResponse = try await DivoAPIClient.shared.request(
+                path: requestPath
+            )
+            return response.data
+        } catch {
+            self.debugLog("[DivoAPI] getUserProfile error: \(error)")
+            return nil
+        }
+    }
+
+    private func fetchEngagementTotals() async -> EngagementTotals? {
+        guard isMyProfile || model.userId != nil else { return nil }
+        do {
+            let path = isMyProfile ? "/user/engagement?offset=0&limit=1" : "/user/engagement?offset=0&limit=1&userId=\(model.userId!)"
+            let response: UserEngagementResponse = try await DivoAPIClient.shared.request(
+                path: path,
+                method: "GET"
+            )
+            let likes = response.data?.liked?.pagination?.meta?.totalCount ?? response.data?.liked?.pagination?.total ?? 0
+            let views = response.data?.viewed?.pagination?.meta?.totalCount ?? response.data?.viewed?.pagination?.total ?? 0
+            let saves = response.data?.followed?.pagination?.meta?.totalCount ?? response.data?.followed?.pagination?.total ?? 0
+            return EngagementTotals(likes: likes, views: views, saves: saves)
+        } catch {
+            print("❌ [ENGAGEMENT TOTALS] Error: \(error)")
+            return nil
         }
     }
 
@@ -334,33 +376,6 @@ public final class PublicProfileScreenController: TelegramBaseController {
         }
     }
     
-    private func getUserProfile() {
-        Task {
-            do {
-                guard !profileLoaded else { return }
-                profileLoaded = true
-                let requestPath: String
-                if isMyProfile {
-                    requestPath = "/user/info"
-                } else {
-                    guard let userId = model.userId else { return }
-                    requestPath = "/user/\(userId)"
-                }
-                let response: UserDetailResponse = try await DivoAPIClient.shared.request(
-                    path: requestPath
-                )
-                await MainActor.run {
-                    self.userDetailModel = response.data
-                    self.controllerNode.updateWithUserDetail(response.data, self.isMyProfile)
-                    self.userID = response.data.id
-                    self.loadGalleryPage(userId: self.userID, offset: 0)
-                    self.loadVideoGalleryPage(userId: self.userID, offset: 0)
-                }
-            } catch {
-                self.debugLog("[DivoAPI] getUserProfile error: \(error)")
-            }
-        }
-    }
     
     private func getUserGalleryProfile() {
         guard !galleryLoaded else { return }
@@ -719,14 +734,14 @@ extension PublicProfileScreenController {
 extension PublicProfileScreenController: EditSocialLinksDelegate {
     func didUpdateSocialLinksData() {
         self.profileLoaded = false
-        self.getUserProfile()
+        self.loadInitialData()
     }
 }
 
 extension PublicProfileScreenController: EditProfileDelegate {
     func didUpdateProfileData() {
         self.profileLoaded = false
-        self.getUserProfile()
+        self.loadInitialData()
     }
 }
 
