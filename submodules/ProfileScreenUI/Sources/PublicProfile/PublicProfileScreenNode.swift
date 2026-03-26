@@ -37,6 +37,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private static let mockBiographyMyProfileText = "Fill in the information about you"
     private let model: ProfileModel
     private var modelRole: Role = .model
+    /// myProfile, но НЕ agency (у agency свой набор табов)
+    private var isMyModelProfile: Bool {
+        model.isMyProfile && modelRole != .agency
+    }
     private weak var controller: ViewController?
     private let context: AccountContext
     private var presentationData: PresentationData
@@ -2417,7 +2421,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.channelGalleryStatusView.isHidden = hasItems
         self.channelGalleryCollectionView.isHidden = !hasItems
         if !hasItems {
-            self.channelGalleryStatusView.configure(isLoading: false, text: "No channels yet", isMyProfile: false)
+            self.channelGalleryStatusView.configure(isLoading: false, text: model.isMyProfile ? "Add channel" : "No channels yet", isMyProfile: model.isMyProfile)
         }
         self.channelGalleryCollectionView.reloadData()
         
@@ -2460,7 +2464,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.modelGalleryStatusView.isHidden = hasItems
         self.modelGalleryCollectionView.isHidden = !hasItems
         if !hasItems {
-            self.modelGalleryStatusView.configure(isLoading: false, text: "No models yet", isMyProfile: false)
+            self.modelGalleryStatusView.configure(isLoading: false, text: model.isMyProfile ? "Add model" : "No models yet", isMyProfile: model.isMyProfile)
         }
         self.modelGalleryCollectionView.reloadData()
         
@@ -2501,7 +2505,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.eventGalleryStatusView.isHidden = hasItems
         self.eventGalleryCollectionView.isHidden = !hasItems
         if !hasItems {
-            self.eventGalleryStatusView.configure(isLoading: false, text: "No events yet", isMyProfile: false)
+            self.eventGalleryStatusView.configure(isLoading: false, text: model.isMyProfile ? "Add event" : "No events yet", isMyProfile: model.isMyProfile)
         }
         self.eventGalleryCollectionView.reloadData()
         
@@ -2563,7 +2567,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         
         let newHeight: CGFloat
         
-        if model.isMyProfile {
+        if isMyModelProfile {
             switch currentTabIndex {
             case 0: newHeight = heightFor(isEmpty: galleryPhotos.isEmpty, constraint: galleryHeightConstraint)
             case 1: newHeight = heightFor(isEmpty: videoGalleryItems.isEmpty, constraint: videoHeightConstraint)
@@ -2885,7 +2889,7 @@ extension PublicProfileScreenNode: UIScrollViewDelegate {
     
     // Менеджер загрузки для текущей вкладки
     private func triggerLoadMoreForActiveTab() {
-        if model.isMyProfile {
+        if isMyModelProfile {
             switch currentTabIndex {
             case 0:
                 if galleryHasMore && !galleryIsLoading { loadNextGalleryPage() }
@@ -2932,7 +2936,7 @@ extension PublicProfileScreenNode: ProfileInfoViewDelegate {
 extension PublicProfileScreenNode: ProfileSegmentedBarDelegate {
     
     private func getTabContainer(for index: Int) -> UIView {
-        if model.isMyProfile {
+        if isMyModelProfile {
             switch index {
             case 0: return photoTabContainer
             case 1: return videoTabContainer
@@ -2989,7 +2993,7 @@ extension PublicProfileScreenNode: ProfileSegmentedBarDelegate {
     }
     
     private func loadDataForTab(index: Int) {
-        if model.isMyProfile {
+        if isMyModelProfile {
             if index == 1 && !videoGalleryInitialized { videoGalleryInitialized = true; loadVideoGallery() }
         } else if (modelRole == .model || modelRole == .newFace) && !model.isMyProfile {
             if index == 1 && !videoGalleryInitialized { videoGalleryInitialized = true; loadVideoGallery() }
