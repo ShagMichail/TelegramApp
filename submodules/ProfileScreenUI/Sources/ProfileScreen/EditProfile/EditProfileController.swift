@@ -110,11 +110,17 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
     }
     
     override public func loadDisplayNode() {
+        self.title = userDetailData?.role == "agency_employee" ? "AGENCY PROFILE" : "MY PROFILE"
+
         self.displayNode = EditProfileNode(
             context: self.context,
             presentationData: self.presentationData,
             model: userDetailData
         )
+
+        self.createEventNode.saveAgencyProfile = { [weak self] rawData in
+            self?.handleAgencySave(with: rawData)
+        }
 
         self.createEventNode.saveProfile = { [weak self] rawData in
             self?.handleSave(with: rawData)
@@ -270,6 +276,39 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
             }
         }
     }
+
+    private func handleAgencySave(with rawData: UpdateDescriptionAgencyRequest) {
+        Task { @MainActor in
+            do {
+                let photoUuid = self.selectedAvatarUUID.map {
+                    UpdateDescriptionAgencyRequest.AvatarUuid(uuid: $0)
+                }
+                let request = UpdateDescriptionAgencyRequest(
+                    agencyId: rawData.agencyId,
+                    description: rawData.description,
+                    photo: photoUuid
+                )
+
+                let response: UpdateDescriptionAgencyResponse = try await DivoAPIClient.shared.request(
+                    path: "/agency/update",
+                    method: "POST",
+                    body: request
+                )
+                
+                print("✅ Profile successfully saved: \(response.message ?? "OK")")
+                self.delegate?.didUpdateProfileData()
+                self.createEventNode.toggleSpinner(active: false)
+                self.showAlert(text: "Profile updated")
+                
+                self.navigationController?.popViewController(animated: true)
+                
+            } catch {
+                print("❌ Error saving social links: \(error)")
+                self.createEventNode.toggleSpinner(active: false)
+                self.showAlert(text: error.localizedDescription)
+            }
+        }
+    }
     
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
@@ -340,7 +379,7 @@ extension EditProfileController: UIImagePickerControllerDelegate {
 
 // MARK: - UIImage orientation fix
 
-private extension UIImage {
+extension UIImage {
     func fixedOrientation() -> UIImage {
         guard imageOrientation != .up else { return self }
         UIGraphicsBeginImageContextWithOptions(size, false, scale)

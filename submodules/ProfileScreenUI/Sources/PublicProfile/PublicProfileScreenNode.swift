@@ -10,11 +10,37 @@ import PresentationDataUtils
 import AccountContext
 import AppBundle
 
+public enum Role {
+    case model
+    case newFace
+    case agency
+
+    init(apiRole: String?) {
+        switch apiRole {
+        case "agency_employee": self = .agency
+        case "new_face":        self = .newFace
+        default:                self = .model
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .model: "model"
+        case .newFace: "new face"
+        case .agency: "agency"
+        }
+    }
+}
+
 final class PublicProfileScreenNode: ASDisplayNode {
     private static let mockBiographyText = "No biograpy"
     private static let mockBiographyMyProfileText = "Fill in the information about you"
     private let model: ProfileModel
-    private var modelRole: String = "model"
+    private var modelRole: Role = .model
+    /// myProfile, но НЕ agency (у agency свой набор табов)
+    private var isMyModelProfile: Bool {
+        model.isMyProfile && modelRole != .agency
+    }
     private weak var controller: ViewController?
     private let context: AccountContext
     private var presentationData: PresentationData
@@ -72,6 +98,14 @@ final class PublicProfileScreenNode: ASDisplayNode {
         iv.translatesAutoresizingMaskIntoConstraints = false
         iv.backgroundColor = .gray
         return iv
+    }()
+
+    private let headerSpinner: UIActivityIndicatorView = {
+        let spinner = UIActivityIndicatorView(style: .large)
+        spinner.color = .white
+        spinner.hidesWhenStopped = true
+        spinner.translatesAutoresizingMaskIntoConstraints = false
+        return spinner
     }()
     
     var currentPhoto: UIImage? = nil {
@@ -603,14 +637,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.context = context
         self.presentationData = presentationData
         self.model = model
-        //        self.addPhoto = addPhoto
+
         super.init()
         
         self.view.backgroundColor = .black
-
-        if model.role == "agency_employee" {
-            self.modelRole = "agency_employee"
-        }
 
         setupContent()
         configureNodes()
@@ -766,6 +796,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         headerHeightConstraint.isActive = true
         
         headerContainer.addSubview(infoStack)
+        headerContainer.addSubview(headerSpinner)
         infoStack.addArrangedSubview(profileHeaderView)
         // Шиммер как overlay поверх profileHeaderView (не arranged subview),
         // чтобы избежать UIStackView-анимации при переключении isHidden
@@ -775,6 +806,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
         NSLayoutConstraint.activate([
             headerContainer.widthAnchor.constraint(equalTo: contentViewStack.widthAnchor),
             
+            headerSpinner.centerXAnchor.constraint(equalTo: headerContainer.centerXAnchor),
+            headerSpinner.centerYAnchor.constraint(equalTo: headerContainer.centerYAnchor, constant: -150),
+
             infoStack.leadingAnchor.constraint(equalTo: headerContainer.leadingAnchor, constant: 16),
             infoStack.trailingAnchor.constraint(equalTo: headerContainer.trailingAnchor, constant: -16),
             infoStack.heightAnchor.constraint(equalToConstant: 85),
@@ -1705,17 +1739,34 @@ final class PublicProfileScreenNode: ASDisplayNode {
         
         self.layoutIfNeeded()
     }
+
+    func setBackgroundLoading(_ loading: Bool) {
+        if loading {
+            headerSpinner.startAnimating()
+            headerImageView.alpha = 0.5
+        } else {
+            headerSpinner.stopAnimating()
+            headerImageView.alpha = 1.0
+        }
+    }
+    
+    func updateBackgroundImage(_ image: UIImage?) {
+        if let image = image {
+            headerImageView.image = image
+        }
+    }
     
     // Обновление профиля, после загрузки baseURL/user/userId
     func updateWithUserDetail(_ detail: UserDetail, _ isMyProfile: Bool) {
         var bio: String
         var appearance: [AppearanceAttribute]
-        
-        if detail.role == "agency_employee" {
-            self.modelRole = "agency_employee"
+
+        self.modelRole = Role(apiRole: detail.role)
+
+        if self.modelRole == .agency {
             setupNavigationBarTitle(name: detail.agency?.title ?? "No name")
             
-            if let photoURLString = detail.agency?.photo?.fullUrl, let photoURL = CDNURLHelper.convertToCDNURL(photoURLString) {
+            if let photoURLString = detail.agency?.background?.fullUrl, let photoURL = CDNURLHelper.convertToCDNURL(photoURLString) {
                 headerImageView.loadImage(from: photoURL)
             }
             
@@ -1729,8 +1780,18 @@ final class PublicProfileScreenNode: ASDisplayNode {
             }
             currentAgencyContainer.removeFromSuperview()
             segmentedBar.configure(isAgency: true, isMyProfile: isMyProfile)
+            self.addWorkHistoryContainer.removeFromSuperview()
+
+            if let avatarURLString = detail.agency?.photo?.fullUrl {
+                if let avatarURL = CDNURLHelper.convertToCDNURL(avatarURLString) {
+                    ImageLoader.shared.load(url: avatarURL) { [weak self] image in
+                        if let image = image {
+                            self?.profileHeaderView.changeAvatar(with: image)
+                        }
+                    }
+                }
+            }
         } else {
-            self.modelRole = "model"
             let age = detail.birthday.flatMap { calculateAge(from: $0) } ?? 0
             setupNavigationBarTitle(name: detail.fullName ?? "No name", info: "\(age) y.o • \(detail.city?.name ?? "")")
             
@@ -1756,13 +1817,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
                 currentAgencyView.configure(name: detail.model?.agency?.title, logoURL: logoURL)
             }
             segmentedBar.configure(isAgency: false, isMyProfile: isMyProfile)
-        }
-        
-        if let avatarURLString = detail.avatar?.fullUrl {
-            if let avatarURL = CDNURLHelper.convertToCDNURL(avatarURLString) {
-                ImageLoader.shared.load(url: avatarURL) { [weak self] image in
-                    if let image = image {
-                        self?.profileHeaderView.changeAvatar(with: image)
+
+            if let avatarURLString = detail.avatar?.fullUrl {
+                if let avatarURL = CDNURLHelper.convertToCDNURL(avatarURLString) {
+                    ImageLoader.shared.load(url: avatarURL) { [weak self] image in
+                        if let image = image {
+                            self?.profileHeaderView.changeAvatar(with: image)
+                        }
                     }
                 }
             }
@@ -1789,13 +1850,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
         }
         
         UIView.performWithoutAnimation {
-            if detail.role == "agency_employee" {
+            if self.modelRole == .agency {
                 let viewModel = UserProfileViewModel(
                     name: detail.agency?.title ?? "No name",
                     age: nil,
                     location: detail.agency?.address?.city?.name ?? "",
                     countryFlag: Self.flag(for: detail.agency?.address?.city?.countryCode),
-                    jobTitle: detail.role?.lowercased() ?? "model",
+                    jobTitle: self.modelRole.title,
                     avatarImage: nil,
                     isPremium: true,
                     isOnline: true
@@ -1808,7 +1869,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
                     age: age,
                     location: detail.city?.name ?? "",
                     countryFlag: Self.flag(for: detail.city?.countryCode),
-                    jobTitle: detail.role ?? "model",
+                    jobTitle: self.modelRole.title,
                     avatarImage: nil,
                     isPremium: true,
                     isOnline: true
@@ -2360,14 +2421,14 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.channelGalleryStatusView.isHidden = hasItems
         self.channelGalleryCollectionView.isHidden = !hasItems
         if !hasItems {
-            self.channelGalleryStatusView.configure(isLoading: false, text: "No channels yet", isMyProfile: false)
+            self.channelGalleryStatusView.configure(isLoading: false, text: model.isMyProfile ? "Add channel" : "No channels yet", isMyProfile: model.isMyProfile)
         }
         self.channelGalleryCollectionView.reloadData()
         
         if let layout = self.containerLayout?.0 {
             self.updateAllCollectionViewHeights(layout: layout)
             // Индекс каналов зависит от роли
-            let channelIndex = (modelRole == "model") ? 2 : 3
+            let channelIndex = (modelRole == .model) ? 2 : 3
             if self.currentTabIndex == channelIndex { self.updateCollectionsContainerHeight(animated: true) }
         }
     }
@@ -2403,7 +2464,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.modelGalleryStatusView.isHidden = hasItems
         self.modelGalleryCollectionView.isHidden = !hasItems
         if !hasItems {
-            self.modelGalleryStatusView.configure(isLoading: false, text: "No models yet", isMyProfile: false)
+            self.modelGalleryStatusView.configure(isLoading: false, text: model.isMyProfile ? "Add model" : "No models yet", isMyProfile: model.isMyProfile)
         }
         self.modelGalleryCollectionView.reloadData()
         
@@ -2444,7 +2505,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.eventGalleryStatusView.isHidden = hasItems
         self.eventGalleryCollectionView.isHidden = !hasItems
         if !hasItems {
-            self.eventGalleryStatusView.configure(isLoading: false, text: "No events yet", isMyProfile: false)
+            self.eventGalleryStatusView.configure(isLoading: false, text: model.isMyProfile ? "Add event" : "No events yet", isMyProfile: model.isMyProfile)
         }
         self.eventGalleryCollectionView.reloadData()
         
@@ -2506,13 +2567,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
         
         let newHeight: CGFloat
         
-        if model.isMyProfile {
+        if isMyModelProfile {
             switch currentTabIndex {
             case 0: newHeight = heightFor(isEmpty: galleryPhotos.isEmpty, constraint: galleryHeightConstraint)
             case 1: newHeight = heightFor(isEmpty: videoGalleryItems.isEmpty, constraint: videoHeightConstraint)
             default: newHeight = 160
             }
-        } else if (modelRole == "model" || modelRole == "new_face") && !model.isMyProfile {
+        } else if (modelRole == .model || modelRole == .newFace) && !model.isMyProfile {
             switch currentTabIndex {
             case 0: newHeight = heightFor(isEmpty: galleryPhotos.isEmpty, constraint: galleryHeightConstraint)
             case 1: newHeight = heightFor(isEmpty: videoGalleryItems.isEmpty, constraint: videoHeightConstraint)
@@ -2828,7 +2889,7 @@ extension PublicProfileScreenNode: UIScrollViewDelegate {
     
     // Менеджер загрузки для текущей вкладки
     private func triggerLoadMoreForActiveTab() {
-        if model.isMyProfile {
+        if isMyModelProfile {
             switch currentTabIndex {
             case 0:
                 if galleryHasMore && !galleryIsLoading { loadNextGalleryPage() }
@@ -2836,7 +2897,7 @@ extension PublicProfileScreenNode: UIScrollViewDelegate {
                 if videoGalleryHasMore && !videoGalleryIsLoading { loadNextVideoGalleryPage() }
             default: break
             }
-        } else if (modelRole == "model" || modelRole == "new_face") && !model.isMyProfile {
+        } else if (modelRole == .model || modelRole == .newFace) && !model.isMyProfile {
             switch currentTabIndex {
             case 0:
                 if galleryHasMore && !galleryIsLoading { loadNextGalleryPage() }
@@ -2875,13 +2936,13 @@ extension PublicProfileScreenNode: ProfileInfoViewDelegate {
 extension PublicProfileScreenNode: ProfileSegmentedBarDelegate {
     
     private func getTabContainer(for index: Int) -> UIView {
-        if model.isMyProfile {
+        if isMyModelProfile {
             switch index {
             case 0: return photoTabContainer
             case 1: return videoTabContainer
             default: return photoTabContainer
             }
-        } else if (modelRole == "model" || modelRole == "new_face") && !model.isMyProfile {
+        } else if (modelRole == .model || modelRole == .newFace) && !model.isMyProfile {
             switch index {
             case 0: return photoTabContainer
             case 1: return videoTabContainer
@@ -2932,9 +2993,9 @@ extension PublicProfileScreenNode: ProfileSegmentedBarDelegate {
     }
     
     private func loadDataForTab(index: Int) {
-        if model.isMyProfile {
+        if isMyModelProfile {
             if index == 1 && !videoGalleryInitialized { videoGalleryInitialized = true; loadVideoGallery() }
-        } else if (modelRole == "model" || modelRole == "new_face") && !model.isMyProfile {
+        } else if (modelRole == .model || modelRole == .newFace) && !model.isMyProfile {
             if index == 1 && !videoGalleryInitialized { videoGalleryInitialized = true; loadVideoGallery() }
             else if index == 2 && !channelGalleryInitialized { channelGalleryInitialized = true; loadChannelGallery() }
         } else {

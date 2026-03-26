@@ -49,6 +49,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
     
     private let model: ProfileModel
     private var userID: Int = -1
+    private var userRole: Role = .model
     private var userDetailModel: UserDetail? = nil
     private var userProfileData: UserProfileData? = nil
     private let context: AccountContext
@@ -70,6 +71,14 @@ public final class PublicProfileScreenController: TelegramBaseController {
     private weak var activeGalleryController: ProfileGalleryController?
 
     private var isMyProfile: Bool
+
+    private enum PickerPurpose {
+        case photo
+        case video
+        case background
+    }
+
+    private var pickerPurpose: PickerPurpose = .photo
     
     internal var currentGalleryPhotos: [UserPhoto] = []
     internal var currentGalleryVideos: [UserVideoItem] = []
@@ -139,7 +148,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
     @objc private func showEditMenuPressed() {
         // debug: removed
         
-        let items: [EditMenuViewController.MenuItem] = [
+        var items: [EditMenuViewController.MenuItem] = [
             .init(title: "Edit Profile", action: { [weak self] in
                 self?.navigateToEditProfile()
             }),
@@ -148,22 +157,27 @@ public final class PublicProfileScreenController: TelegramBaseController {
             }),
             .init(title: "Edit Social Links", action: { [weak self] in
                 self?.navigateToEditSocialLinks()
-            }),
-            .init(title: "Manage Work Experience", action: { [weak self] in
-                self?.navigateToManageExperience()
-            }),
-            .init(title: "Add Photo", action: { [weak self] in
-                if #available(iOS 14, *) {
-                    self?.navigateToAddPhoto()
-                }
-            }),
-            .init(title: "Add Video", action: { [weak self] in
-                if #available(iOS 14, *) {
-                    self?.navigateToAddVideo()
-                }
             })
         ]
         
+        if self.userRole != .agency {
+            items.append(.init(title: "Manage Work Experience", action: { [weak self] in
+                self?.navigateToManageExperience()
+            }))
+        }
+        
+        items.append(.init(title: "Add Photo", action: { [weak self] in
+            if #available(iOS 14, *) {
+                self?.navigateToAddPhoto()
+            }
+        }))
+        
+        items.append(.init(title: "Add Video", action: { [weak self] in
+            if #available(iOS 14, *) {
+                self?.navigateToAddVideo()
+            }
+        }))
+                
         var sourcePoint = CGPoint(x: UIScreen.main.bounds.width - 20, y: 90)
         
         if let (_, navigationBarHeight) = self.containerLayout {
@@ -177,6 +191,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
 
     @available(iOS 14, *)
     private func navigateToAddPhoto() {
+        self.pickerPurpose = .photo
         var configuration = PHPickerConfiguration()
         configuration.filter = .images
         configuration.selectionLimit = 1
@@ -187,6 +202,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
 
     @available(iOS 14, *)
     private func navigateToAddVideo() {
+        self.pickerPurpose = .video
         var configuration = PHPickerConfiguration()
         configuration.filter = .videos
         configuration.selectionLimit = 1
@@ -205,8 +221,22 @@ public final class PublicProfileScreenController: TelegramBaseController {
     }
     
     private func navigateToChangeBackground() {
-        // debug: removed
-        // Открытие пикера или контроллера
+        self.pickerPurpose = .background
+
+        if #available(iOS 14, *) {
+            PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] status in
+                guard status == .authorized || status == .limited else { return }
+                DispatchQueue.main.async {
+                    var configuration = PHPickerConfiguration()
+                    configuration.filter = .images
+                    configuration.selectionLimit = 1
+                    
+                    let picker = PHPickerViewController(configuration: configuration)
+                    picker.delegate = self
+                    self?.present(picker, animated: true)
+                }
+            }
+        }
     }
     
     private func navigateToEditSocialLinks() {
@@ -312,6 +342,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
                 self.userDetailModel = detail
                 self.controllerNode.updateWithUserDetail(detail, self.isMyProfile)
                 self.userID = detail.id
+                self.userRole = Role(apiRole: detail.role)
                 if let eng = engagement {
                     self.controllerNode.updateEngagementStats(likes: eng.likes, views: eng.views, saves: eng.saves)
                 }
@@ -375,7 +406,6 @@ public final class PublicProfileScreenController: TelegramBaseController {
             UIApplication.shared.open(url, options: [:], completionHandler: nil)
         }
     }
-    
     
     private func getUserGalleryProfile() {
         guard !galleryLoaded else { return }
@@ -753,29 +783,39 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
     public func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true, completion: nil)
 
-        guard let result = results.first else {
-            return
-        }
+        guard let result = results.first else { return }
 
-        if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
-            result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
-                guard let self = self, let uiImage = image as? UIImage else {
-                    return
+        switch self.pickerPurpose {
+        case .background:
+            if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
+                result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
+                    guard let self = self, let uiImage = image as? UIImage else { return }
+                    let normalized = uiImage.fixedOrientation()
+                    DispatchQueue.main.async {
+                        self.controllerNode.updateBackgroundImage(normalized)
+                        self.controllerNode.setBackgroundLoading(true)
+                    }
+                    self.uploadAndSetBackground(normalized)
                 }
-                self.uploadAndAddPhoto(uiImage)
             }
-        } else if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
-            result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { [weak self] url, error in
-                guard let self = self, let url = url else {
-                    return
+        case .photo:
+            if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
+                result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
+                    guard let self = self, let uiImage = image as? UIImage else { return }
+                    self.uploadAndAddPhoto(uiImage)
                 }
-                
-                let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("temp_video_\(Date().timeIntervalSince1970).mov")
-                do {
-                    try FileManager.default.copyItem(at: url, to: tempURL)
-                    self.uploadAndAddVideo(tempURL)
-                } catch {
-                    print("❌ [PHPICKER DELEGATE] Failed to copy video: \(error)")
+            }
+        case .video:
+            if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+                result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { [weak self] url, error in
+                    guard let self = self, let url = url else { return }
+                    let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("temp_video_\(Date().timeIntervalSince1970).mov")
+                    do {
+                        try FileManager.default.copyItem(at: url, to: tempURL)
+                        self.uploadAndAddVideo(tempURL)
+                    } catch {
+                        self.debugLog("[DivoAPI] Failed to copy video: \(error)")
+                    }
                 }
             }
         }
@@ -930,5 +970,65 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
         let time = CMTime(seconds: 0.1, preferredTimescale: 600)
         guard let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) else { return nil }
         return UIImage(cgImage: cgImage)
+    }
+
+    private func uploadAndSetBackground(_ image: UIImage) {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            DispatchQueue.main.async {
+                self.controllerNode.setBackgroundLoading(false)
+            }
+            return
+        }
+
+        Task {
+            do {
+                let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
+                    path: "/file/upload-file",
+                    fileData: imageData
+                )
+
+                guard let fileUuid = uploadResponse.data?.uuid else {
+                    throw DivoAPIError.unknown
+                }
+
+                self.debugLog("[DivoAPI] Background uploaded, uuid: \(fileUuid)")
+
+                if self.userRole == .agency {
+                    let request = UpdateDescriptionAgencyRequest(
+                        agencyId: self.userDetailModel?.agency?.id,
+                        background: UpdateDescriptionAgencyRequest.AvatarUuid(uuid: fileUuid)
+                    )
+                    let _: UpdateDescriptionAgencyResponse = try await DivoAPIClient.shared.request(
+                        path: "/agency/update",
+                        method: "POST",
+                        body: request
+                    )
+                } else {
+                    let request = UpdateBiographyPageRequest(
+                        photo: UpdateBiographyPageRequest.AvatarUuid(uuid: fileUuid)
+                    )
+                    let _: UpdateBiographyPageResponse = try await DivoAPIClient.shared.request(
+                        path: "/user/update-profile",
+                        method: "POST",
+                        body: request
+                    )
+                }
+
+                self.debugLog("[DivoAPI] Background updated successfully")
+
+                await MainActor.run {
+                    self.controllerNode.setBackgroundLoading(false)
+                }
+            } catch {
+                self.debugLog("[DivoAPI] Upload background error: \(error)")
+                await MainActor.run {
+                    self.controllerNode.setBackgroundLoading(false)
+
+                    let alert = UIAlertController(title: "Error", message: "Failed to update background: \(error.localizedDescription)", preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
+                    self.present(alert, animated: true)
+                }
+            }
+        }
     }
 }

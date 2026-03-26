@@ -216,8 +216,9 @@ public extension Double {
 public struct UpdateBiographyPageRequest: Encodable {
     public let fullName: String?
     public let gender: String?
-    public let model: ModelData
+    public let model: ModelData?
     public let avatar: AvatarUuid?
+    public let photo: AvatarUuid?
 
     public struct AvatarUuid: Encodable {
         public let uuid: String
@@ -233,11 +234,12 @@ public struct UpdateBiographyPageRequest: Encodable {
         }
     }
 
-    public init(fullName: String?, gender: String?, model: ModelData, avatar: AvatarUuid? = nil) {
+    public init(fullName: String? = nil, gender: String? = nil, model: ModelData? = nil, avatar: AvatarUuid? = nil, photo: AvatarUuid? = nil) {
         self.fullName = fullName
         self.gender = gender
         self.model = model
         self.avatar = avatar
+        self.photo = photo
     }
 }
 
@@ -458,5 +460,36 @@ public struct EventListRequest: Encodable {
     public init(offset: Int, limit: Int) {
         self.offset = offset
         self.limit = limit
+    }
+}
+
+public struct UpdateDescriptionAgencyRequest: Encodable {
+    public let agencyId: Int?
+    public let description: String?
+    public let background: AvatarUuid?
+    public let photo: AvatarUuid?
+
+    public struct AvatarUuid: Encodable {
+        public let uuid: String
+        public init(uuid: String) { self.uuid = uuid }
+    }
+
+    public init(agencyId: Int?, description: String? = nil, background: AvatarUuid? = nil, photo: AvatarUuid? = nil) {
+        self.agencyId = agencyId
+        self.description = description
+        self.background = background
+        self.photo = photo
+    }
+}
+
+public struct UpdateDescriptionAgencyResponse: Decodable {
+    public let message: String?
+    public let data: String?
+    public let errors: [String]?
+
+    public init(message: String?, data: String?, errors: [String]?) {
+        self.message = message
+        self.data = data
+        self.errors = errors
     }
 }
