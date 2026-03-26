@@ -108,7 +108,7 @@ public final class SecureIdAuthController: ViewController, StandalonePresentable
             self.navigationPresentation = .modal
         }
         
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
         

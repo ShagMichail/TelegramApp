@@ -860,7 +860,7 @@ public class ReplaceBoostScreen: ViewController {
         
         self.navigationItem.leftBarButtonItem = UIBarButtonItem(title: presentationData.strings.Common_Cancel, style: .plain, target: self, action: #selector(self.cancelPressed))
         
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         selectedSlotsUpdatedImpl = { [weak self] selectedSlots in
             self?.node.selectedSlots = selectedSlots

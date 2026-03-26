@@ -47,7 +47,7 @@ public final class PermissionController: ViewController {
         
         self._hasGlassStyle = true
         
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         self.updateThemeAndStrings()
         

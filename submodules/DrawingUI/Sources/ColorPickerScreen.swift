@@ -2426,7 +2426,7 @@ public final class ColorPickerScreen: ViewControllerComponentContainer {
         self.dismissed = dismissed
         super.init(context: context, component: ColorPickerSheetComponent(context: context, initialColor: initialColor, updated: updated, openEyedropper: openEyedropper, dismissed: dismissed), navigationBarAppearance: .none)
         
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         self.navigationPresentation = .flatModal
     }

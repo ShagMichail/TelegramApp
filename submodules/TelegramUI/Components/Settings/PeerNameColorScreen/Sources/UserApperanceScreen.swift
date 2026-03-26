@@ -2020,7 +2020,7 @@ public class UserAppearanceScreen: ViewControllerComponentContainer {
         
         self.automaticallyControlPresentationContextLayout = false
         
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
         self.title = ""

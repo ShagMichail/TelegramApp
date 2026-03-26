@@ -4109,7 +4109,7 @@ public class CameraScreenImpl: ViewController, CameraScreen {
         super.init(navigationBarPresentationData: nil)
 
         self.statusBar.statusBarStyle = .Ignore
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         self.automaticallyControlPresentationContextLayout = false
         
         self.navigationPresentation = .flatModal

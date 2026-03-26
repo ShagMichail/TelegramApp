@@ -440,7 +440,7 @@ public class GiftDemoScreen: ViewControllerComponentContainer {
     public init(context: AccountContext, action: @escaping () -> Void = {}) {
         super.init(context: context, component: DemoSheetComponent(context: context, action: action), navigationBarAppearance: .none, theme: .default)
         
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         self.navigationPresentation = .flatModal
     }

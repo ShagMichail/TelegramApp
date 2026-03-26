@@ -731,7 +731,7 @@ public final class TranslateScreen: ViewControllerComponentContainer {
         self.statusBar.statusBarStyle = .Ignore
         self.navigationPresentation = .flatModal
         self.blocksBackgroundWhenInOverlay = true
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         copyTranslationImpl = { [weak self] text in
             UIPasteboard.general.string = text

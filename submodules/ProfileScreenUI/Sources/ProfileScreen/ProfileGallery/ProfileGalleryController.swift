@@ -65,7 +65,7 @@ public class ProfileGalleryController: TelegramBaseController {
         super.init(context: context, navigationBarPresentationData: navigationBarData)
         
         self.statusBar.statusBarStyle = .White
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .all)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         let totalCount = isVideoGallery ? videos.count : photos.count
         self.title = "\(initialIndex + 1) of \(totalCount)"

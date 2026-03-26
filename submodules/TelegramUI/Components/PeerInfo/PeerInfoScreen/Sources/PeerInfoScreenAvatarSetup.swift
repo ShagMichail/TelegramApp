@@ -260,7 +260,7 @@ extension PeerInfoScreenImpl {
                     self.present(mainController, in: .window(.root))
                 } else {
                     mainController.navigationPresentation = .flatModal
-                    mainController.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+                    mainController.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
                     if self.navigationController != nil {
                         self.push(mainController)
                     } else {

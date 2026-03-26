@@ -626,7 +626,7 @@ public final class ChatQrCodeScreenImpl: ViewController, ChatQrCodeScreen {
         self.navigationPresentation = .flatModal
         
         self.statusBar.statusBarStyle = .Ignore
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         self.blocksBackgroundWhenInOverlay = true
         

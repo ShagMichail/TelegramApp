@@ -1545,7 +1545,7 @@ public class BrowserScreen: ViewController, MinimizableController {
         
         self.navigationPresentation = .modalInCompactLayout
         
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .allButUpsideDown)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         self.scrollToTop = { [weak self] in
             self?.node.content.last?.scrollToTop()

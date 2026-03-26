@@ -116,13 +116,13 @@ public final class LegacyControllerContext: NSObject, LegacyComponentsContext {
     
     public func lockPortrait() {
         if let controller = self.controller as? LegacyController {
-            controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+            controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         }
     }
     
     public func unlockPortrait() {
         if let controller = self.controller as? LegacyController {
-            controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .allButUpsideDown)
+            controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         }
     }
     

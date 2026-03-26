@@ -359,7 +359,7 @@ public final class PresentationContext {
     }
     
     func combinedSupportedOrientations(currentOrientationToLock: UIInterfaceOrientationMask) -> ViewControllerSupportedOrientations {
-        var mask = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .all)
+        var mask = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         for (controller, _) in self.controllers {
             mask = mask.intersection(controller.combinedSupportedOrientations(currentOrientationToLock: currentOrientationToLock))
         }

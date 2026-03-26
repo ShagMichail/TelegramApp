@@ -2005,7 +2005,7 @@ extension ChatControllerImpl {
             }
         }
         mainController.navigationPresentation = .flatModal
-        mainController.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        mainController.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         self.push(mainController)
     }
     
