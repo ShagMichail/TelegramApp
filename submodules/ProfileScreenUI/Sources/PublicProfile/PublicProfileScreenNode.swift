@@ -14,7 +14,15 @@ public enum Role {
     case model
     case newFace
     case agency
-    
+
+    init(apiRole: String?) {
+        switch apiRole {
+        case "agency_employee": self = .agency
+        case "new_face":        self = .newFace
+        default:                self = .model
+        }
+    }
+
     var title: String {
         switch self {
         case .model: "model"
@@ -1749,15 +1757,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
         var bio: String
         var appearance: [AppearanceAttribute]
 
-        if detail.role == "agency_employee" {
-            self.modelRole = .agency
-        } else if detail.role == "model" {
-            self.modelRole = .model
-        } else if detail.role == "new_face" {
-            self.modelRole = .newFace
-        }
-        
-        if detail.role == "agency_employee" {
+        self.modelRole = Role(apiRole: detail.role)
+
+        if self.modelRole == .agency {
             setupNavigationBarTitle(name: detail.agency?.title ?? "No name")
             
             if let photoURLString = detail.agency?.background?.fullUrl, let photoURL = CDNURLHelper.convertToCDNURL(photoURLString) {
@@ -1844,7 +1846,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         }
         
         UIView.performWithoutAnimation {
-            if detail.role == "agency_employee" {
+            if self.modelRole == .agency {
                 let viewModel = UserProfileViewModel(
                     name: detail.agency?.title ?? "No name",
                     age: nil,

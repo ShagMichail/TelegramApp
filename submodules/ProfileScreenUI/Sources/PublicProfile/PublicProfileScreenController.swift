@@ -72,7 +72,13 @@ public final class PublicProfileScreenController: TelegramBaseController {
 
     private var isMyProfile: Bool
 
-    private var isPickingBackground: Bool = false
+    private enum PickerPurpose {
+        case photo
+        case video
+        case background
+    }
+
+    private var pickerPurpose: PickerPurpose = .photo
     
     internal var currentGalleryPhotos: [UserPhoto] = []
     internal var currentGalleryVideos: [UserVideoItem] = []
@@ -185,6 +191,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
 
     @available(iOS 14, *)
     private func navigateToAddPhoto() {
+        self.pickerPurpose = .photo
         var configuration = PHPickerConfiguration()
         configuration.filter = .images
         configuration.selectionLimit = 1
@@ -195,6 +202,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
 
     @available(iOS 14, *)
     private func navigateToAddVideo() {
+        self.pickerPurpose = .video
         var configuration = PHPickerConfiguration()
         configuration.filter = .videos
         configuration.selectionLimit = 1
@@ -213,11 +221,11 @@ public final class PublicProfileScreenController: TelegramBaseController {
     }
     
     private func navigateToChangeBackground() {
-        self.isPickingBackground = true
-        
+        self.pickerPurpose = .background
+
         if #available(iOS 14, *) {
             PHPhotoLibrary.requestAuthorization(for: .readWrite) { [weak self] status in
-                guard status == .authorized else { return }
+                guard status == .authorized || status == .limited else { return }
                 DispatchQueue.main.async {
                     var configuration = PHPickerConfiguration()
                     configuration.filter = .images
@@ -417,13 +425,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
                     self.userDetailModel = response.data
                     self.controllerNode.updateWithUserDetail(response.data, self.isMyProfile)
                     self.userID = response.data.id
-                    if response.data.role == "agency_employee" {
-                        self.userRole = .agency
-                    } else if response.data.role == "model" {
-                        self.userRole = .model
-                    } else if response.data.role == "new_face" {
-                        self.userRole = .newFace
-                    }
+                    self.userRole = Role(apiRole: response.data.role)
                     self.loadGalleryPage(userId: self.userID, offset: 0)
                     self.loadVideoGalleryPage(userId: self.userID, offset: 0)
                 }
@@ -809,54 +811,39 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
     public func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true, completion: nil)
 
-        guard let result = results.first else {
-            self.isPickingBackground = false
-            return
-        }
-        
-        if self.isPickingBackground {
-            self.isPickingBackground = false
-            
+        guard let result = results.first else { return }
+
+        switch self.pickerPurpose {
+        case .background:
             if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
                 result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
                     guard let self = self, let uiImage = image as? UIImage else { return }
-                    
                     let normalized = uiImage.fixedOrientation()
-                    
                     DispatchQueue.main.async {
                         self.controllerNode.updateBackgroundImage(normalized)
                         self.controllerNode.setBackgroundLoading(true)
                     }
-                    
-                    if userRole == .agency {
-                        self.uploadAndSetBackgroundAgency(normalized)
-                    } else {
-                        self.uploadAndSetBackground(normalized)
+                    self.uploadAndSetBackground(normalized)
+                }
+            }
+        case .photo:
+            if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
+                result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
+                    guard let self = self, let uiImage = image as? UIImage else { return }
+                    self.uploadAndAddPhoto(uiImage)
+                }
+            }
+        case .video:
+            if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
+                result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { [weak self] url, error in
+                    guard let self = self, let url = url else { return }
+                    let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("temp_video_\(Date().timeIntervalSince1970).mov")
+                    do {
+                        try FileManager.default.copyItem(at: url, to: tempURL)
+                        self.uploadAndAddVideo(tempURL)
+                    } catch {
+                        self.debugLog("[DivoAPI] Failed to copy video: \(error)")
                     }
-                }
-            }
-            return
-        }
-
-        if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
-            result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] image, _ in
-                guard let self = self, let uiImage = image as? UIImage else {
-                    return
-                }
-                self.uploadAndAddPhoto(uiImage)
-            }
-        } else if result.itemProvider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) {
-            result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { [weak self] url, error in
-                guard let self = self, let url = url else {
-                    return
-                }
-                
-                let tempURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("temp_video_\(Date().timeIntervalSince1970).mov")
-                do {
-                    try FileManager.default.copyItem(at: url, to: tempURL)
-                    self.uploadAndAddVideo(tempURL)
-                } catch {
-                    print("❌ [PHPICKER DELEGATE] Failed to copy video: \(error)")
                 }
             }
         }
@@ -1013,57 +1000,6 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
         return UIImage(cgImage: cgImage)
     }
 
-    private func uploadAndSetBackgroundAgency(_ image: UIImage) {
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
-            DispatchQueue.main.async {
-                self.controllerNode.setBackgroundLoading(false)
-            }
-            return
-        }
-        
-        Task {
-            do {
-                let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
-                    path: "/file/upload-file",
-                    fileData: imageData
-                )
-                
-                guard let fileUuid = uploadResponse.data?.uuid else {
-                    throw DivoAPIError.unknown
-                }
-                
-                print("✅ Background uploaded, uuid: \(fileUuid)")
-                
-                let request = UpdateDescriptionAgencyRequest(
-                    agencyId: userDetailModel?.agency?.id,
-                    background: UpdateDescriptionAgencyRequest.AvatarUuid(uuid: fileUuid)
-                )
-
-                let response: UpdateDescriptionAgencyResponse = try await DivoAPIClient.shared.request(
-                    path: "/agency/update",
-                    method: "POST",
-                    body: request
-                )
-                
-                print("✅  [UPLOAD BACKGROUND]: \(response.message ?? "OK")")
-                
-                await MainActor.run {
-                    self.controllerNode.setBackgroundLoading(false)
-                }
-                
-            } catch {
-                print("❌ [UPLOAD BACKGROUND] Ошибка: \(error)")
-                await MainActor.run {
-                    self.controllerNode.setBackgroundLoading(false)
-                    
-                    let alert = UIAlertController(title: "Error", message: "Failed to update background: \(error.localizedDescription)", preferredStyle: .alert)
-                    alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
-                    self.present(alert, animated: true)
-                }
-            }
-        }
-    }
-    
     private func uploadAndSetBackground(_ image: UIImage) {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else {
             DispatchQueue.main.async {
@@ -1071,41 +1007,51 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
             }
             return
         }
-        
+
         Task {
             do {
                 let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
                     path: "/file/upload-file",
                     fileData: imageData
                 )
-                
+
                 guard let fileUuid = uploadResponse.data?.uuid else {
                     throw DivoAPIError.unknown
                 }
-                
-                print("✅ Background uploaded, uuid: \(fileUuid)")
-                
-                let request = UpdateBiographyPageRequest(
-                    photo: UpdateBiographyPageRequest.AvatarUuid(uuid: fileUuid)
-                )
 
-                let response: UpdateBiographyPageResponse = try await DivoAPIClient.shared.request(
-                    path: "/user/update-profile",
-                    method: "POST",
-                    body: request
-                )
-                
-                print("✅  [UPLOAD BACKGROUND]: \(response.message ?? "OK")")
-                
+                self.debugLog("[DivoAPI] Background uploaded, uuid: \(fileUuid)")
+
+                if self.userRole == .agency {
+                    let request = UpdateDescriptionAgencyRequest(
+                        agencyId: self.userDetailModel?.agency?.id,
+                        background: UpdateDescriptionAgencyRequest.AvatarUuid(uuid: fileUuid)
+                    )
+                    let _: UpdateDescriptionAgencyResponse = try await DivoAPIClient.shared.request(
+                        path: "/agency/update",
+                        method: "POST",
+                        body: request
+                    )
+                } else {
+                    let request = UpdateBiographyPageRequest(
+                        photo: UpdateBiographyPageRequest.AvatarUuid(uuid: fileUuid)
+                    )
+                    let _: UpdateBiographyPageResponse = try await DivoAPIClient.shared.request(
+                        path: "/user/update-profile",
+                        method: "POST",
+                        body: request
+                    )
+                }
+
+                self.debugLog("[DivoAPI] Background updated successfully")
+
                 await MainActor.run {
                     self.controllerNode.setBackgroundLoading(false)
                 }
-                
             } catch {
-                print("❌ [UPLOAD BACKGROUND] Ошибка: \(error)")
+                self.debugLog("[DivoAPI] Upload background error: \(error)")
                 await MainActor.run {
                     self.controllerNode.setBackgroundLoading(false)
-                    
+
                     let alert = UIAlertController(title: "Error", message: "Failed to update background: \(error.localizedDescription)", preferredStyle: .alert)
                     alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
                     self.present(alert, animated: true)
