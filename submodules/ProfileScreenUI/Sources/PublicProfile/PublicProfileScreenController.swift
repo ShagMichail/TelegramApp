@@ -342,6 +342,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
                 self.userDetailModel = detail
                 self.controllerNode.updateWithUserDetail(detail, self.isMyProfile)
                 self.userID = detail.id
+                self.userRole = Role(apiRole: detail.role)
                 if let eng = engagement {
                     self.controllerNode.updateEngagementStats(likes: eng.likes, views: eng.views, saves: eng.saves)
                 }
@@ -406,35 +407,6 @@ public final class PublicProfileScreenController: TelegramBaseController {
         }
     }
     
-    private func getUserProfile() {
-        Task {
-            do {
-                guard !profileLoaded else { return }
-                profileLoaded = true
-                let requestPath: String
-                if isMyProfile {
-                    requestPath = "/user/info"
-                } else {
-                    guard let userId = model.userId else { return }
-                    requestPath = "/user/\(userId)"
-                }
-                let response: UserDetailResponse = try await DivoAPIClient.shared.request(
-                    path: requestPath
-                )
-                await MainActor.run {
-                    self.userDetailModel = response.data
-                    self.controllerNode.updateWithUserDetail(response.data, self.isMyProfile)
-                    self.userID = response.data.id
-                    self.userRole = Role(apiRole: response.data.role)
-                    self.loadGalleryPage(userId: self.userID, offset: 0)
-                    self.loadVideoGalleryPage(userId: self.userID, offset: 0)
-                }
-            } catch {
-                self.debugLog("[DivoAPI] getUserProfile error: \(error)")
-            }
-        }
-    }
-
     private func getUserGalleryProfile() {
         guard !galleryLoaded else { return }
         galleryLoaded = true
