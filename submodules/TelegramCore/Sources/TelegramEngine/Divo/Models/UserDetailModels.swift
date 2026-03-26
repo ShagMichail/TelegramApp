@@ -463,7 +463,7 @@ public struct EventListRequest: Encodable {
     }
 }
 
-public struct UpdateDescriprionAgencyRequest: Encodable {
+public struct UpdateDescriptionAgencyRequest: Encodable {
     public let agencyId: Int?
     public let description: String?
     public let background: AvatarUuid?
@@ -482,7 +482,7 @@ public struct UpdateDescriprionAgencyRequest: Encodable {
     }
 }
 
-public struct UpdateDescriprionAgencyResponse: Decodable {
+public struct UpdateDescriptionAgencyResponse: Decodable {
     public let message: String?
     public let data: String?
     public let errors: [String]?

@@ -41,7 +41,7 @@ final class EditProfileNode: ASDisplayNode {
     }
     
     var saveProfile: ((UpdateBiographyPageRequest) -> Void)?
-    var saveAgencyProfile: ((UpdateDescriprionAgencyRequest) -> Void)?
+    var saveAgencyProfile: ((UpdateDescriptionAgencyRequest) -> Void)?
     var onAvatarTap: (() -> Void)?
     
     
@@ -706,7 +706,7 @@ final class EditProfileNode: ASDisplayNode {
     }
 
     @objc private func saveAgencyButtonPressed() {
-        let data = UpdateDescriprionAgencyRequest(
+        let data = UpdateDescriptionAgencyRequest(
             agencyId: model?.agency?.id,
             description: self.aboutEventTextField.text
         )

@@ -1034,12 +1034,12 @@ extension PublicProfileScreenController: PHPickerViewControllerDelegate {
                 
                 print("✅ Background uploaded, uuid: \(fileUuid)")
                 
-                let request = UpdateDescriprionAgencyRequest(
+                let request = UpdateDescriptionAgencyRequest(
                     agencyId: userDetailModel?.agency?.id,
-                    background: UpdateDescriprionAgencyRequest.AvatarUuid(uuid: fileUuid)
+                    background: UpdateDescriptionAgencyRequest.AvatarUuid(uuid: fileUuid)
                 )
 
-                let response: UpdateDescriprionAgencyResponse = try await DivoAPIClient.shared.request(
+                let response: UpdateDescriptionAgencyResponse = try await DivoAPIClient.shared.request(
                     path: "/agency/update",
                     method: "POST",
                     body: request

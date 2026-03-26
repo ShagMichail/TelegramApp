@@ -277,19 +277,19 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
         }
     }
 
-    private func handleAgencySave(with rawData: UpdateDescriprionAgencyRequest) {
+    private func handleAgencySave(with rawData: UpdateDescriptionAgencyRequest) {
         Task { @MainActor in
             do {
                 let photoUuid = self.selectedAvatarUUID.map {
-                    UpdateDescriprionAgencyRequest.AvatarUuid(uuid: $0)
+                    UpdateDescriptionAgencyRequest.AvatarUuid(uuid: $0)
                 }
-                let request = UpdateDescriprionAgencyRequest(
+                let request = UpdateDescriptionAgencyRequest(
                     agencyId: rawData.agencyId,
                     description: rawData.description,
                     photo: photoUuid
                 )
 
-                let response: UpdateDescriprionAgencyResponse = try await DivoAPIClient.shared.request(
+                let response: UpdateDescriptionAgencyResponse = try await DivoAPIClient.shared.request(
                     path: "/agency/update",
                     method: "POST",
                     body: request
