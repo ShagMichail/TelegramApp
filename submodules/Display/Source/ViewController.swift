@@ -100,7 +100,7 @@ public protocol CustomViewControllerNavigationDataSummary: AnyObject {
     
     public let presentationContext: PresentationContext
     
-    public final var supportedOrientations: ViewControllerSupportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .allButUpsideDown) {
+    public final var supportedOrientations: ViewControllerSupportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait) {
         didSet {
             if self.supportedOrientations != oldValue {
                 if self.isNodeLoaded {

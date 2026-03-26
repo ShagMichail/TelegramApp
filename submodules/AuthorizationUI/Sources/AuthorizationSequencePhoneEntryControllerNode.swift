@@ -176,7 +176,7 @@ private final class PhoneAndCountryNode: ASDisplayNode {
                     }
                 } else {
                     strongSelf.hasCountry = false
-                    strongSelf.countryButton.setTitle(strings.Login_SelectCountry, with: Font.regular(20.0), with: theme.list.itemAccentColor, for: [])
+                    strongSelf.countryButton.setTitle(strings.Login_SelectCountry, with: Font.regular(20.0), with: theme.list.itemPlaceholderTextColor, for: [])
                     strongSelf.phoneInputNode.mask = nil
                     strongSelf.phoneInputNode.numberField.textField.attributedPlaceholder = NSAttributedString(string: strings.Login_PhonePlaceholder, font: Font.regular(20.0), textColor: theme.list.itemPlaceholderTextColor)
                 }

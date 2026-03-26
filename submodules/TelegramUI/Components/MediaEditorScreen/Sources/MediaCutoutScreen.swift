@@ -654,7 +654,7 @@ final class MediaCutoutScreen: ViewController {
         super.init(navigationBarPresentationData: nil)
         self.navigationPresentation = .flatModal
                     
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         self.statusBar.statusBarStyle = .White
         

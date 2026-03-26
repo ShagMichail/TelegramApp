@@ -3484,7 +3484,7 @@ public func wallpaperMediaPickerController(
         mediaPickerController.customSelection = completion
         present(mediaPickerController, mediaPickerController.mediaPickerContext)
     }
-    controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+    controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
     return controller
 }
 
@@ -3527,7 +3527,7 @@ public func mediaPickerController(
         present(mediaPickerController, mediaPickerController.mediaPickerContext)
     }
     controller.navigationPresentation = .flatModal
-    controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+    controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
     return controller
 }
 
@@ -3664,7 +3664,7 @@ public func storyMediaPickerController(
         selectionContext?.clear()
     }
     controller.navigationPresentation = .flatModal
-    controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+    controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
     return controller
 }
 
@@ -3815,7 +3815,7 @@ public func stickerMediaPickerController(
         dismissed()
     }
     controller.navigationPresentation = .flatModal
-    controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+    controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
     return controller
 }
 
@@ -4005,7 +4005,7 @@ public func avatarMediaPickerController(
             dismissed()
         }
         controller.navigationPresentation = .flatModal
-        controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         return (controller, nil)
     }
 }
@@ -4068,7 +4068,7 @@ public func coverMediaPickerController(
         dismissed()
     }
     controller.navigationPresentation = .flatModal
-    controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+    controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
     return controller
 }
 

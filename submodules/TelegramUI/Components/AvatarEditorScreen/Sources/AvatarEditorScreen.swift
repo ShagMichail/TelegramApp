@@ -1665,7 +1665,7 @@ public final class AvatarEditorScreen: ViewControllerComponentContainer {
         
         self.navigationItem.leftBarButtonItem = UIBarButtonItem(customView: UIView())
         
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         self.scrollToTop = { [weak self] in
             if let self {

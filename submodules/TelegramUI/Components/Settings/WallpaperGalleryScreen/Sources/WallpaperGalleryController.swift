@@ -248,7 +248,7 @@ public class WallpaperGalleryController: ViewController {
         
         self.title = self.presentationData.strings.WallpaperPreview_Title
         //self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         self.interaction = WallpaperGalleryInteraction(editMedia: { [weak self] asset, image, cropRect, adjustments, referenceView, apply, fullSizeApply in
             guard let self else {

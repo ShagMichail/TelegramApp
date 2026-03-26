@@ -26,9 +26,9 @@ func chatMessageDisplaySendMessageOptions(selfController: ChatControllerImpl, no
     }
     let previousSupportedOrientations = selfController.supportedOrientations
     if layout.size.width > layout.size.height {
-        selfController.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .landscape)
+        selfController.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
     } else {
-        selfController.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        selfController.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
     }
     
     let _ = ApplicationSpecificNotice.incrementChatMessageOptionsTip(accountManager: selfController.context.sharedContext.accountManager, count: 4).startStandalone()

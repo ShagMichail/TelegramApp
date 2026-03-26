@@ -562,7 +562,7 @@ public final class FaceScanScreen: ViewControllerComponentContainer {
         self.statusBar.statusBarStyle = .White
         self.navigationPresentation = .standaloneFlatModal
         
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
     }
     
     required public init(coder aDecoder: NSCoder) {

@@ -666,7 +666,7 @@ public func storyAudioPickerController(
         present(filePickerController, filePickerController.mediaPickerContext)
     }
     controller.navigationPresentation = .flatModal
-    controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+    controller.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
     controller.didDismiss = {
         dismissed()
     }

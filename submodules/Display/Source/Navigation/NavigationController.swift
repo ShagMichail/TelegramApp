@@ -334,7 +334,7 @@ open class NavigationController: UINavigationController, ContainableController, 
     }
     
     public func combinedSupportedOrientations(currentOrientationToLock: UIInterfaceOrientationMask) -> ViewControllerSupportedOrientations {
-        var supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .allButUpsideDown)
+        var supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         if let rootContainer = self.rootContainer {
             switch rootContainer {
             case let .flat(container):

@@ -71,7 +71,7 @@ public final class PasscodeEntryController: ViewController {
         
         super.init(navigationBarPresentationData: nil)
         
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         self.statusBar.updateStatusBarStyle(.White, animated: false)
         
         self.presentationDataDisposable = (presentationDataSignal

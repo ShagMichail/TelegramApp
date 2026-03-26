@@ -2794,7 +2794,7 @@ public class DrawingScreen: ViewController, TGPhotoDrawingInterfaceController, U
         super.init(navigationBarPresentationData: nil)
         
         self.statusBar.statusBarStyle = .Hide
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
     }
     
     required public init(coder: NSCoder) {

@@ -64,7 +64,7 @@ public final class TwoFactorAuthSplashScreen: ViewController {
         self.navigationPresentation = presentation
         
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         self.navigationBar?.intrinsicCanTransitionInline = false
         
         let hasBackButton: Bool

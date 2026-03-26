@@ -86,7 +86,7 @@ public final class ThemeAccentColorController: ViewController {
         self.navigationPresentation = .modal
                 
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         self.segmentedTitleView.sectionUpdated = { [weak self] section in
             if let strongSelf = self {

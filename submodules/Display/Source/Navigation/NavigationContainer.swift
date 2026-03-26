@@ -660,7 +660,7 @@ public final class NavigationContainer: ASDisplayNode, ASGestureRecognizerDelega
     }
     
     func combinedSupportedOrientations(currentOrientationToLock: UIInterfaceOrientationMask) -> ViewControllerSupportedOrientations {
-        var supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .allButUpsideDown)
+        var supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         if let controller = self.controllers.last {
             if controller.lockOrientation {
                 if let lockedOrientation = controller.lockedOrientation {

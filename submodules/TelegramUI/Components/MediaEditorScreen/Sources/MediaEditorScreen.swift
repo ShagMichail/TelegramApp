@@ -6817,7 +6817,7 @@ public final class MediaEditorScreenImpl: ViewController, MediaEditorScreen, UID
         self.automaticallyControlPresentationContextLayout = false
         
         self.navigationPresentation = .flatModal
-        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .all, compactSize: .portrait)
+        self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         self.statusBar.statusBarStyle = .White
         
         if isEditing {
