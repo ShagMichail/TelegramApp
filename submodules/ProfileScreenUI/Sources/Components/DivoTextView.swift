@@ -17,7 +17,8 @@ final class DivoTextView: ASDisplayNode, ASEditableTextNodeDelegate {
     }
     
     private let title: String
-    
+    private var needsScrollToTop = true
+
     var text: String {
         get {
             return textNode.textView.text ?? ""
@@ -96,6 +97,12 @@ final class DivoTextView: ASDisplayNode, ASEditableTextNodeDelegate {
             width: textWidth,
             height: textHeight
         )
+        if needsScrollToTop {
+            needsScrollToTop = false
+            DispatchQueue.main.async { [weak self] in
+                self?.textNode.textView.setContentOffset(.zero, animated: false)
+            }
+        }
     }
     
     override func calculateSizeThatFits(_ constrainedSize: CGSize) -> CGSize {
