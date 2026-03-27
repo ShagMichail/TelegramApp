@@ -19,7 +19,7 @@ final class EventCollectionViewCell: UICollectionViewCell {
     private let profileImageView = UIImageView()
     private let profileNameLabel = UILabel()
     private let titleLabel = UILabel()
-    private let subtitleLabel = UILabel()
+    private let dateLocationLabel = UILabel()
     private let timeRemainingContainer = UIView()
     private let timeRemainingLabel = UILabel()
     private let applyButton = UIButton(type: .system)
@@ -34,18 +34,20 @@ final class EventCollectionViewCell: UICollectionViewCell {
     }
 
     private func setupViews() {
-//        self.layer.cornerRadius = 12.0
-        self.layer.masksToBounds = true
+        contentView.layer.cornerRadius = 12
+        contentView.layer.masksToBounds = true
 
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
+        imageView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
         imageView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(imageView)
 
         overlayView.configure(
             colors: [
-                UIColor(white: 0.0, alpha: 0.2),
-                UIColor.black
+                UIColor(white: 0.0, alpha: 0.0),
+                UIColor(white: 0.0, alpha: 0.15),
+                UIColor(white: 0.0, alpha: 0.7)
             ],
             direction: .vertical
         )
@@ -54,41 +56,44 @@ final class EventCollectionViewCell: UICollectionViewCell {
 
         profileImageView.contentMode = .scaleAspectFill
         profileImageView.clipsToBounds = true
-        profileImageView.layer.cornerRadius = 15.0
+        profileImageView.layer.cornerRadius = 14
+        profileImageView.backgroundColor = UIColor(white: 0.8, alpha: 1.0)
         profileImageView.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(profileImageView)
 
-        profileNameLabel.font = .systemFont(ofSize: 15, weight: .regular)
+        profileNameLabel.font = .systemFont(ofSize: 11, weight: .medium)
         profileNameLabel.textColor = .white
         profileNameLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(profileNameLabel)
 
-        titleLabel.font = Font.helveticaNeue(16)
+        titleLabel.font = UIFont.systemFont(ofSize: 15, weight: .heavy)
         titleLabel.textColor = .white
+        titleLabel.numberOfLines = 3
+        titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(titleLabel)
 
-        subtitleLabel.font = .systemFont(ofSize: 10, weight: .regular)
-        subtitleLabel.textColor = UIColor(red: 0.55, green: 0.55, blue: 0.55, alpha: 1.00)
-        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(subtitleLabel)
+        dateLocationLabel.font = .systemFont(ofSize: 9, weight: .regular)
+        dateLocationLabel.textColor = UIColor(white: 0.85, alpha: 1.0)
+        dateLocationLabel.translatesAutoresizingMaskIntoConstraints = false
+        contentView.addSubview(dateLocationLabel)
 
-        timeRemainingContainer.backgroundColor = .white.withAlphaComponent(0.3)
-        timeRemainingContainer.layer.cornerRadius = 15.0
+        timeRemainingContainer.backgroundColor = UIColor(white: 1.0, alpha: 0.25)
+        timeRemainingContainer.layer.cornerRadius = 10
         timeRemainingContainer.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(timeRemainingContainer)
 
-        timeRemainingLabel.font = .systemFont(ofSize: 12, weight: .bold)
+        timeRemainingLabel.font = .systemFont(ofSize: 9, weight: .semibold)
         timeRemainingLabel.textColor = .white
         timeRemainingLabel.textAlignment = .center
         timeRemainingLabel.translatesAutoresizingMaskIntoConstraints = false
         timeRemainingContainer.addSubview(timeRemainingLabel)
 
         applyButton.setTitle("Apply", for: .normal)
-        applyButton.titleLabel?.font = Font.helveticaNeue(11)
+        applyButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .semibold)
         applyButton.setTitleColor(.white, for: .normal)
         applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
-        applyButton.layer.cornerRadius = 6
+        applyButton.layer.cornerRadius = 10
         applyButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(applyButton)
 
@@ -103,49 +108,67 @@ final class EventCollectionViewCell: UICollectionViewCell {
             overlayView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             overlayView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
-            applyButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
-            applyButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
-            applyButton.heightAnchor.constraint(equalToConstant: 30),
-            applyButton.widthAnchor.constraint(equalToConstant: 40),
-
-            subtitleLabel.bottomAnchor.constraint(equalTo: applyButton.topAnchor, constant: -10),
-            subtitleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
-            subtitleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
-
-            titleLabel.bottomAnchor.constraint(equalTo: subtitleLabel.topAnchor, constant: -5),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
-            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
-
-            profileImageView.bottomAnchor.constraint(equalTo: titleLabel.topAnchor, constant: -10),
-            profileImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
-            profileImageView.widthAnchor.constraint(equalToConstant: 30),
-            profileImageView.heightAnchor.constraint(equalToConstant: 30),
+            profileImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+            profileImageView.widthAnchor.constraint(equalToConstant: 28),
+            profileImageView.heightAnchor.constraint(equalToConstant: 28),
 
             profileNameLabel.centerYAnchor.constraint(equalTo: profileImageView.centerYAnchor),
             profileNameLabel.leadingAnchor.constraint(equalTo: profileImageView.trailingAnchor, constant: 5),
+            profileNameLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -8),
 
-            timeRemainingContainer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
-            timeRemainingContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
-            timeRemainingContainer.heightAnchor.constraint(equalToConstant: 30),
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+
+            profileImageView.bottomAnchor.constraint(equalTo: titleLabel.topAnchor, constant: -6),
+
+            dateLocationLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 3),
+            dateLocationLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+            dateLocationLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+
+            timeRemainingContainer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
+            timeRemainingContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+            timeRemainingContainer.heightAnchor.constraint(equalToConstant: 20),
 
             timeRemainingLabel.topAnchor.constraint(equalTo: timeRemainingContainer.topAnchor),
-            timeRemainingLabel.leadingAnchor.constraint(equalTo: timeRemainingContainer.leadingAnchor, constant: 10),
-            timeRemainingLabel.trailingAnchor.constraint(equalTo: timeRemainingContainer.trailingAnchor, constant: -10),
+            timeRemainingLabel.leadingAnchor.constraint(equalTo: timeRemainingContainer.leadingAnchor, constant: 8),
+            timeRemainingLabel.trailingAnchor.constraint(equalTo: timeRemainingContainer.trailingAnchor, constant: -8),
             timeRemainingLabel.bottomAnchor.constraint(equalTo: timeRemainingContainer.bottomAnchor),
+
+            applyButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
+            applyButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            applyButton.heightAnchor.constraint(equalToConstant: 20),
+            applyButton.widthAnchor.constraint(equalToConstant: 50),
+
+            dateLocationLabel.bottomAnchor.constraint(equalTo: timeRemainingContainer.topAnchor, constant: -6),
         ])
+    }
+
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        imageView.cancelImageLoad()
+        imageView.image = nil
+        profileImageView.cancelImageLoad()
+        profileImageView.image = nil
     }
 
     func configure(with event: EventData, context: AccountContext) {
         profileNameLabel.text = event.profileName
         titleLabel.text = event.title
-        subtitleLabel.text = event.subtitle
         timeRemainingLabel.text = event.timeRemaining
 
-        if let image = event.coverPhoto {
+        let flag = "\u{1F1FA}\u{1F1F8}"
+        if !event.location.isEmpty {
+            dateLocationLabel.text = "\(event.eventDateFormatted) \u{00B7} \(flag) \(event.location)"
+        } else {
+            dateLocationLabel.text = event.eventDateFormatted
+        }
+
+        if let urlString = event.coverPhotoURL, let url = URL(string: urlString) {
+            imageView.loadImage(from: url)
+        } else if let image = event.coverPhoto {
             guard let representation = largestImageRepresentation(image.representations) else {
                 return
             }
-
             let resourceData = context.account.postbox.mediaBox.resourceData(representation.resource)
             let _ = (resourceData
                      |> deliverOnMainQueue).start(next: { data in
@@ -158,20 +181,18 @@ final class EventCollectionViewCell: UICollectionViewCell {
                             self.imageView.image = uiImage
                         }, completion: nil)
                     }
-
                 } else {
                     let _ = context.account.postbox.mediaBox.fetchedResource(representation.resource, parameters: nil).start()
                 }
             })
-        } else {
-            imageView.image = UIImage(named: event.imageName)
         }
 
-        if let image = event.profilePhoto {
+        if let urlString = event.profilePhotoURL, let url = URL(string: urlString) {
+            profileImageView.loadImage(from: url)
+        } else if let image = event.profilePhoto {
             guard let representation = largestImageRepresentation(image.representations) else {
                 return
             }
-
             let resourceData = context.account.postbox.mediaBox.resourceData(representation.resource)
             let _ = (resourceData
                      |> deliverOnMainQueue).start(next: { data in
@@ -184,13 +205,10 @@ final class EventCollectionViewCell: UICollectionViewCell {
                             self.profileImageView.image = uiImage
                         }, completion: nil)
                     }
-
                 } else {
                     let _ = context.account.postbox.mediaBox.fetchedResource(representation.resource, parameters: nil).start()
                 }
             })
-        } else {
-            profileImageView.image = UIImage(named: event.profileImageName)
         }
     }
 }
@@ -276,8 +294,6 @@ final class ButtonWithIconNode: ASControlNode {
 
         self.backgroundColor = theme.list.itemBlocksBackgroundColor
         self.cornerRadius = 6
-        //        self.layer.borderColor = UIColor(red: 1.00, green: 1.00, blue: 1.00, alpha: 0.14).cgColor
-        //        self.layer.borderWidth = 1
 
         if icon != nil {
             self.addSubnode(self.iconNode)
@@ -291,7 +307,6 @@ final class ButtonWithIconNode: ASControlNode {
         let textSize = self.textNode.measure(self.bounds.size)
 
         if self.iconNode.image != nil {
-            // Layout with icon
             let contentWidth = self.imageSize.width + self.spacing + textSize.width
             let contentOriginX = (self.bounds.width - contentWidth) / 2.0
 
@@ -305,7 +320,6 @@ final class ButtonWithIconNode: ASControlNode {
                                          width: textSize.width,
                                          height: textSize.height)
         } else {
-            // Layout without icon (center the text)
             self.textNode.frame = CGRect(x: (self.bounds.width - textSize.width) / 2.0,
                                          y: (self.bounds.height - textSize.height) / 2.0,
                                          width: textSize.width,
