@@ -34,6 +34,7 @@ public final class EventsController: TelegramBaseController {
     private let peerViewDisposable = MetaDisposable()
 
     private var isEmpty: Bool?
+    private var hasLoadedOnce = false
 
     private let createActionDisposable = MetaDisposable()
     private let clearDisposable = MetaDisposable()
@@ -84,7 +85,10 @@ public final class EventsController: TelegramBaseController {
 
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        getEvents()
+        if !hasLoadedOnce {
+            hasLoadedOnce = true
+            getEvents()
+        }
     }
 
     private func getEvents() {
