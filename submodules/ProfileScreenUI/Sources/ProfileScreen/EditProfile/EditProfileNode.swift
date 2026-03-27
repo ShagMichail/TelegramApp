@@ -271,13 +271,60 @@ final class EditProfileNode: ASDisplayNode {
         self.genderDropdown = DropdownNode(title: "Gender", placeholder: "Select a Gender", options: [currentGender])
         self.genderDropdown.selectedValue = self.model?.gender?.title
         
-        self.ageSlider = AgeSliderNode(title: "Age (y.o)", type: "y.o", defaultValue: 17, minimumValue: 14, maximumValue: 45)
-        self.heightSlider = AgeSliderNode(title: "Height (cm)", type: "cm", defaultValue: model?.model?.appearance?.height ?? 1.68, minimumValue: 1.68, maximumValue: 2.50)
-        self.weightSlider = AgeSliderNode(title: "Weight (kg)", type: "kg", defaultValue: model?.model?.appearance?.weight ?? 50, minimumValue: 48, maximumValue: 90)
-        self.waistSlider = AgeSliderNode(title: "Waist (cm)", type: "cm", defaultValue: model?.model?.appearance?.waist ?? 60, minimumValue: 48, maximumValue: 90)
-        self.hipsSlider = AgeSliderNode(title: "Hips (cm)", type: "cm", defaultValue: model?.model?.appearance?.hips ?? 91, minimumValue: 80, maximumValue: 110)
-        self.shoeSizeSlider = AgeSliderNode(title: "Shoe size (EU)", type: "", defaultValue: model?.model?.appearance?.shoesSize ?? 37, minimumValue: 36, maximumValue: 42)
+        self.ageSlider = AgeSliderNode<Int>(
+            title: "Age (y.o)",
+            type: "y.o",
+            mode: .single(value: 17),
+            minimumValue: 14,
+            maximumValue: 45,
+            configuration: .default
+        )
         
+        self.heightSlider = AgeSliderNode<Double>(
+            title: "Height (cm)",
+            type: "cm",
+            mode: .single(value: Float(model?.model?.appearance?.height ?? 1.68)),
+            minimumValue: 1.68,
+            maximumValue: 2.50,
+            configuration: .default
+        )
+        
+        self.weightSlider = AgeSliderNode<Double>(
+            title: "Weight (kg)",
+            type: "kg",
+            mode: .single(value: Float(model?.model?.appearance?.weight ?? 50)),
+            minimumValue: 48,
+            maximumValue: 90,
+            configuration: .default
+        )
+        
+        self.waistSlider = AgeSliderNode<Double>(
+            title: "Waist (cm)",
+            type: "cm",
+            mode: .single(value: Float(model?.model?.appearance?.waist ?? 60)),
+            minimumValue: 48,
+            maximumValue: 90,
+            configuration: .default
+        )
+        
+        self.hipsSlider = AgeSliderNode<Double>(
+            title: "Hips (cm)",
+            type: "cm",
+            mode: .single(value: Float(model?.model?.appearance?.hips ?? 91)),
+            minimumValue: 80,
+            maximumValue: 110,
+            configuration: .default
+        )
+        
+        self.shoeSizeSlider = AgeSliderNode<Double>(
+            title: "Shoe size (EU)",
+            type: "",
+            mode: .single(value: Float(model?.model?.appearance?.shoesSize ?? 37)),
+            minimumValue: 36,
+            maximumValue: 42,
+            configuration: .default
+        )
+
         let currentHairLength = model?.model?.appearance?.hairLength?.title ?? "Loading..."
         let currentHairColor = model?.model?.appearance?.hairColor?.title ?? "Loading..."
         let currentEyeColor = model?.model?.appearance?.eyeColor?.title ?? "Loading..."
@@ -300,8 +347,14 @@ final class EditProfileNode: ASDisplayNode {
         
         super.init()
         
-        self.ageSlider = AgeSliderNode(title: "Age (y.o)", type: "y.o", defaultValue: calculateAge(from: model?.birthday ?? ""), minimumValue: 14, maximumValue: 45)
-        
+        self.ageSlider = AgeSliderNode<Int>(
+            title: "Age (y.o)",
+            type: "y.o",
+            mode: .single(value: Float(calculateAge(from: model?.birthday ?? ""))),
+            minimumValue: 14,
+            maximumValue: 45,
+            configuration: .default
+        )
         
         self.backgroundColor = UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.00)
     }
@@ -591,7 +644,7 @@ final class EditProfileNode: ASDisplayNode {
             node.view.widthAnchor.constraint(equalTo: appearanceStackView.widthAnchor).isActive = true
             
             if node is DropdownNode {
-                node.view.heightAnchor.constraint(equalToConstant: 48).isActive = true
+                node.view.heightAnchor.constraint(equalToConstant: 80).isActive = true
             } else {
                 node.view.heightAnchor.constraint(equalToConstant: 80).isActive = true
             }

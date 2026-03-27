@@ -15,6 +15,18 @@ import ItemListUI
 import Postbox
 import ChatScheduleTimeController
 
+enum EventParameter: String, CaseIterable {
+    case gender = "Gender"
+    case age = "Age"
+    case height = "Height"
+    case weight = "Weight"
+    case waist = "Waist"
+    case hips = "Hips"
+    case shoeSize = "Shoe size"
+    case hairLength = "Hair length"
+    case hairColor = "Hair color"
+}
+
 final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
 
     private let context: AccountContext
@@ -52,7 +64,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     private let nameEventTextField: TextFieldNode
 
     private let aboutEventLabel: ASTextNode
-    private let aboutEventTextField: DivoTextView
+    private let aboutEventTextField: MultilineTextFieldNode
 
     private let eventTypeLabel: ASTextNode
     private let eventTypeTextField: TextFieldNode
@@ -69,7 +81,21 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     private let parametersApplyingLabel: ASTextNode
     private let addParametersButton: ASControlNode
 
+    private var selectedParameters: Set<EventParameter> = []
+    
+    private var genderDropdown: DropdownNode?
+    private var ageSlider: AgeSliderNode<Int>?
+    private var heightSlider: AgeSliderNode<Double>?
+    private var weightSlider: AgeSliderNode<Double>?
+    private var waistSlider: AgeSliderNode<Double>?
+    private var hipsSlider: AgeSliderNode<Double>?
+    private var shoeSizeSlider: AgeSliderNode<Double>?
+    private var hairLengthDropdown: DropdownNode?
+    private var hairColorDropdown: DropdownNode?
+
     private let applyButton: ASControlNode
+
+    var onAddParametersTapped: ((Set<EventParameter>) -> Void)?
     private let addPhoto: () -> Void
     var selectCountryCode: (() -> Void)?
     var scheduleTimeController: ((TimeControllerMode) -> Void)?
@@ -92,6 +118,8 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         }
     }
 
+    private var currentLayoutData: (ContainerViewLayout, CGFloat, CGFloat)?
+
     init(context: AccountContext, addPhoto: @escaping () -> Void) {
         self.context = context
         self.addPhoto = addPhoto
@@ -108,7 +136,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         self.addPhotoButton = HighlightableButtonNode()
         self.addPhotoButton.setImage(
             generateTintedImage(
-                image: UIImage(bundleImageName: "Avatar/AddAvatarIconLarge"),
+                image: UIImage(bundleImageName: "Profile/AddPhotoIcon"),
                 color: iconColor),
             for: .normal)
 
@@ -130,8 +158,8 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         self.currentPhotoNode.displaysAsynchronously = false
         self.currentPhotoNode.displayWithoutProcessing = true
 
-        let headerColor = UIColor(red: 0.09, green: 0.09, blue: 0.11, alpha: 1.00)
-        let labelColor = UIColor(red: 0.24, green: 0.24, blue: 0.26, alpha: 1.00)
+        let headerColor = UIColor(hexString: "#17181C") ?? .white
+        let labelColor = UIColor(hexString: "#3C3C43") ?? .white
         let regularFont = Font.regular(16)
         let semiboldFont = Font.semibold(16)
 
@@ -146,7 +174,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         self.aboutEventLabel = ASTextNode()
         self.aboutEventLabel.attributedText = NSAttributedString(string: "About event", font: regularFont, textColor: labelColor)
 
-        self.aboutEventTextField = DivoTextView(title: "", initialText: "")
+        self.aboutEventTextField = getEditableText(placeholder: "Description event")
 
         self.eventTypeLabel = ASTextNode()
         self.eventTypeLabel.attributedText = NSAttributedString(string: "Event type", font: regularFont, textColor: labelColor)
@@ -208,7 +236,8 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(self.dismissKeyboard))
         tapGesture.cancelsTouchesInView = false
         self.scrollNode.view.addGestureRecognizer(tapGesture)
-
+        self.scrollNode.view.showsVerticalScrollIndicator = false
+        
         self.scrollNode.addSubnode(self.applyButton)
 
         self.presentationDataDisposable = (context.sharedContext.presentationData
@@ -264,7 +293,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     @objc private func addPhotoPressed() {
         self.addPhoto()
     }
-    @objc private func applyButtonTapped() {
+    @objc func applyButtonTapped() {
         print("applyButton Tapped!")
 
         if let nameEventTextField = nameEventTextField.textField.text,
@@ -322,7 +351,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     }
 
     @objc private func addParametersTapped() {
-        print("Add Parameters Tapped!")
+        onAddParametersTapped?(selectedParameters)
     }
 
     func updateCountry(countryId: String, countryName: String) {
@@ -395,91 +424,216 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     }
 
     func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, actualNavigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
-
+        
+        self.currentLayoutData = (layout, navigationBarHeight, actualNavigationBarHeight)
+        
         let avatarSize: CGSize = CGSize(width: 100.0, height: 100.0)
-
         let avatarX: CGFloat = floor((layout.size.width - avatarSize.width) / 2.0)
-        self.addPhotoButton.frame = CGRect(origin: CGPoint(x: avatarX, y: 20), size: avatarSize)
-        self.currentPhotoNode.frame = CGRect(origin: CGPoint(), size: avatarSize)
-
+        
+        transition.updateFrame(node: self.addPhotoButton, frame: CGRect(origin: CGPoint(x: avatarX, y: 20), size: avatarSize))
+        transition.updateFrame(node: self.currentPhotoNode, frame: CGRect(origin: CGPoint(), size: avatarSize))
+        
         let topInset: CGFloat = navigationBarHeight
-
+        
         let sidePadding: CGFloat = 16.0
-        let sectionSpacing: CGFloat = 24.0
+        let sectionSpacing: CGFloat = 20.0
         let itemSpacing: CGFloat = 12.0
         let itemHeight: CGFloat = 48.0
-        let halfItemSpacing: CGFloat = 6.0
-
-        self.scrollNode.frame = CGRect(origin: CGPoint(x: 0.0, y: topInset), size: CGSize(width: layout.size.width, height: layout.size.height - topInset))
-
+        let halfItemSpacing: CGFloat = 10.0
+        let fullWidth = layout.size.width - sidePadding * 2
+        
+        transition.updateFrame(node: self.scrollNode, frame: CGRect(origin: CGPoint(x: 0.0, y: topInset), size: CGSize(width: layout.size.width, height: layout.size.height - topInset)))
+        
         var currentY: CGFloat = 140.0
-
-        let eventInfoBySize = self.eventInfoLabel.measure(CGSize(width: layout.size.width - sidePadding * 2, height: .greatestFiniteMagnitude))
-        self.eventInfoLabel.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: eventInfoBySize)
-        currentY += eventInfoBySize.height + sectionSpacing
-
-        let nameEventLabelSize = self.nameEventLabel.measure(CGSize(width: layout.size.width - sidePadding * 2, height: .greatestFiniteMagnitude))
-        self.nameEventLabel.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: nameEventLabelSize)
+        
+        let eventInfoSize = self.eventInfoLabel.measure(CGSize(width: fullWidth, height: .greatestFiniteMagnitude))
+        transition.updateFrame(node: self.eventInfoLabel, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: eventInfoSize))
+        currentY += eventInfoSize.height + sectionSpacing
+        
+        let nameEventLabelSize = self.nameEventLabel.measure(CGSize(width: fullWidth, height: .greatestFiniteMagnitude))
+        transition.updateFrame(node: self.nameEventLabel, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: nameEventLabelSize))
         currentY += nameEventLabelSize.height + halfItemSpacing
-
-        self.nameEventTextField.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: layout.size.width - sidePadding * 2, height: itemHeight))
+        
+        transition.updateFrame(node: self.nameEventTextField, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: fullWidth, height: itemHeight)))
         currentY += itemHeight + sectionSpacing
-
-        let aboutEventLabelSize = self.aboutEventLabel.measure(CGSize(width: layout.size.width - sidePadding * 2, height: .greatestFiniteMagnitude))
-        self.aboutEventLabel.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: aboutEventLabelSize)
+        
+        let aboutEventLabelSize = self.aboutEventLabel.measure(CGSize(width: fullWidth, height: .greatestFiniteMagnitude))
+        transition.updateFrame(node: self.aboutEventLabel, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: aboutEventLabelSize))
         currentY += aboutEventLabelSize.height + halfItemSpacing
-
-        let aboutEventHeight: CGFloat = 100.0
-        self.aboutEventTextField.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: layout.size.width - sidePadding * 2, height: aboutEventHeight))
+        
+        let aboutEventHeight: CGFloat = 120.0
+        transition.updateFrame(node: self.aboutEventTextField, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: fullWidth, height: aboutEventHeight)))
         currentY += aboutEventHeight + sectionSpacing
-
-        let eventTypeLabelSize = self.eventTypeLabel.measure(CGSize(width: layout.size.width - sidePadding * 2, height: .greatestFiniteMagnitude))
-        self.eventTypeLabel.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: eventTypeLabelSize)
+        
+        let eventTypeLabelSize = self.eventTypeLabel.measure(CGSize(width: fullWidth, height: .greatestFiniteMagnitude))
+        transition.updateFrame(node: self.eventTypeLabel, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: eventTypeLabelSize))
         currentY += eventTypeLabelSize.height + halfItemSpacing
-
-        self.eventTypeTextField.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: layout.size.width - sidePadding * 2, height: itemHeight))
+        
+        transition.updateFrame(node: self.eventTypeTextField, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: fullWidth, height: itemHeight)))
         currentY += itemHeight + sectionSpacing
-
+        
         let dateWidth: CGFloat = floor((layout.size.width - sidePadding * 3) / 2.0)
-
+        
         let eventDateLabelSize = self.eventDateLabel.measure(CGSize(width: dateWidth, height: .greatestFiniteMagnitude))
-        self.eventDateLabel.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: eventDateLabelSize)
-
+        transition.updateFrame(node: self.eventDateLabel, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: eventDateLabelSize))
+        
         let eventTimeLabelSize = self.eventTimeLabel.measure(CGSize(width: dateWidth, height: .greatestFiniteMagnitude))
-        self.eventTimeLabel.frame = CGRect(origin: CGPoint(x: sidePadding * 2 + dateWidth, y: currentY), size: eventTimeLabelSize)
-        currentY += eventDateLabelSize.height + halfItemSpacing
-
-        self.eventDateTextField.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: dateWidth, height: itemHeight))
-        self.eventTimeTextField.frame = CGRect(origin: CGPoint(x: sidePadding * 2 + dateWidth, y: currentY), size: CGSize(width: dateWidth, height: itemHeight))
+        transition.updateFrame(node: self.eventTimeLabel, frame: CGRect(origin: CGPoint(x: sidePadding * 2 + dateWidth, y: currentY), size: eventTimeLabelSize))
+        currentY += max(eventDateLabelSize.height, eventTimeLabelSize.height) + halfItemSpacing
+        
+        transition.updateFrame(node: self.eventDateTextField, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: dateWidth, height: itemHeight)))
+        transition.updateFrame(node: self.eventTimeTextField, frame: CGRect(origin: CGPoint(x: sidePadding * 2 + dateWidth, y: currentY), size: CGSize(width: dateWidth, height: itemHeight)))
         currentY += itemHeight + sectionSpacing
-
-        let venueEventLabelSize = self.venueEventLabel.measure(CGSize(width: layout.size.width - sidePadding * 2, height: .greatestFiniteMagnitude))
-        self.venueEventLabel.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: venueEventLabelSize)
+        
+        let venueEventLabelSize = self.venueEventLabel.measure(CGSize(width: fullWidth, height: .greatestFiniteMagnitude))
+        transition.updateFrame(node: self.venueEventLabel, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: venueEventLabelSize))
         currentY += venueEventLabelSize.height + halfItemSpacing
-
-        self.venueEventTextField.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: layout.size.width - sidePadding * 2, height: itemHeight))
+        
+        transition.updateFrame(node: self.venueEventTextField, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: fullWidth, height: itemHeight)))
         currentY += itemHeight + sectionSpacing
-
-        let parametersApplyingLabelSize = self.parametersApplyingLabel.measure(CGSize(width: layout.size.width - sidePadding * 2, height: .greatestFiniteMagnitude))
-        self.parametersApplyingLabel.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: parametersApplyingLabelSize)
-        currentY += parametersApplyingLabelSize.height + itemSpacing
-
-        let addParamsButtonWidth: CGFloat = 150.0
+        
+        let paramLabelSize = self.parametersApplyingLabel.measure(CGSize(width: fullWidth, height: .greatestFiniteMagnitude))
+        transition.updateFrame(node: self.parametersApplyingLabel, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: paramLabelSize))
+        currentY += paramLabelSize.height + itemSpacing
+        
+        for param in EventParameter.allCases {
+            if selectedParameters.contains(param) {
+                let node = getOrCreateNode(for: param)
+                
+                let nodeHeight: CGFloat = (node is DropdownNode) ? 80.0 : 80.0
+                
+                transition.updateFrame(node: node, frame: CGRect(x: sidePadding, y: currentY, width: fullWidth, height: nodeHeight))
+                currentY += nodeHeight + sectionSpacing
+            }
+        }
+        
+        let addParamsButtonWidth: CGFloat = 160.0
         let addParamsButtonHeight: CGFloat = 35.0
-
-        self.addParametersButton.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: addParamsButtonWidth, height: addParamsButtonHeight))
+        
+        transition.updateFrame(node: self.addParametersButton, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: addParamsButtonWidth, height: addParamsButtonHeight)))
         currentY += addParamsButtonHeight + sectionSpacing
-
-        let buttonWidth = layout.size.width - sidePadding * 2
-        let buttonHeight: CGFloat = 50.0
-
-        self.applyButton.frame = CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: buttonWidth, height: buttonHeight))
-
-        currentY += buttonHeight + sectionSpacing
-
-        self.scrollNode.view.contentSize = CGSize(width: layout.size.width, height: currentY + 20.0)
-
+        
+        if self.applyButton.supernode != nil && !self.applyButton.isHidden {
+            let buttonHeight: CGFloat = 50.0
+            transition.updateFrame(node: self.applyButton, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: fullWidth, height: buttonHeight)))
+            currentY += buttonHeight + sectionSpacing
+        }
+        
+        self.scrollNode.view.contentSize = CGSize(width: layout.size.width, height: currentY + 40.0)
+        
         self.readyValue = true
+    }
+    
+    func updateSelectedParameters(_ params: Set<EventParameter>) {
+        self.selectedParameters = params
+        
+        for param in params {
+            let node = getOrCreateNode(for: param)
+            if node.supernode == nil {
+                self.scrollNode.addSubnode(node)
+            }
+        }
+        
+        let allNodes: [ASDisplayNode?] = [genderDropdown, ageSlider, heightSlider, weightSlider, waistSlider, hipsSlider, shoeSizeSlider, hairLengthDropdown, hairColorDropdown]
+        for node in allNodes {
+            node?.isHidden = true
+        }
+        for param in params {
+            getOrCreateNode(for: param).isHidden = false
+        }
+        
+        if let (layout, navHeight, actualNavHeight) = self.currentLayoutData {
+            self.containerLayoutUpdated(layout, navigationBarHeight: navHeight, actualNavigationBarHeight: actualNavHeight, transition: .animated(duration: 0.3, curve: .spring))
+        }
+    }
+    
+    private func getOrCreateNode(for param: EventParameter) -> ASDisplayNode {
+        switch param {
+        case .gender:
+            if genderDropdown == nil { genderDropdown = DropdownNode(title: "Gender", placeholder: "Select Gender", options: ["Loading..."], backgroundColor: UIColor(hexString: "#EFEFF0"), placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), titleColor: UIColor(hexString: "#3C3C43"), arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), apperTitleColor: UIColor(hexString: "#3C3C43")) }
+            return genderDropdown!
+        case .age:
+            let singleAgeSlider = AgeSliderNode<Int>(
+                title: "Age (y.o)",
+                type: "y.o",
+                mode: .range(minValue: 17, maxValue: 30),
+                minimumValue: 14,
+                maximumValue: 45,
+                configuration: .light
+            )
+            if ageSlider == nil { ageSlider = singleAgeSlider }
+            return ageSlider!
+        case .height:
+            let singleHeightSlider = AgeSliderNode<Double>(
+                title: "Height (cm)",
+                type: "cm",
+                mode: .range(minValue: 1.78, maxValue: 2.20),
+                minimumValue: 1.68,
+                maximumValue: 2.50,
+                configuration: .light
+            )
+            
+            if heightSlider == nil { heightSlider = singleHeightSlider }
+            return heightSlider!
+        case .weight:
+            let singleWeightSlider = AgeSliderNode<Double>(
+                title: "Weight (kg)",
+                type: "kg",
+                mode: .range(minValue: 50, maxValue: 70),
+                minimumValue: 48,
+                maximumValue: 90,
+                configuration: .light
+            )
+            
+            if weightSlider == nil { weightSlider = singleWeightSlider }
+            return weightSlider!
+        case .waist:
+            let singleWaistSlider = AgeSliderNode<Double>(
+                title: "Waist (cm)",
+                type: "cm",
+                mode: .range(minValue: 55, maxValue: 85),
+                minimumValue: 48,
+                maximumValue: 90,
+                configuration: .light
+            )
+            
+            if waistSlider == nil { waistSlider = singleWaistSlider }
+            return waistSlider!
+        case .hips:
+            let singleHipsSlider = AgeSliderNode<Double>(
+                title: "Hips (cm)",
+                type: "cm",
+                mode: .range(minValue: 90, maxValue: 100),
+                minimumValue: 80,
+                maximumValue: 110,
+                configuration: .light
+            )
+            
+            if hipsSlider == nil { hipsSlider = singleHipsSlider }
+            return hipsSlider!
+        case .shoeSize:
+            let singleShoeSizeSlider = AgeSliderNode<Double>(
+                title: "Shoe size (EU)",
+                type: "",
+                mode: .range(minValue: 37, maxValue: 40),
+                minimumValue: 36,
+                maximumValue: 42,
+                configuration: .light
+            )
+            
+            if shoeSizeSlider == nil { shoeSizeSlider = singleShoeSizeSlider }
+            return shoeSizeSlider!
+            
+            
+        case .hairLength:
+            if hairLengthDropdown == nil { hairLengthDropdown = DropdownNode(title: "Hair length", placeholder: "Select hair length", options: ["Loading..."], backgroundColor: UIColor(hexString: "#EFEFF0"), placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), titleColor: UIColor(hexString: "#3C3C43"), arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), apperTitleColor: UIColor(hexString: "#3C3C43"))
+            }
+            return hairLengthDropdown!
+        case .hairColor:
+            if hairColorDropdown == nil { hairColorDropdown = DropdownNode(title: "Hair color", placeholder: "Select hair color", options: ["Loading..."], backgroundColor: UIColor(hexString: "#EFEFF0"), placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), titleColor: UIColor(hexString: "#3C3C43"), arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), apperTitleColor: UIColor(hexString: "#3C3C43"))
+            }
+            return hairColorDropdown!
+        }
     }
 }
 
@@ -519,4 +673,8 @@ private func roundCorners(diameter: CGFloat) -> UIImage {
     let image = UIGraphicsGetImageFromCurrentImageContext()!.stretchableImage(withLeftCapWidth: Int(diameter / 2.0), topCapHeight: Int(diameter / 2.0))
     UIGraphicsEndImageContext()
     return image
+}
+
+private func getEditableText(placeholder: String) -> MultilineTextFieldNode {
+    return MultilineTextFieldNode(placeholder: placeholder)
 }

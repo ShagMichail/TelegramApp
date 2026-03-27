@@ -50,9 +50,12 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
 
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
 
-        self.title = "Create event"
+        self.title = "CREATE EVENT"
 
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
+
+        let createItem = UIBarButtonItem(title: "Create", style: .done, target: self, action: #selector(createPressed))
+        self.navigationItem.rightBarButtonItem = createItem
 
         self.presentationDataDisposable = (context.sharedContext.presentationData
                                            |> deliverOnMainQueue).start(next: { [weak self] presentationData in
@@ -123,6 +126,9 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
         self.createEventNode.showAlert = { [weak self] text in
             self?.showAlert(text: text)
         }
+        self.createEventNode.onAddParametersTapped = { [weak self] selectedParams in
+            self?.showParametersSheet(currentSelection: selectedParams)
+        }
         self.displayNodeDidLoad()
     }
 
@@ -166,5 +172,15 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
 
         self.createEventNode.containerLayoutUpdated(layout, navigationBarHeight: self.cleanNavigationHeight, actualNavigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
     }
+    
+    private func showParametersSheet(currentSelection: Set<EventParameter>) {
+        let sheet = EventParametersSheetController(selectedParameters: currentSelection) { [weak self] newSelection in
+            self?.createEventNode.updateSelectedParameters(newSelection)
+        }
+        self.present(sheet, animated: true)
+    }
 
+    @objc private func createPressed() {
+        self.createEventNode.applyButtonTapped()
+    }
 }

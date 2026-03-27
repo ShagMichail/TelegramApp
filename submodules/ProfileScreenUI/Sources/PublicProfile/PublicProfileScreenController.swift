@@ -17,6 +17,7 @@ import Postbox
 import MapResourceToAvatarSizes
 import ContextUI
 import GalleryUI
+import EventsUI
 
 enum MediaFormatValidator {
     static let videoExtensions: Set<String> = ["mp4", "mov", "avi", "mkv", "webm"]
@@ -147,7 +148,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
     
     @objc private func showEditMenuPressed() {
         // debug: removed
-        
+
         var items: [EditMenuViewController.MenuItem] = [
             .init(title: "Edit Profile", action: { [weak self] in
                 self?.navigateToEditProfile()
@@ -159,34 +160,43 @@ public final class PublicProfileScreenController: TelegramBaseController {
                 self?.navigateToEditSocialLinks()
             })
         ]
-        
+
         if self.userRole != .agency {
             items.append(.init(title: "Manage Work Experience", action: { [weak self] in
                 self?.navigateToManageExperience()
             }))
+        } else {
+            items.append(.init(title: "Create Event", action: { [weak self] in
+                self?.navigateToCreateEvent()
+            }))
         }
-        
+
         items.append(.init(title: "Add Photo", action: { [weak self] in
             if #available(iOS 14, *) {
                 self?.navigateToAddPhoto()
             }
         }))
-        
+
         items.append(.init(title: "Add Video", action: { [weak self] in
             if #available(iOS 14, *) {
                 self?.navigateToAddVideo()
             }
         }))
-                
+
         var sourcePoint = CGPoint(x: UIScreen.main.bounds.width - 20, y: 90)
-        
+
         if let (_, navigationBarHeight) = self.containerLayout {
             sourcePoint.y = navigationBarHeight
         }
-        
+
         let menuVC = EditMenuViewController(items: items, sourcePoint: sourcePoint)
-        
+
         self.present(menuVC, animated: false, completion: nil)
+    }
+
+    private func navigateToCreateEvent() {
+        let createEventController = CreateEventController(context: self.context)
+        self.push(createEventController)
     }
 
     @available(iOS 14, *)
@@ -263,7 +273,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
         let historyController = WorkExperienceController(context: self.context, model: self.model)
         self.push(historyController)
     }
-    
+
     override public func loadDisplayNode() {
         self.displayNode = PublicProfileScreenNode(
             controller: self,
