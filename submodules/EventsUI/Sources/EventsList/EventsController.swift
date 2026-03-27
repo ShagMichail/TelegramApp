@@ -94,32 +94,47 @@ public final class EventsController: TelegramBaseController {
     }
 
     private func getEvents() {
-        //        displayNode.
-        let supportPeer = Promise<[EventModel]?>()
-        // FIXME DIVO: заменить на REST — закомментирован вызов MTProto
-        // supportPeer.set(context.engine.eventsEngine.getEvents())
-        self.supportPeerDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { events in
-            print("🔕", events ?? "")//displayNode
-            if let events = events {
-                let eventDataArray: [EventData] = events.map { model in
-                    let datePartPrefix = model.eventDate.prefix(while: { $0 != "T" })
-
-                    return EventData(
-                        id: model.id,
-                        title: model.title,
-                        subtitle: model.title,
-                        imageName: "Components/Model",
-                        profileImageName: "Components/Model",
-                        profileName: "@" + (model.creatorName ?? ""),
-                        timeRemaining: String(datePartPrefix),
-                        coverPhoto: model.coverPhoto,
-                        profilePhoto: model.creatorPhoto
-                    )
+        let body = EventListRequest(offset: 0, limit: 30)
+        Task {
+            do {
+                let response: EventListResponse = try await DivoAPIClient.shared.request(
+                    path: "/event/list",
+                    method: "POST",
+                    body: body
+                )
+                let items = response.data.items
+                if !items.isEmpty {
+                    let eventDataArray: [EventData] = items.map { item in
+                        let dateString = item.date?.prefix(while: { $0 != "T" }).description ?? ""
+                        let coverURL = item.files?.first?.fullUrl
+                        let avatarURL = item.user?.avatar?.fullUrl
+                        let cityName = item.address?.city?.title ?? ""
+                        return EventData(
+                            id: item.id,
+                            title: item.title,
+                            subtitle: item.type?.title ?? "",
+                            profileName: "@" + (item.user?.fullName ?? ""),
+                            timeRemaining: "4d : 4h : 0m",
+                            type: item.type?.title ?? "",
+                            coverPhotoURL: coverURL,
+                            profilePhotoURL: avatarURL,
+                            location: cityName,
+                            eventDateFormatted: dateString
+                        )
+                    }
+                    await MainActor.run {
+                        self.controllerNode.reloadEvents(events: eventDataArray)
+                    }
+                    return
                 }
-
-                self.controllerNode.reloadEvents(events: eventDataArray)
+            } catch {
+                // API failed or empty — fall through to mocks
             }
-        }))
+            // Show mocks when API returns empty or fails
+            await MainActor.run {
+                self.controllerNode.reloadEvents(events: EventData.mockEvents())
+            }
+        }
     }
 
     @objc private func searchPressed() {

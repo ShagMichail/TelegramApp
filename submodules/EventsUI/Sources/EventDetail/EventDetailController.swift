@@ -137,29 +137,31 @@ public final class EventDetailController: TelegramBaseController {
     }
 
     private func getEvent() {
-        let supportPeer = Promise<EventModel?>()
-        // FIXME DIVO: заменить на REST — закомментирован вызов MTProto
-        // supportPeer.set(context.engine.eventsEngine.getEvent(eventId: eventData.id))
-        self.getEventDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { eventModel in
-
-            if let eventModel = eventModel {
-                let datePartPrefix = eventModel.eventDate.prefix(while: { $0 != "T" })
-
-                let data = EventData(
-                    id: eventModel.id,
-                    title: eventModel.title,
-                    subtitle: eventModel.description,
-                    imageName: "Components/Model",
-                    profileImageName: "Components/Model",
-                    profileName: "@" + (eventModel.creatorName ?? ""),
-                    timeRemaining: String(datePartPrefix),
-                    type: eventModel.eventType ?? "",
-                    coverPhoto: eventModel.coverPhoto,
-                    profilePhoto: eventModel.creatorPhoto
+        Task {
+            do {
+                let response: EventDetailResponse = try await DivoAPIClient.shared.request(
+                    path: "/event/\(eventData.id)"
                 )
-                self.controllerNode.updateEventData(data)
-                print("🔕", eventModel)
+                let item = response.data
+                let dateString = item.date?.prefix(while: { $0 != "T" }).description ?? ""
+                let coverURL = item.files?.first?.fullUrl
+                let avatarURL = item.user?.avatar?.fullUrl
+                let data = EventData(
+                    id: item.id,
+                    title: item.title,
+                    subtitle: item.description ?? "",
+                    profileName: "@" + (item.user?.fullName ?? ""),
+                    timeRemaining: dateString,
+                    type: item.type?.title ?? "",
+                    coverPhotoURL: coverURL,
+                    profilePhotoURL: avatarURL
+                )
+                await MainActor.run {
+                    self.controllerNode.updateEventData(data)
+                }
+            } catch {
+                print("❌ [DivoAPI] event/\(eventData.id) error: \(error)")
             }
-        }))
+        }
     }
 }

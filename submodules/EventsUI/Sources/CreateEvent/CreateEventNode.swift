@@ -267,13 +267,10 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     @objc private func applyButtonTapped() {
         print("applyButton Tapped!")
 
-        if let nameEventTextField = nameEventTextField.textField.text,
-           nameEventTextField.isEmpty,
-           aboutEventTextField.text.isEmpty,
-           eventTime != 0,
-           eventDate != 0
-        {
+        let nameText = nameEventTextField.textField.text ?? ""
+        if nameText.isEmpty || aboutEventTextField.text.isEmpty || eventTime == 0 || eventDate == 0 {
             showAlert?("Please fill in all fields")
+            return
         }
 
         let unixTimestampDate = TimeInterval(eventDate)
@@ -288,37 +285,42 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         formatter.dateFormat = "HH:mm"
         let formattedTime = formatter.string(from: time)
 
-        let _ = Promise<String?>()
-        let _ = EventModel(
-            title: nameEventTextField.textField.text ?? "",
-            description: aboutEventTextField.text,
-            eventDate: formattedDate,
-            eventTime: formattedTime,
-            coverPhoto: nil,
-            enabledParameterKeys: [])
+        let eventTitle = nameText
+        let eventDescription = aboutEventTextField.text
 
-        if currentPhoto != nil {
-            // FIXME DIVO: заменить на REST — закомментирован вызов MTProto (upload + createEvent)
-            // let _ = uploadPhotoToCloud(context: context, image: currentPhoto).start(next: { id in
-            //     if let id = id {
-            //         print("⛳️", id)
-            //         supportPeer.set(self.context.engine.eventsEngine.createEvent(eventModel: eventModel, id: id))
-            //         self.supportPeerDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { peerId in
-            //             print("🔕", peerId ?? "")
-            //             self.showAlert?("event added")
-            //         }))
-            //     }
-            // })
+        Task {
+            do {
+                var fileUuids: [CreateEventFile] = []
+                if let photo = currentPhoto, let data = photo.jpegData(compressionQuality: 0.9) {
+                    let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
+                        path: "/file/upload-file",
+                        fileData: data
+                    )
+                    if let uuid = uploadResponse.data?.uuid {
+                        fileUuids.append(CreateEventFile(order: 0, fileUuid: uuid))
+                    }
+                }
+                let body = CreateEventRequest(
+                    title: eventTitle,
+                    description: eventDescription,
+                    typeId: 1,
+                    date: formattedDate + " " + formattedTime + ":00",
+                    files: fileUuids.isEmpty ? nil : fileUuids
+                )
+                let _: CreateEventResponse = try await DivoAPIClient.shared.request(
+                    path: "/event/create",
+                    method: "POST",
+                    body: body
+                )
+                await MainActor.run {
+                    self.showAlert?("event added")
+                }
+            } catch {
+                await MainActor.run {
+                    self.showAlert?("Error: \(error)")
+                }
+            }
         }
-    }
-
-    func uploadPhotoToCloud(context: AccountContext, image: UIImage) -> Signal<Int64?, NoError> {
-        guard image.jpegData(compressionQuality: 0.9) != nil else {
-            return .single(nil)
-        }
-        // FIXME DIVO: заменить на REST — закомментирован вызов MTProto
-        // return context.engine.engineDivo.uploadedPhoto(resource: data)
-        return .single(nil)
     }
 
     @objc private func addParametersTapped() {
