@@ -28,6 +28,19 @@ final class EventsControllerNode: ASDisplayNode {
     private var isLoading = true
     private var shimmerViews: [ShimmerView] = []
 
+    private let navBackgroundView: UIView = {
+        let v = UIView()
+        v.backgroundColor = .white
+        return v
+    }()
+
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.font = Font.helveticaNeue(34)
+        label.textColor = .black
+        return label
+    }()
+
     init(controller: ViewController, context: AccountContext, presentationData: PresentationData) {
         self.controller = controller
         self.context = context
@@ -37,6 +50,8 @@ final class EventsControllerNode: ASDisplayNode {
 
         self.view.backgroundColor = .white
 
+        titleLabel.text = presentationData.strings.Events_TabTitle.uppercased()
+
         let flowLayout = UICollectionViewFlowLayout()
 
         self.collectionView = UICollectionView(frame: .zero, collectionViewLayout: flowLayout)
@@ -44,11 +59,12 @@ final class EventsControllerNode: ASDisplayNode {
         self.collectionView.dataSource = self
         self.collectionView.delegate = self
         self.collectionView.showsVerticalScrollIndicator = false
-        self.collectionView.translatesAutoresizingMaskIntoConstraints = false
 
         self.collectionView.register(EventCollectionViewCell.self, forCellWithReuseIdentifier: "EventCollectionViewCell")
 
         self.view.addSubview(self.collectionView)
+        self.view.addSubview(self.navBackgroundView)
+        self.navBackgroundView.addSubview(self.titleLabel)
 
         self.events = []
         self.collectionView.reloadData()
@@ -139,6 +155,15 @@ final class EventsControllerNode: ASDisplayNode {
         let insets = layout.insets(options: [.input])
         let safeAreaInsets = layout.safeInsets
 
+        // Nav background + title (same pattern as ModelsFeedNode)
+        navBackgroundView.frame = CGRect(x: 0, y: 0, width: layout.size.width, height: navigationBarHeight)
+
+        titleLabel.sizeToFit()
+        let titleX: CGFloat = 16 + safeAreaInsets.left
+        let titleY: CGFloat = navigationBarHeight - titleLabel.frame.height - 10
+        titleLabel.frame = CGRect(x: titleX, y: titleY, width: ceil(titleLabel.frame.width), height: ceil(titleLabel.frame.height) + 2)
+
+        // Collection
         let spacing: CGFloat = 10
         let itemWidth = floor((layout.size.width - safeAreaInsets.left - safeAreaInsets.right - spacing * 3) / 2.0)
         let itemHeight = floor(itemWidth * 1.35)

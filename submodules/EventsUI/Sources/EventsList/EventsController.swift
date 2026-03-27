@@ -42,7 +42,8 @@ public final class EventsController: TelegramBaseController {
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
 
-        super.init(context: context, navigationBarPresentationData: NavigationBarPresentationData(presentationData: self.presentationData))
+        let navTheme = NavigationBarTheme(overallDarkAppearance: true, buttonColor: .black, disabledButtonColor: UIColor(rgb: 0x525252), primaryTextColor: .white, backgroundColor: .clear, opaqueBackgroundColor: .clear, enableBackgroundBlur: false, separatorColor: .clear, badgeBackgroundColor: .clear, badgeStrokeColor: .clear, badgeTextColor: .clear)
+        super.init(context: context, navigationBarPresentationData: NavigationBarPresentationData(theme: navTheme, strings: NavigationBarStrings(presentationStrings: self.presentationData.strings)))
 
         let icon: UIImage?
         icon = UIImage(bundleImageName: "Chat List/Tabs/IconEvents")
@@ -63,24 +64,17 @@ public final class EventsController: TelegramBaseController {
     private func updateNavigation() {
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
 
-        let searchButton = UIBarButtonItem(image: PresentationResourcesRootController.navigationSearchIcon(self.presentationData.theme), style: .plain, target: self, action: #selector(self.searchPressed))
-        let addButton = UIBarButtonItem(image: PresentationResourcesRootController.navigationAddIcon(self.presentationData.theme), style: .plain, target: self, action: #selector(self.addPressed))
+        let copperColor = UIColor(rgb: 0xBF7A54)
 
-        self.navigationItem.rightBarButtonItems = [searchButton, addButton]
+        let searchIcon = generateTintedImage(image: PresentationResourcesRootController.navigationSearchIcon(self.presentationData.theme), color: copperColor)
+        let searchButton = UIBarButtonItem(image: searchIcon?.withRenderingMode(.alwaysOriginal), style: .plain, target: self, action: #selector(self.searchPressed))
 
-        let titleLabel = UILabel()
-        titleLabel.text = self.presentationData.strings.Events_TabTitle.uppercased()
-        titleLabel.font = Font.helveticaNeue(34)
-        titleLabel.textColor = self.presentationData.theme.rootController.navigationBar.primaryTextColor
-        titleLabel.sizeToFit()
+        let addIcon = generateTintedImage(image: PresentationResourcesRootController.navigationAddIcon(self.presentationData.theme), color: copperColor)
+        let addButton = UIBarButtonItem(image: addIcon?.withRenderingMode(.alwaysOriginal), style: .plain, target: self, action: #selector(self.addPressed))
 
-        let containerView = UIView(frame: CGRect(x: 0, y: 0, width: 200, height: 40))
-        containerView.addSubview(titleLabel)
-        titleLabel.frame.origin.x = -50
-        titleLabel.frame.origin.y = 10
+        self.navigationItem.rightBarButtonItems = [addButton, searchButton]
 
-        self.navigationItem.titleView = containerView
-        self.navigationController?.hidesBarsOnSwipe = true
+        self.navigationItem.titleView = UIView()
     }
 
     private var lastContentOffset: CGPoint = .zero
