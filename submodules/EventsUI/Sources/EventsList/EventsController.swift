@@ -35,6 +35,7 @@ public final class EventsController: TelegramBaseController {
 
     private var isEmpty: Bool?
     private var hasLoadedOnce = false
+    private var tokenChangeObserver: NSObjectProtocol?
 
     private let createActionDisposable = MetaDisposable()
     private let clearDisposable = MetaDisposable()
@@ -60,6 +61,15 @@ public final class EventsController: TelegramBaseController {
                 strongSelf.presentationData = presentationData
             }
         }).strict()
+
+        self.tokenChangeObserver = NotificationCenter.default.addObserver(
+            forName: DivoConfig.tokenDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.hasLoadedOnce = false
+            self?.getEvents()
+        }
     }
 
     private func updateNavigation() {
@@ -163,6 +173,9 @@ public final class EventsController: TelegramBaseController {
         self.peerViewDisposable.dispose()
         self.clearDisposable.dispose()
         self.supportPeerDisposable.dispose()
+        if let observer = self.tokenChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     override public func loadDisplayNode() {
