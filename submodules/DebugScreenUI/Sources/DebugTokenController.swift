@@ -15,28 +15,15 @@ public final class DebugTokenController: TelegramBaseController {
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
 
-        let navTheme = NavigationBarTheme(
-            overallDarkAppearance: true,
-            buttonColor: .white,
-            disabledButtonColor: UIColor(white: 0.5, alpha: 1),
-            primaryTextColor: .white,
-            backgroundColor: UIColor(rgb: 0x1C1C1E),
-            opaqueBackgroundColor: UIColor(rgb: 0x1C1C1E),
-            enableBackgroundBlur: false,
-            separatorColor: UIColor(white: 0.3, alpha: 1),
-            badgeBackgroundColor: .clear,
-            badgeStrokeColor: .clear,
-            badgeTextColor: .clear
-        )
         super.init(
             context: context,
             navigationBarPresentationData: NavigationBarPresentationData(
-                theme: navTheme,
+                theme: DebugTheme.navTheme(),
                 strings: NavigationBarStrings(presentationStrings: self.presentationData.strings)
             )
         )
 
-        self.title = "Access Token"
+        self.title = "Токен доступа"
     }
 
     required init(coder aDecoder: NSCoder) {
@@ -82,7 +69,7 @@ private final class DebugTokenNode: ASDisplayNode {
 
     override init() {
         super.init()
-        self.backgroundColor = UIColor(rgb: 0x000000)
+        self.backgroundColor = DebugTheme.background
     }
 
     override func didLoad() {
@@ -93,69 +80,69 @@ private final class DebugTokenNode: ASDisplayNode {
         self.view.addSubview(scrollView)
 
         // MARK: Current Token
-        setupSectionHeader(currentHeader, text: "CURRENT TOKEN")
+        setupSectionHeader(currentHeader, text: "ТЕКУЩИЙ ТОКЕН")
         scrollView.addSubview(currentHeader)
 
-        currentTokenContainer.backgroundColor = UIColor(rgb: 0x1C1C1E)
+        currentTokenContainer.backgroundColor = DebugTheme.cellBackground
         currentTokenContainer.layer.cornerRadius = 10
         currentTokenContainer.clipsToBounds = true
         scrollView.addSubview(currentTokenContainer)
 
         currentTokenLabel.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-        currentTokenLabel.textColor = UIColor(white: 0.7, alpha: 1)
+        currentTokenLabel.textColor = DebugTheme.secondaryText
         currentTokenLabel.numberOfLines = 0
         currentTokenContainer.addSubview(currentTokenLabel)
 
-        copyButton.setTitle("Copy", for: .normal)
-        copyButton.setTitleColor(UIColor(rgb: 0xBF7A54), for: .normal)
+        copyButton.setTitle("Скопировать", for: .normal)
+        copyButton.setTitleColor(DebugTheme.accent, for: .normal)
         copyButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .medium)
         copyButton.addTarget(self, action: #selector(copyTapped), for: .touchUpInside)
         currentTokenContainer.addSubview(copyButton)
 
         // MARK: Presets
-        setupSectionHeader(presetsHeader, text: "PRESETS")
+        setupSectionHeader(presetsHeader, text: "ПРЕСЕТЫ")
         scrollView.addSubview(presetsHeader)
 
-        presetsContainer.backgroundColor = UIColor(rgb: 0x1C1C1E)
+        presetsContainer.backgroundColor = DebugTheme.cellBackground
         presetsContainer.layer.cornerRadius = 10
         presetsContainer.clipsToBounds = true
         scrollView.addSubview(presetsContainer)
 
-        agencyRow.configure(title: "Agency", tokenPreview: tokenPreview(DivoConfig.agencyToken))
+        agencyRow.configure(title: "Агентство", tokenPreview: tokenPreview(DivoConfig.agencyToken))
         agencyRow.onTap = { [weak self] in self?.selectPreset(.agency) }
         presetsContainer.addSubview(agencyRow)
 
-        presetSeparator.backgroundColor = UIColor(white: 0.25, alpha: 1)
+        presetSeparator.backgroundColor = DebugTheme.separator
         presetsContainer.addSubview(presetSeparator)
 
-        modelRow.configure(title: "Model", tokenPreview: tokenPreview(DivoConfig.modelToken))
+        modelRow.configure(title: "Модель", tokenPreview: tokenPreview(DivoConfig.modelToken))
         modelRow.onTap = { [weak self] in self?.selectPreset(.model) }
         presetsContainer.addSubview(modelRow)
 
         // MARK: Custom Token
-        setupSectionHeader(customHeader, text: "CUSTOM TOKEN")
+        setupSectionHeader(customHeader, text: "СВОЙ ТОКЕН")
         scrollView.addSubview(customHeader)
 
-        customContainer.backgroundColor = UIColor(rgb: 0x1C1C1E)
+        customContainer.backgroundColor = DebugTheme.cellBackground
         customContainer.layer.cornerRadius = 10
         customContainer.clipsToBounds = true
         scrollView.addSubview(customContainer)
 
         customTextField.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
-        customTextField.textColor = .white
+        customTextField.textColor = DebugTheme.primaryText
         customTextField.attributedPlaceholder = NSAttributedString(
-            string: "Paste token here...",
-            attributes: [.foregroundColor: UIColor(white: 0.35, alpha: 1)]
+            string: "Вставьте токен...",
+            attributes: [.foregroundColor: DebugTheme.separator]
         )
         customTextField.backgroundColor = .clear
         customTextField.autocorrectionType = .no
         customTextField.autocapitalizationType = .none
         customContainer.addSubview(customTextField)
 
-        applyButton.setTitle("Apply Custom Token", for: .normal)
+        applyButton.setTitle("Применить свой токен", for: .normal)
         applyButton.setTitleColor(.white, for: .normal)
         applyButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
-        applyButton.backgroundColor = UIColor(rgb: 0xBF7A54)
+        applyButton.backgroundColor = DebugTheme.accent
         applyButton.layer.cornerRadius = 10
         applyButton.addTarget(self, action: #selector(applyCustom), for: .touchUpInside)
         scrollView.addSubview(applyButton)
@@ -173,7 +160,6 @@ private final class DebugTokenNode: ASDisplayNode {
         let w = bounds.width - pad * 2
         var y: CGFloat = 8
 
-        // Current token section
         currentHeader.frame = CGRect(x: pad + 4, y: y, width: w, height: 30)
         y += 30
 
@@ -182,10 +168,10 @@ private final class DebugTokenNode: ASDisplayNode {
         let containerH = max(tokenHeight + 52, 80)
         currentTokenContainer.frame = CGRect(x: pad, y: y, width: w, height: containerH)
         currentTokenLabel.frame = CGRect(x: 16, y: 12, width: w - 32, height: tokenHeight + 4)
-        copyButton.frame = CGRect(x: w - 70, y: containerH - 36, width: 54, height: 28)
+        copyButton.sizeToFit()
+        copyButton.frame = CGRect(x: w - copyButton.frame.width - 16, y: containerH - 36, width: copyButton.frame.width, height: 28)
         y += containerH + 20
 
-        // Presets section
         presetsHeader.frame = CGRect(x: pad + 4, y: y, width: w, height: 30)
         y += 30
 
@@ -196,7 +182,6 @@ private final class DebugTokenNode: ASDisplayNode {
         modelRow.frame = CGRect(x: 0, y: rowH + 0.5, width: w, height: rowH)
         y += rowH * 2 + 0.5 + 20
 
-        // Custom token section
         customHeader.frame = CGRect(x: pad + 4, y: y, width: w, height: 30)
         y += 30
 
@@ -205,7 +190,6 @@ private final class DebugTokenNode: ASDisplayNode {
         customTextField.frame = CGRect(x: 16, y: 0, width: w - 32, height: fieldH)
         y += fieldH + 16
 
-        // Apply button
         let btnH: CGFloat = 50
         applyButton.frame = CGRect(x: pad, y: y, width: w, height: btnH)
         y += btnH + 20
@@ -218,7 +202,7 @@ private final class DebugTokenNode: ASDisplayNode {
     @objc private func copyTapped() {
         UIPasteboard.general.string = DivoConfig.accessToken
         let original = copyButton.title(for: .normal)
-        copyButton.setTitle("Copied!", for: .normal)
+        copyButton.setTitle("Скопировано!", for: .normal)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             self?.copyButton.setTitle(original, for: .normal)
         }
@@ -259,9 +243,7 @@ private final class DebugTokenNode: ASDisplayNode {
     }
 
     private func tokenPreview(_ token: String) -> String {
-        let prefix = String(token.prefix(8))
-        let suffix = String(token.suffix(4))
-        return "\(prefix)...\(suffix)"
+        return "\(token.prefix(8))...\(token.suffix(4))"
     }
 
     private func heightForText(_ text: String, font: UIFont, width: CGFloat) -> CGFloat {
@@ -276,7 +258,7 @@ private final class DebugTokenNode: ASDisplayNode {
 
     private func setupSectionHeader(_ label: UILabel, text: String) {
         label.font = .systemFont(ofSize: 13, weight: .regular)
-        label.textColor = UIColor(white: 0.45, alpha: 1)
+        label.textColor = DebugTheme.secondaryText
         label.text = text
     }
 }
@@ -297,17 +279,18 @@ private final class PresetTokenRow: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
+        backgroundColor = DebugTheme.cellBackground
 
         titleLabel.font = .systemFont(ofSize: 17, weight: .regular)
-        titleLabel.textColor = .white
+        titleLabel.textColor = DebugTheme.primaryText
         addSubview(titleLabel)
 
         previewLabel.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
-        previewLabel.textColor = UIColor(white: 0.45, alpha: 1)
+        previewLabel.textColor = DebugTheme.secondaryText
         addSubview(previewLabel)
 
         checkmark.image = UIImage(systemName: "checkmark")
-        checkmark.tintColor = UIColor(rgb: 0xBF7A54)
+        checkmark.tintColor = DebugTheme.accent
         checkmark.contentMode = .scaleAspectFit
         checkmark.isHidden = true
         addSubview(checkmark)
@@ -316,9 +299,7 @@ private final class PresetTokenRow: UIView {
         addGestureRecognizer(tap)
     }
 
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
+    required init?(coder: NSCoder) { fatalError() }
 
     func configure(title: String, tokenPreview: String) {
         titleLabel.text = title
@@ -339,12 +320,9 @@ private final class PresetTokenRow: UIView {
     }
 
     @objc private func tapped() {
-        UIView.animate(withDuration: 0.1, animations: {
-            self.alpha = 0.5
-        }) { _ in
+        UIView.animate(withDuration: 0.1, animations: { self.alpha = 0.6 }) { _ in
             UIView.animate(withDuration: 0.15) { self.alpha = 1 }
         }
         onTap?()
     }
 }
-

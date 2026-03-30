@@ -19,6 +19,7 @@ public struct DivoRequestLogEntry {
 
 public final class DivoRequestLogger {
     public static let shared = DivoRequestLogger()
+    public static let newEntryNotification = Notification.Name("DivoRequestLoggerNewEntry")
 
     private var entries: [DivoRequestLogEntry] = []
     private let queue = DispatchQueue(label: "com.divo.requestLogger")
@@ -51,6 +52,12 @@ public final class DivoRequestLogger {
             if entries.count > maxEntries {
                 entries.removeLast()
             }
+        }
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(
+                name: DivoRequestLogger.newEntryNotification,
+                object: entry
+            )
         }
     }
 

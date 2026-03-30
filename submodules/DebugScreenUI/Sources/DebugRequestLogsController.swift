@@ -15,36 +15,18 @@ public final class DebugRequestLogsController: TelegramBaseController {
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
 
-        let navTheme = NavigationBarTheme(
-            overallDarkAppearance: true,
-            buttonColor: .white,
-            disabledButtonColor: UIColor(white: 0.5, alpha: 1),
-            primaryTextColor: .white,
-            backgroundColor: UIColor(rgb: 0x1C1C1E),
-            opaqueBackgroundColor: UIColor(rgb: 0x1C1C1E),
-            enableBackgroundBlur: false,
-            separatorColor: UIColor(white: 0.3, alpha: 1),
-            badgeBackgroundColor: .clear,
-            badgeStrokeColor: .clear,
-            badgeTextColor: .clear
-        )
         super.init(
             context: context,
             navigationBarPresentationData: NavigationBarPresentationData(
-                theme: navTheme,
+                theme: DebugTheme.navTheme(),
                 strings: NavigationBarStrings(presentationStrings: self.presentationData.strings)
             )
         )
 
-        self.title = "Request Logs"
+        self.title = "Логи запросов"
 
-        let clearButton = UIBarButtonItem(
-            title: "Clear",
-            style: .plain,
-            target: self,
-            action: #selector(clearLogs)
-        )
-        clearButton.setTitleTextAttributes([.foregroundColor: UIColor(rgb: 0xBF7A54)], for: .normal)
+        let clearButton = UIBarButtonItem(title: "Очистить", style: .plain, target: self, action: #selector(clearLogs))
+        clearButton.setTitleTextAttributes([.foregroundColor: DebugTheme.accent], for: .normal)
         self.navigationItem.rightBarButtonItem = clearButton
     }
 
@@ -96,14 +78,14 @@ private final class DebugRequestLogsNode: ASDisplayNode {
 
     override init() {
         super.init()
-        self.backgroundColor = UIColor(rgb: 0x000000)
+        self.backgroundColor = DebugTheme.background
     }
 
     override func didLoad() {
         super.didLoad()
 
-        tableView.backgroundColor = UIColor(rgb: 0x000000)
-        tableView.separatorColor = UIColor(white: 0.2, alpha: 1)
+        tableView.backgroundColor = DebugTheme.background
+        tableView.separatorColor = DebugTheme.separator
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 0)
         tableView.delegate = self
         tableView.dataSource = self
@@ -131,8 +113,7 @@ extension DebugRequestLogsNode: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "LogEntry", for: indexPath) as! LogEntryCell
-        let entry = entries[indexPath.row]
-        cell.configure(with: entry, timeFormatter: DebugRequestLogsNode.timeFormatter)
+        cell.configure(with: entries[indexPath.row], timeFormatter: DebugRequestLogsNode.timeFormatter)
         return cell
     }
 
@@ -160,21 +141,19 @@ private final class LogEntryCell: UITableViewCell {
         setup()
     }
 
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
+    required init?(coder: NSCoder) { fatalError() }
 
     private func setup() {
-        backgroundColor = UIColor(rgb: 0x1C1C1E)
+        backgroundColor = DebugTheme.cellBackground
         let selectedBg = UIView()
-        selectedBg.backgroundColor = UIColor(white: 0.15, alpha: 1)
+        selectedBg.backgroundColor = DebugTheme.background
         selectedBackgroundView = selectedBg
 
         methodLabel.font = .monospacedSystemFont(ofSize: 12, weight: .bold)
         contentView.addSubview(methodLabel)
 
         pathLabel.font = .systemFont(ofSize: 15, weight: .regular)
-        pathLabel.textColor = .white
+        pathLabel.textColor = DebugTheme.primaryText
         pathLabel.lineBreakMode = .byTruncatingMiddle
         contentView.addSubview(pathLabel)
 
@@ -183,11 +162,11 @@ private final class LogEntryCell: UITableViewCell {
         contentView.addSubview(statusLabel)
 
         timeLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        timeLabel.textColor = UIColor(white: 0.4, alpha: 1)
+        timeLabel.textColor = DebugTheme.secondaryText
         contentView.addSubview(timeLabel)
 
         durationLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        durationLabel.textColor = UIColor(white: 0.4, alpha: 1)
+        durationLabel.textColor = DebugTheme.secondaryText
         durationLabel.textAlignment = .right
         contentView.addSubview(durationLabel)
     }
@@ -195,22 +174,21 @@ private final class LogEntryCell: UITableViewCell {
     func configure(with entry: DivoRequestLogEntry, timeFormatter: DateFormatter) {
         methodLabel.text = entry.method
         methodLabel.textColor = colorForMethod(entry.method)
-
         pathLabel.text = entry.path
 
         if let code = entry.statusCode {
             statusLabel.text = "\(code)"
-            statusLabel.textColor = entry.isSuccess ? UIColor(rgb: 0x34C759) : UIColor(rgb: 0xFF3B30)
+            statusLabel.textColor = entry.isSuccess ? DebugTheme.success : DebugTheme.destructive
         } else if entry.error != nil {
             statusLabel.text = "ERR"
-            statusLabel.textColor = UIColor(rgb: 0xFF3B30)
+            statusLabel.textColor = DebugTheme.destructive
         } else {
             statusLabel.text = "—"
-            statusLabel.textColor = UIColor(white: 0.4, alpha: 1)
+            statusLabel.textColor = DebugTheme.secondaryText
         }
 
         timeLabel.text = timeFormatter.string(from: entry.timestamp)
-        durationLabel.text = String(format: "%.0fms", entry.duration * 1000)
+        durationLabel.text = String(format: "%.0fмс", entry.duration * 1000)
     }
 
     override func layoutSubviews() {
@@ -228,11 +206,11 @@ private final class LogEntryCell: UITableViewCell {
 
     private func colorForMethod(_ method: String) -> UIColor {
         switch method.uppercased() {
-        case "GET": return UIColor(rgb: 0x34C759)
-        case "POST": return UIColor(rgb: 0x5AC8FA)
-        case "PUT", "PATCH": return UIColor(rgb: 0xFF9500)
-        case "DELETE": return UIColor(rgb: 0xFF3B30)
-        default: return UIColor(white: 0.6, alpha: 1)
+        case "GET": return DebugTheme.success
+        case "POST": return UIColor(rgb: 0x007AFF)
+        case "PUT", "PATCH": return DebugTheme.warning
+        case "DELETE": return DebugTheme.destructive
+        default: return DebugTheme.secondaryText
         }
     }
 }
@@ -241,33 +219,30 @@ private final class LogEntryCell: UITableViewCell {
 
 final class DebugRequestDetailController: TelegramBaseController {
     private let entry: DivoRequestLogEntry
+    private var detailText: String = ""
 
     init(context: AccountContext, entry: DivoRequestLogEntry) {
         self.entry = entry
         let presentationData = context.sharedContext.currentPresentationData.with { $0 }
 
-        let navTheme = NavigationBarTheme(
-            overallDarkAppearance: true,
-            buttonColor: .white,
-            disabledButtonColor: UIColor(white: 0.5, alpha: 1),
-            primaryTextColor: .white,
-            backgroundColor: UIColor(rgb: 0x1C1C1E),
-            opaqueBackgroundColor: UIColor(rgb: 0x1C1C1E),
-            enableBackgroundBlur: false,
-            separatorColor: UIColor(white: 0.3, alpha: 1),
-            badgeBackgroundColor: .clear,
-            badgeStrokeColor: .clear,
-            badgeTextColor: .clear
-        )
         super.init(
             context: context,
             navigationBarPresentationData: NavigationBarPresentationData(
-                theme: navTheme,
+                theme: DebugTheme.navTheme(),
                 strings: NavigationBarStrings(presentationStrings: presentationData.strings)
             )
         )
 
-        self.title = "\(entry.method) \(entry.path)"
+        self.title = entry.path
+
+        let shareButton = UIBarButtonItem(
+            image: UIImage(systemName: "square.and.arrow.up"),
+            style: .plain,
+            target: self,
+            action: #selector(shareTapped)
+        )
+        shareButton.tintColor = DebugTheme.accent
+        self.navigationItem.rightBarButtonItem = shareButton
     }
 
     required init(coder aDecoder: NSCoder) {
@@ -276,6 +251,7 @@ final class DebugRequestDetailController: TelegramBaseController {
 
     override func loadDisplayNode() {
         let node = DebugRequestDetailNode(entry: entry)
+        self.detailText = node.fullText
         self.displayNode = node
         self.displayNodeDidLoad()
     }
@@ -285,14 +261,21 @@ final class DebugRequestDetailController: TelegramBaseController {
         let navHeight = self.navigationLayout(layout: layout).navigationFrame.maxY
         (self.displayNode as? DebugRequestDetailNode)?.containerLayoutUpdated(layout, navigationBarHeight: navHeight)
     }
+
+    @objc private func shareTapped() {
+        let ac = UIActivityViewController(activityItems: [detailText], applicationActivities: nil)
+        if let popover = ac.popoverPresentationController {
+            popover.barButtonItem = self.navigationItem.rightBarButtonItem
+        }
+        self.view.window?.rootViewController?.present(ac, animated: true)
+    }
 }
 
 // MARK: - Request Detail Node
 
 private final class DebugRequestDetailNode: ASDisplayNode {
-    private let scrollView = UIScrollView()
     private let textView = UITextView()
-    private let entry: DivoRequestLogEntry
+    let fullText: String
 
     private static let detailTimeFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -301,44 +284,41 @@ private final class DebugRequestDetailNode: ASDisplayNode {
     }()
 
     init(entry: DivoRequestLogEntry) {
-        self.entry = entry
+        var text = ""
+        text += "Метод:       \(entry.method)\n"
+        text += "Путь:        \(entry.path)\n"
+        text += "Статус:      \(entry.statusCode.map { "\($0)" } ?? "N/A")\n"
+        text += "Длительность: \(String(format: "%.1fмс", entry.duration * 1000))\n"
+        text += "Время:       \(DebugRequestDetailNode.detailTimeFormatter.string(from: entry.timestamp))\n"
+
+        if let error = entry.error {
+            text += "\n--- ОШИБКА ---\n\(error)\n"
+        }
+        if let reqBody = entry.requestBody {
+            text += "\n--- ТЕЛО ЗАПРОСА ---\n"
+            text += DebugRequestDetailNode.prettyJSON(reqBody)
+            text += "\n"
+        }
+        if let resBody = entry.responseBody {
+            text += "\n--- ТЕЛО ОТВЕТА ---\n"
+            text += DebugRequestDetailNode.prettyJSON(resBody)
+            text += "\n"
+        }
+
+        self.fullText = text
         super.init()
-        self.backgroundColor = UIColor(rgb: 0x000000)
+        self.backgroundColor = DebugTheme.cellBackground
     }
 
     override func didLoad() {
         super.didLoad()
 
         textView.isEditable = false
-        textView.backgroundColor = UIColor(rgb: 0x000000)
-        textView.textColor = .white
+        textView.backgroundColor = DebugTheme.cellBackground
+        textView.textColor = DebugTheme.primaryText
         textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         textView.textContainerInset = UIEdgeInsets(top: 16, left: 12, bottom: 16, right: 12)
-
-        var text = ""
-        text += "Method:   \(entry.method)\n"
-        text += "Path:     \(entry.path)\n"
-        text += "Status:   \(entry.statusCode.map { "\($0)" } ?? "N/A")\n"
-        text += "Duration: \(String(format: "%.1fms", entry.duration * 1000))\n"
-        text += "Time:     \(DebugRequestDetailNode.detailTimeFormatter.string(from: entry.timestamp))\n"
-
-        if let error = entry.error {
-            text += "\n--- ERROR ---\n\(error)\n"
-        }
-
-        if let reqBody = entry.requestBody {
-            text += "\n--- REQUEST BODY ---\n"
-            text += prettyJSON(reqBody)
-            text += "\n"
-        }
-
-        if let resBody = entry.responseBody {
-            text += "\n--- RESPONSE BODY ---\n"
-            text += prettyJSON(resBody)
-            text += "\n"
-        }
-
-        textView.text = text
+        textView.text = fullText
         self.view.addSubview(textView)
     }
 
@@ -347,7 +327,7 @@ private final class DebugRequestDetailNode: ASDisplayNode {
         textView.frame = CGRect(x: 0, y: navigationBarHeight, width: bounds.width, height: bounds.height - navigationBarHeight)
     }
 
-    private func prettyJSON(_ string: String) -> String {
+    private static func prettyJSON(_ string: String) -> String {
         guard let data = string.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data),
               let pretty = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]),
@@ -358,4 +338,3 @@ private final class DebugRequestDetailNode: ASDisplayNode {
         return result
     }
 }
-

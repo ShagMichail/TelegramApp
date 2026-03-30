@@ -15,23 +15,10 @@ public final class DebugMenuController: TelegramBaseController {
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
 
-        let navTheme = NavigationBarTheme(
-            overallDarkAppearance: true,
-            buttonColor: .white,
-            disabledButtonColor: UIColor(white: 0.5, alpha: 1),
-            primaryTextColor: .white,
-            backgroundColor: UIColor(rgb: 0x1C1C1E),
-            opaqueBackgroundColor: UIColor(rgb: 0x1C1C1E),
-            enableBackgroundBlur: false,
-            separatorColor: UIColor(white: 0.3, alpha: 1),
-            badgeBackgroundColor: .clear,
-            badgeStrokeColor: .clear,
-            badgeTextColor: .clear
-        )
         super.init(
             context: context,
             navigationBarPresentationData: NavigationBarPresentationData(
-                theme: navTheme,
+                theme: DebugTheme.navTheme(),
                 strings: NavigationBarStrings(presentationStrings: self.presentationData.strings)
             )
         )
@@ -44,12 +31,20 @@ public final class DebugMenuController: TelegramBaseController {
     }
 
     override public func loadDisplayNode() {
-        let node = DebugMenuNode()
-        node.onItemSelected = { [weak self] item in
-            self?.handleSelection(item)
+        let node = DebugMenuNode(context: context)
+        node.onPush = { [weak self] controller in
+            self?.push(controller)
+        }
+        node.onPresent = { [weak self] controller in
+            self?.present(controller, in: .window(.root))
         }
         self.displayNode = node
         self.displayNodeDidLoad()
+    }
+
+    override public func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        (self.displayNode as? DebugMenuNode)?.refresh()
     }
 
     override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
@@ -57,297 +52,255 @@ public final class DebugMenuController: TelegramBaseController {
         let navHeight = self.navigationLayout(layout: layout).navigationFrame.maxY
         (self.displayNode as? DebugMenuNode)?.containerLayoutUpdated(layout, navigationBarHeight: navHeight)
     }
-
-    private func handleSelection(_ item: DebugMenuItem) {
-        switch item {
-        case .accessToken:
-            let controller = DebugTokenController(context: context)
-            self.push(controller)
-        case .requestLogs:
-            let controller = DebugRequestLogsController(context: context)
-            self.push(controller)
-        case .appInfo:
-            break
-        }
-    }
-}
-
-// MARK: - Menu Items
-
-enum DebugMenuItem {
-    case accessToken
-    case requestLogs
-    case appInfo
 }
 
 // MARK: - Node
 
-private final class DebugMenuNode: ASDisplayNode {
-    private let scrollView = UIScrollView()
-    private let stackView = UIStackView()
+private final class DebugMenuNode: ASDisplayNode, UITableViewDataSource, UITableViewDelegate {
+    private let context: AccountContext
+    private let tableView = UITableView(frame: .zero, style: .insetGrouped)
 
-    private let tokenCell = DebugMenuCell()
-    private let logsCell = DebugMenuCell()
-    private let infoSection = DebugInfoSection()
+    var onPush: ((ViewController) -> Void)?
+    var onPresent: ((ViewController) -> Void)?
 
-    var onItemSelected: ((DebugMenuItem) -> Void)?
+    private struct Row {
+        let icon: String
+        let title: String
+        let subtitle: () -> String
+        let accessory: AccessoryType
+        let action: () -> Void
 
-    override init() {
+        enum AccessoryType {
+            case chevron
+            case toggle(Bool, (Bool) -> Void)
+            case none
+        }
+    }
+
+    private var sections: [(header: String?, rows: [Row])] = []
+
+    init(context: AccountContext) {
+        self.context = context
         super.init()
-        self.backgroundColor = UIColor(rgb: 0x000000)
+        self.backgroundColor = DebugTheme.background
     }
 
     override func didLoad() {
         super.didLoad()
 
-        scrollView.alwaysBounceVertical = true
-        self.view.addSubview(scrollView)
+        tableView.backgroundColor = DebugTheme.background
+        tableView.separatorColor = DebugTheme.separator
+        tableView.delegate = self
+        tableView.dataSource = self
+        tableView.register(DebugMenuTableCell.self, forCellReuseIdentifier: "Cell")
+        tableView.register(DebugMenuToggleCell.self, forCellReuseIdentifier: "Toggle")
+        tableView.register(DebugInfoTableCell.self, forCellReuseIdentifier: "Info")
+        self.view.addSubview(tableView)
 
-        stackView.axis = .vertical
-        stackView.spacing = 1
-        scrollView.addSubview(stackView)
+        buildSections()
+    }
 
-        // Token cell
-        tokenCell.configure(
-            icon: "key.fill",
-            title: "Access Token",
-            subtitle: currentTokenLabel()
-        )
-        tokenCell.onTap = { [weak self] in
-            self?.onItemSelected?(.accessToken)
-        }
-        stackView.addArrangedSubview(tokenCell)
+    func refresh() {
+        buildSections()
+        tableView.reloadData()
+    }
 
-        // Logs cell
-        let logsCount = DivoRequestLogger.shared.getEntries().count
-        logsCell.configure(
-            icon: "list.bullet.rectangle",
-            title: "Request Logs",
-            subtitle: "\(logsCount) entries"
-        )
-        logsCell.onTap = { [weak self] in
-            self?.onItemSelected?(.requestLogs)
-        }
-        stackView.addArrangedSubview(logsCell)
+    private func buildSections() {
+        let overlayEnabled = UserDefaults.standard.bool(forKey: "DivoNetworkOverlay.enabled")
 
-        // Spacer
-        let spacer = UIView()
-        spacer.heightAnchor.constraint(equalToConstant: 24).isActive = true
-        stackView.addArrangedSubview(spacer)
-
-        // Info section
-        infoSection.configure()
-        stackView.addArrangedSubview(infoSection)
+        sections = [
+            (header: "ИНСТРУМЕНТЫ", rows: [
+                Row(icon: "key.fill", title: "Токен доступа", subtitle: { self.currentTokenLabel() }, accessory: .chevron, action: { [weak self] in
+                    guard let self = self else { return }
+                    let c = DebugTokenController(context: self.context)
+                    self.onPush?(c)
+                }),
+                Row(icon: "list.bullet.rectangle", title: "Логи запросов", subtitle: {
+                    let count = DivoRequestLogger.shared.getEntries().count
+                    return "\(count)"
+                }, accessory: .chevron, action: { [weak self] in
+                    guard let self = self else { return }
+                    let c = DebugRequestLogsController(context: self.context)
+                    self.onPush?(c)
+                }),
+                Row(icon: "person.crop.circle", title: "Пользователь", subtitle: { "" }, accessory: .chevron, action: { [weak self] in
+                    guard let self = self else { return }
+                    let c = DebugUserInfoController(context: self.context)
+                    self.onPush?(c)
+                }),
+            ]),
+            (header: "СЕТЬ", rows: [
+                Row(icon: "speedometer", title: "Сетевой оверлей", subtitle: { "" }, accessory: .toggle(overlayEnabled, { [weak self] enabled in
+                    UserDefaults.standard.set(enabled, forKey: "DivoNetworkOverlay.enabled")
+                    if enabled {
+                        DivoNetworkOverlay.shared.show()
+                    } else {
+                        DivoNetworkOverlay.shared.hide()
+                    }
+                    self?.buildSections()
+                    self?.tableView.reloadData()
+                }), action: {}),
+                Row(icon: "tortoise.fill", title: "Замедление сети", subtitle: {
+                    self.delayLabel()
+                }, accessory: .chevron, action: { [weak self] in
+                    self?.showDelayPicker()
+                }),
+            ]),
+            (header: "КЕШ", rows: [
+                Row(icon: "photo.on.rectangle", title: "Кеш изображений", subtitle: {
+                    self.cacheSizeLabel()
+                }, accessory: .chevron, action: { [weak self] in
+                    self?.clearImageCache()
+                }),
+            ]),
+            (header: "ИНФОРМАЦИЯ", rows:
+                self.infoRows()
+            ),
+        ]
     }
 
     func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat) {
         let bounds = CGRect(origin: .zero, size: layout.size)
-        scrollView.frame = CGRect(x: 0, y: navigationBarHeight, width: bounds.width, height: bounds.height - navigationBarHeight)
-
-        let insets = layout.safeInsets
-        let width = bounds.width
-        stackView.frame = CGRect(x: 0, y: 0, width: width, height: 10000)
-        stackView.layoutIfNeeded()
-        let contentHeight = stackView.systemLayoutSizeFitting(
-            CGSize(width: width, height: UIView.layoutFittingCompressedSize.height),
-            withHorizontalFittingPriority: .required,
-            verticalFittingPriority: .fittingSizeLevel
-        ).height
-        stackView.frame = CGRect(x: 0, y: 0, width: width, height: contentHeight)
-        scrollView.contentSize = CGSize(width: width, height: contentHeight + insets.bottom + 20)
+        tableView.frame = CGRect(x: 0, y: navigationBarHeight, width: bounds.width, height: bounds.height - navigationBarHeight)
     }
+
+    // MARK: - UITableView
+
+    func numberOfSections(in tableView: UITableView) -> Int {
+        return sections.count
+    }
+
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return sections[section].rows.count
+    }
+
+    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        return sections[section].header
+    }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let row = sections[indexPath.section].rows[indexPath.row]
+
+        switch row.accessory {
+        case .toggle(let isOn, let handler):
+            let cell = tableView.dequeueReusableCell(withIdentifier: "Toggle", for: indexPath) as! DebugMenuToggleCell
+            cell.configure(icon: row.icon, title: row.title, isOn: isOn, onToggle: handler)
+            return cell
+        case .chevron:
+            if sections[indexPath.section].header == "ИНФОРМАЦИЯ" {
+                let cell = tableView.dequeueReusableCell(withIdentifier: "Info", for: indexPath) as! DebugInfoTableCell
+                cell.configure(title: row.title, value: row.subtitle())
+                return cell
+            }
+            let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as! DebugMenuTableCell
+            cell.configure(icon: row.icon, title: row.title, subtitle: row.subtitle())
+            cell.accessoryType = .disclosureIndicator
+            return cell
+        case .none:
+            let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as! DebugMenuTableCell
+            cell.configure(icon: row.icon, title: row.title, subtitle: row.subtitle())
+            cell.accessoryType = .none
+            return cell
+        }
+    }
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        let row = sections[indexPath.section].rows[indexPath.row]
+        if case .toggle = row.accessory { return }
+        row.action()
+    }
+
+    // MARK: - Helpers
 
     private func currentTokenLabel() -> String {
         let token = DivoConfig.accessToken
-        if token == DivoConfig.agencyToken {
-            return "Agency"
-        } else if token == DivoConfig.modelToken {
-            return "Model"
-        } else {
-            return "Custom"
-        }
-    }
-}
-
-// MARK: - Menu Cell
-
-private final class DebugMenuCell: UIView {
-    private let iconView = UIImageView()
-    private let titleLabel = UILabel()
-    private let subtitleLabel = UILabel()
-    private let chevron = UIImageView()
-
-    var onTap: (() -> Void)?
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        setup()
+        if token == DivoConfig.agencyToken { return "Агентство" }
+        if token == DivoConfig.modelToken { return "Модель" }
+        return "Свой"
     }
 
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
+    private func delayLabel() -> String {
+        let d = DivoConfig.simulatedDelay
+        if d <= 0 { return "Выкл" }
+        if d < 1 { return "\(Int(d * 1000))мс" }
+        return "\(Int(d))с"
     }
 
-    private func setup() {
-        backgroundColor = UIColor(rgb: 0x1C1C1E)
-
-        iconView.tintColor = UIColor(rgb: 0xBF7A54)
-        iconView.contentMode = .scaleAspectFit
-        addSubview(iconView)
-
-        titleLabel.font = .systemFont(ofSize: 17, weight: .regular)
-        titleLabel.textColor = .white
-        addSubview(titleLabel)
-
-        subtitleLabel.font = .systemFont(ofSize: 15, weight: .regular)
-        subtitleLabel.textColor = UIColor(white: 0.5, alpha: 1)
-        addSubview(subtitleLabel)
-
-        chevron.image = UIImage(systemName: "chevron.right")
-        chevron.tintColor = UIColor(white: 0.4, alpha: 1)
-        chevron.contentMode = .scaleAspectFit
-        addSubview(chevron)
-
-        let tap = UITapGestureRecognizer(target: self, action: #selector(tapped))
-        addGestureRecognizer(tap)
-
-        heightAnchor.constraint(equalToConstant: 56).isActive = true
+    private func cacheSizeLabel() -> String {
+        let cache = URLCache.shared
+        let bytes = cache.currentDiskUsage + cache.currentMemoryUsage
+        if bytes == 0 { return "Пусто" }
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useMB, .useKB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(bytes))
     }
 
-    func configure(icon: String, title: String, subtitle: String) {
-        iconView.image = UIImage(systemName: icon)
-        titleLabel.text = title
-        subtitleLabel.text = subtitle
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        let h = bounds.height
-        let pad: CGFloat = 16
-        iconView.frame = CGRect(x: pad, y: (h - 24) / 2, width: 24, height: 24)
-        chevron.frame = CGRect(x: bounds.width - pad - 12, y: (h - 16) / 2, width: 12, height: 16)
-        subtitleLabel.sizeToFit()
-        let subW = subtitleLabel.frame.width
-        subtitleLabel.frame = CGRect(x: chevron.frame.minX - subW - 8, y: (h - 20) / 2, width: subW, height: 20)
-        let textX = iconView.frame.maxX + 12
-        titleLabel.frame = CGRect(x: textX, y: (h - 22) / 2, width: subtitleLabel.frame.minX - textX - 8, height: 22)
-    }
-
-    @objc private func tapped() {
-        UIView.animate(withDuration: 0.1, animations: {
-            self.alpha = 0.5
-        }) { _ in
-            UIView.animate(withDuration: 0.15) { self.alpha = 1 }
-        }
-        onTap?()
-    }
-}
-
-// MARK: - Info Section
-
-private final class DebugInfoSection: UIView {
-    private let headerLabel = UILabel()
-    private let infoStack = UIStackView()
-
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        setup()
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    private func setup() {
-        backgroundColor = .clear
-
-        headerLabel.font = .systemFont(ofSize: 13, weight: .regular)
-        headerLabel.textColor = UIColor(white: 0.45, alpha: 1)
-        headerLabel.text = "APP INFO"
-        addSubview(headerLabel)
-
-        infoStack.axis = .vertical
-        infoStack.spacing = 0
-        infoStack.backgroundColor = UIColor(rgb: 0x1C1C1E)
-        infoStack.layer.cornerRadius = 10
-        infoStack.clipsToBounds = true
-        addSubview(infoStack)
-    }
-
-    func configure() {
-        let items: [(String, String)] = [
-            ("Base URL", DivoConfig.baseURL.absoluteString),
-            ("Version", DivoConfig.appVersion),
-            ("Platform", DivoConfig.appPlatform),
-            ("Bundle ID", Bundle.main.bundleIdentifier ?? "—"),
-            ("Device", deviceName()),
-            ("iOS", UIDevice.current.systemVersion),
+    private func infoRows() -> [Row] {
+        let items: [(String, String, String)] = [
+            ("link", "Base URL", DivoConfig.baseURL.absoluteString),
+            ("info.circle", "Версия", DivoConfig.appVersion),
+            ("apple.logo", "Платформа", DivoConfig.appPlatform),
+            ("number", "Bundle ID", Bundle.main.bundleIdentifier ?? "—"),
+            ("iphone", "Устройство", deviceName()),
+            ("gear", "iOS", UIDevice.current.systemVersion),
         ]
+        return items.map { item in
+            Row(icon: item.0, title: item.1, subtitle: { item.2 }, accessory: .chevron, action: {})
+        }
+    }
 
-        for (i, item) in items.enumerated() {
-            let row = makeInfoRow(label: item.0, value: item.1)
-            infoStack.addArrangedSubview(row)
-            if i < items.count - 1 {
-                let sep = UIView()
-                sep.backgroundColor = UIColor(white: 0.25, alpha: 1)
-                sep.heightAnchor.constraint(equalToConstant: 0.5).isActive = true
-                infoStack.addArrangedSubview(sep)
-            }
+    private func showDelayPicker() {
+        let alert = UIAlertController(title: "Замедление сети", message: "Искусственная задержка перед каждым запросом", preferredStyle: .actionSheet)
+        let options: [(String, TimeInterval)] = [
+            ("Выкл", 0),
+            ("100мс", 0.1),
+            ("500мс", 0.5),
+            ("2 секунды", 2.0),
+            ("5 секунд", 5.0),
+        ]
+        let current = DivoConfig.simulatedDelay
+        for (title, value) in options {
+            let checkmark = (value == current) ? " ✓" : ""
+            alert.addAction(UIAlertAction(title: title + checkmark, style: .default) { [weak self] _ in
+                DivoConfig.simulatedDelay = value
+                self?.buildSections()
+                self?.tableView.reloadData()
+            })
+        }
+        alert.addAction(UIAlertAction(title: "Отмена", style: .cancel))
+
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = self.view
+            popover.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
         }
 
-        setNeedsLayout()
+        if let vc = self.closestViewController {
+            vc.present(alert, animated: true)
+        }
     }
 
-    private func makeInfoRow(label: String, value: String) -> UIView {
-        let row = UIView()
-        row.heightAnchor.constraint(equalToConstant: 44).isActive = true
+    private func clearImageCache() {
+        let cache = URLCache.shared
+        let bytes = cache.currentDiskUsage + cache.currentMemoryUsage
+        if bytes == 0 { return }
 
-        let labelView = UILabel()
-        labelView.font = .systemFont(ofSize: 15, weight: .regular)
-        labelView.textColor = .white
-        labelView.text = label
-        row.addSubview(labelView)
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        let sizeStr = formatter.string(fromByteCount: Int64(bytes))
 
-        let valueView = UILabel()
-        valueView.font = .systemFont(ofSize: 15, weight: .regular)
-        valueView.textColor = UIColor(white: 0.5, alpha: 1)
-        valueView.text = value
-        valueView.textAlignment = .right
-        row.addSubview(valueView)
+        let alert = UIAlertController(title: "Очистить кеш?", message: "Текущий размер: \(sizeStr)", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Очистить", style: .destructive) { [weak self] _ in
+            URLCache.shared.removeAllCachedResponses()
+            self?.buildSections()
+            self?.tableView.reloadData()
+        })
+        alert.addAction(UIAlertAction(title: "Отмена", style: .cancel))
 
-        labelView.translatesAutoresizingMaskIntoConstraints = false
-        valueView.translatesAutoresizingMaskIntoConstraints = false
-
-        NSLayoutConstraint.activate([
-            labelView.leadingAnchor.constraint(equalTo: row.leadingAnchor, constant: 16),
-            labelView.centerYAnchor.constraint(equalTo: row.centerYAnchor),
-            valueView.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -16),
-            valueView.centerYAnchor.constraint(equalTo: row.centerYAnchor),
-            valueView.leadingAnchor.constraint(greaterThanOrEqualTo: labelView.trailingAnchor, constant: 8),
-        ])
-
-        return row
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        let pad: CGFloat = 16
-        headerLabel.frame = CGRect(x: pad + 4, y: 0, width: bounds.width - pad * 2, height: 30)
-        infoStack.frame = CGRect(x: pad, y: 30, width: bounds.width - pad * 2, height: infoStack.systemLayoutSizeFitting(
-            CGSize(width: bounds.width - pad * 2, height: UIView.layoutFittingCompressedSize.height),
-            withHorizontalFittingPriority: .required,
-            verticalFittingPriority: .fittingSizeLevel
-        ).height)
-    }
-
-    override var intrinsicContentSize: CGSize {
-        let pad: CGFloat = 16
-        let stackHeight = infoStack.systemLayoutSizeFitting(
-            CGSize(width: UIScreen.main.bounds.width - pad * 2, height: UIView.layoutFittingCompressedSize.height),
-            withHorizontalFittingPriority: .required,
-            verticalFittingPriority: .fittingSizeLevel
-        ).height
-        return CGSize(width: UIView.noIntrinsicMetric, height: 30 + stackHeight + 16)
+        if let vc = self.closestViewController {
+            vc.present(alert, animated: true)
+        }
     }
 
     private func deviceName() -> String {
@@ -358,3 +311,109 @@ private final class DebugInfoSection: UIView {
     }
 }
 
+// MARK: - Cells
+
+private final class DebugMenuTableCell: UITableViewCell {
+    private let iconView = UIImageView()
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: .value1, reuseIdentifier: reuseIdentifier)
+        backgroundColor = DebugTheme.cellBackground
+        iconView.tintColor = DebugTheme.accent
+        iconView.contentMode = .scaleAspectFit
+        contentView.addSubview(iconView)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func configure(icon: String, title: String, subtitle: String) {
+        iconView.image = UIImage(systemName: icon)
+        textLabel?.text = title
+        textLabel?.textColor = DebugTheme.primaryText
+        detailTextLabel?.text = subtitle
+        detailTextLabel?.textColor = DebugTheme.secondaryText
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let h = contentView.bounds.height
+        iconView.frame = CGRect(x: 16, y: (h - 22) / 2, width: 22, height: 22)
+        var frame = textLabel?.frame ?? .zero
+        frame.origin.x = 48
+        textLabel?.frame = frame
+    }
+}
+
+private final class DebugMenuToggleCell: UITableViewCell {
+    private let iconView = UIImageView()
+    private let toggle = UISwitch()
+    private var onToggle: ((Bool) -> Void)?
+
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: .default, reuseIdentifier: reuseIdentifier)
+        backgroundColor = DebugTheme.cellBackground
+        selectionStyle = .none
+        iconView.tintColor = DebugTheme.accent
+        iconView.contentMode = .scaleAspectFit
+        contentView.addSubview(iconView)
+        toggle.onTintColor = DebugTheme.accent
+        toggle.addTarget(self, action: #selector(toggled), for: .valueChanged)
+        accessoryView = toggle
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func configure(icon: String, title: String, isOn: Bool, onToggle: @escaping (Bool) -> Void) {
+        iconView.image = UIImage(systemName: icon)
+        textLabel?.text = title
+        textLabel?.textColor = DebugTheme.primaryText
+        toggle.isOn = isOn
+        self.onToggle = onToggle
+    }
+
+    @objc private func toggled() {
+        onToggle?(toggle.isOn)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let h = contentView.bounds.height
+        iconView.frame = CGRect(x: 16, y: (h - 22) / 2, width: 22, height: 22)
+        var frame = textLabel?.frame ?? .zero
+        frame.origin.x = 48
+        textLabel?.frame = frame
+    }
+}
+
+private final class DebugInfoTableCell: UITableViewCell {
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: .value1, reuseIdentifier: reuseIdentifier)
+        backgroundColor = DebugTheme.cellBackground
+        selectionStyle = .none
+        accessoryType = .none
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func configure(title: String, value: String) {
+        textLabel?.text = title
+        textLabel?.textColor = DebugTheme.primaryText
+        textLabel?.font = .systemFont(ofSize: 15)
+        detailTextLabel?.text = value
+        detailTextLabel?.textColor = DebugTheme.secondaryText
+        detailTextLabel?.font = .systemFont(ofSize: 15)
+    }
+}
+
+// MARK: - UIView helper
+
+private extension UIView {
+    var closestViewController: UIViewController? {
+        var responder: UIResponder? = self
+        while let r = responder {
+            if let vc = r as? UIViewController { return vc }
+            responder = r.next
+        }
+        return nil
+    }
+}

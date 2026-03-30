@@ -40,6 +40,11 @@ public final class DivoAPIClient {
             requestBodyString = String(data: encoded, encoding: .utf8)
         }
 
+        let delay = DivoConfig.simulatedDelay
+        if delay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+        }
+
         let start = CFAbsoluteTimeGetCurrent()
         do {
             let (data, response) = try await session.data(for: request)
@@ -102,6 +107,11 @@ public final class DivoAPIClient {
             let encoded = try JSONEncoder().encode(body)
             request.httpBody = encoded
             requestBodyString = String(data: encoded, encoding: .utf8)
+        }
+
+        let rawDelay = DivoConfig.simulatedDelay
+        if rawDelay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(rawDelay * 1_000_000_000))
         }
 
         let start = CFAbsoluteTimeGetCurrent()
@@ -175,6 +185,11 @@ public final class DivoAPIClient {
         body.append("\r\n".data(using: .utf8)!)
 
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+
+        let uploadDelay = DivoConfig.simulatedDelay
+        if uploadDelay > 0 {
+            try await Task.sleep(nanoseconds: UInt64(uploadDelay * 1_000_000_000))
+        }
 
         let start = CFAbsoluteTimeGetCurrent()
         do {

@@ -45,6 +45,7 @@ public final class ModelsFeedController: TelegramBaseController {
     private var tabStates: [TabState] = [TabState(), TabState(), TabState()]
     private var selectedTabIndex: Int = 0
     private let feedlinePageSize = 10
+    private var tokenChangeObserver: NSObjectProtocol?
 
     private let createActionDisposable = MetaDisposable()
     private let clearDisposable = MetaDisposable()
@@ -70,6 +71,16 @@ public final class ModelsFeedController: TelegramBaseController {
                 strongSelf.presentationData = presentationData
             }
         }).strict()
+
+        self.tokenChangeObserver = NotificationCenter.default.addObserver(
+            forName: DivoConfig.tokenDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            self.tabStates = [TabState(), TabState(), TabState()]
+            self.loadFeedline(tabIndex: self.selectedTabIndex, reset: true)
+        }
     }
 
     private func updateNavigation() {
@@ -134,6 +145,9 @@ public final class ModelsFeedController: TelegramBaseController {
         self.presentationDataDisposable?.dispose()
         self.peerViewDisposable.dispose()
         self.clearDisposable.dispose()
+        if let observer = self.tokenChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     override public func loadDisplayNode() {
