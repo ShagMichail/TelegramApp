@@ -312,4 +312,9 @@ final class ButtonWithIconNode: ASControlNode {
                                          height: textSize.height)
         }
     }
+
+    func setTitle(_ title: String) {
+        self.textNode.attributedText = NSAttributedString(string: title, font: Font.helveticaNeue(16), textColor: .white)
+        self.setNeedsLayout()
+    }
 }

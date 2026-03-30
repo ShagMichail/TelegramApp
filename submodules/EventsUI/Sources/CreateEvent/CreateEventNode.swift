@@ -25,6 +25,8 @@ enum EventParameter: String, CaseIterable {
     case shoeSize = "Shoe size"
     case hairLength = "Hair length"
     case hairColor = "Hair color"
+    case eyeColor = "Eye color"
+    case skinColor = "Skin color"
 }
 
 final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
@@ -92,6 +94,30 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     private var shoeSizeSlider: AgeSliderNode<Double>?
     private var hairLengthDropdown: DropdownNode?
     private var hairColorDropdown: DropdownNode?
+    private var eyeColorDropdown: DropdownNode?
+    private var skinColorDropdown: DropdownNode?
+    private var deleteButtons: [EventParameter: ASButtonNode] = [:]
+    private var sliderTouchObservers: [ASDisplayNode: NSKeyValueObservation] = [:]
+
+    private var appearanceDictionaries: AppearanceDictionaryData?
+    private var genderDictionaries: GenderResponse?
+    
+    private let eventGalleryLabel: ASTextNode
+    
+    var galleryItems: [EventGalleryItem] = []
+    private let dashedUploadNode = DashedUploadNode()
+    
+    lazy var galleryCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.minimumInteritemSpacing = 0
+        layout.minimumLineSpacing = 0
+        let collection = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        collection.backgroundColor = .clear
+        collection.isScrollEnabled = false
+        collection.delaysContentTouches = false
+        collection.register(EventGalleryCell.self, forCellWithReuseIdentifier: "EventGalleryCell")
+        return collection
+    }()
 
     private let applyButton: ASControlNode
 
@@ -100,6 +126,8 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     var selectCountryCode: (() -> Void)?
     var scheduleTimeController: ((TimeControllerMode) -> Void)?
     var showAlert: ((String) -> Void)?
+    var onAddGalleryPhotoTapped: (() -> Void)?
+
     private var countryId: String = ""
 
     var currentPhoto: UIImage? = nil {
@@ -197,9 +225,14 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
 
         self.addParametersButton = ButtonWithIconNode(title: "+ Add parameters", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
         self.addParametersButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
+        self.addParametersButton.cornerRadius = 4.0
+        self.addParametersButton.clipsToBounds = true
 
         self.applyButton = ButtonWithIconNode(title: "Create Event", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
         self.applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
+
+        self.eventGalleryLabel = ASTextNode()
+        self.eventGalleryLabel.attributedText = NSAttributedString(string: "Event Gallery", font: semiboldFont, textColor: headerColor)
 
         super.init()
         self.venueEventTextField.textField.delegate = self
@@ -232,6 +265,9 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
 
         self.scrollNode.addSubnode(self.parametersApplyingLabel)
         self.scrollNode.addSubnode(self.addParametersButton)
+
+        self.scrollNode.addSubnode(self.eventGalleryLabel)
+        self.scrollNode.addSubnode(self.dashedUploadNode)
 
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(self.dismissKeyboard))
         tapGesture.cancelsTouchesInView = false
@@ -269,6 +305,12 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         self.applyButton.addTarget(self, action: #selector(self.applyButtonTapped), forControlEvents: .touchUpInside)
         self.addPhotoButton.addTarget(self, action: #selector(self.addPhotoPressed), forControlEvents: .touchUpInside)
         self.addParametersButton.addTarget(self, action: #selector(self.addParametersTapped), forControlEvents: .touchUpInside)
+        self.dashedUploadNode.addTarget(self, action: #selector(dashedUploadTapped), forControlEvents: .touchUpInside)
+
+        self.galleryCollectionView.delegate = self
+        self.galleryCollectionView.dataSource = self
+        
+        self.scrollNode.view.addSubview(self.galleryCollectionView)
 
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow), name: UIResponder.keyboardWillShowNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide), name: UIResponder.keyboardWillHideNotification, object: nil)
@@ -290,57 +332,6 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         return true
     }
 
-    @objc private func addPhotoPressed() {
-        self.addPhoto()
-    }
-    @objc func applyButtonTapped() {
-        print("applyButton Tapped!")
-
-        if let nameEventTextField = nameEventTextField.textField.text,
-           nameEventTextField.isEmpty,
-           aboutEventTextField.text.isEmpty,
-           eventTime != 0,
-           eventDate != 0
-        {
-            showAlert?("Please fill in all fields")
-        }
-
-        let unixTimestampDate = TimeInterval(eventDate)
-        let unixTimestampTime = TimeInterval(eventTime)
-        let date = Date(timeIntervalSince1970: unixTimestampDate)
-        let time = Date(timeIntervalSince1970: unixTimestampTime)
-
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let formattedDate = formatter.string(from: date)
-
-        formatter.dateFormat = "HH:mm"
-        let formattedTime = formatter.string(from: time)
-
-        let _ = Promise<String?>()
-        let _ = EventModel(
-            title: nameEventTextField.textField.text ?? "",
-            description: aboutEventTextField.text,
-            eventDate: formattedDate,
-            eventTime: formattedTime,
-            coverPhoto: nil,
-            enabledParameterKeys: [])
-
-        if currentPhoto != nil {
-            // FIXME DIVO: заменить на REST — закомментирован вызов MTProto (upload + createEvent)
-            // let _ = uploadPhotoToCloud(context: context, image: currentPhoto).start(next: { id in
-            //     if let id = id {
-            //         print("⛳️", id)
-            //         supportPeer.set(self.context.engine.eventsEngine.createEvent(eventModel: eventModel, id: id))
-            //         self.supportPeerDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { peerId in
-            //             print("🔕", peerId ?? "")
-            //             self.showAlert?("event added")
-            //         }))
-            //     }
-            // })
-        }
-    }
-
     func uploadPhotoToCloud(context: AccountContext, image: UIImage) -> Signal<Int64?, NoError> {
         guard image.jpegData(compressionQuality: 0.9) != nil else {
             return .single(nil)
@@ -348,10 +339,6 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         // FIXME DIVO: заменить на REST — закомментирован вызов MTProto
         // return context.engine.engineDivo.uploadedPhoto(resource: data)
         return .single(nil)
-    }
-
-    @objc private func addParametersTapped() {
-        onAddParametersTapped?(selectedParameters)
     }
 
     func updateCountry(countryId: String, countryName: String) {
@@ -379,50 +366,51 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         }
     }
 
-    private func updateThemeAndStrings() {
-        self.backgroundColor = self.presentationData.theme.chatList.backgroundColor
-    }
-
-    @objc private func dismissKeyboard() {
-        self.view.endEditing(true)
-    }
-
-    @objc func keyboardWillShow(notification: NSNotification) {
-        guard let userInfo = notification.userInfo,
-              let keyboardFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue,
-              let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber,
-              let curve = userInfo[UIResponder.keyboardAnimationCurveUserInfoKey] as? NSNumber else {
-            return
+    func startPhotoUpload(image: UIImage) -> EventGalleryItem {
+        let item = EventGalleryItem(image: image, isUploading: true)
+        let wasEmpty = galleryItems.isEmpty
+        galleryItems.append(item)
+        
+        if wasEmpty {
+            galleryCollectionView.isHidden = false
+            galleryCollectionView.reloadData()
+            triggerLayoutUpdate()
+        } else {
+            let indexPath = IndexPath(item: galleryItems.count - 1, section: 0)
+            galleryCollectionView.performBatchUpdates({
+                galleryCollectionView.insertItems(at: [indexPath])
+                triggerLayoutUpdate()
+            }, completion: nil)
         }
-
-        let keyboardHeight = keyboardFrame.cgRectValue.height
-
-        var currentInsets = self.scrollNode.view.contentInset
-
-        currentInsets.bottom = keyboardHeight
-
-        UIView.animate(withDuration: duration.doubleValue, delay: 0.0, options: UIView.AnimationOptions(rawValue: curve.uintValue << 16), animations: {
-            self.scrollNode.view.contentInset = currentInsets
-            self.scrollNode.view.scrollIndicatorInsets = currentInsets
-        }, completion: nil)
+        return item
     }
-
-    @objc func keyboardWillHide(notification: NSNotification) {
-        guard let userInfo = notification.userInfo,
-              let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber,
-              let curve = userInfo[UIResponder.keyboardAnimationCurveUserInfoKey] as? NSNumber else {
-            return
-        }
-
-        var currentInsets = self.scrollNode.view.contentInset
-        currentInsets.bottom = 0
-
-        UIView.animate(withDuration: duration.doubleValue, delay: 0.0, options: UIView.AnimationOptions(rawValue: curve.uintValue << 16), animations: {
-            self.scrollNode.view.contentInset = currentInsets
-            self.scrollNode.view.scrollIndicatorInsets = currentInsets
-        }, completion: nil)
+    
+    func finishPhotoUpload(item: EventGalleryItem, fileUuid: String) {
+        guard let index = galleryItems.firstIndex(of: item) else { return }
+        galleryItems[index].isUploading = false
+        galleryItems[index].fileUuid = fileUuid
+        galleryCollectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
     }
-
+    
+    func cancelPhotoUpload(item: EventGalleryItem) {
+        removePhoto(item: item)
+    }
+    
+    func removePhoto(item: EventGalleryItem) {
+        guard let index = galleryItems.firstIndex(of: item) else { return }
+        galleryItems.remove(at: index)
+        
+        let indexPath = IndexPath(item: index, section: 0)
+        galleryCollectionView.performBatchUpdates({
+            galleryCollectionView.deleteItems(at: [indexPath])
+            triggerLayoutUpdate()
+        }, completion: { [weak self] _ in
+            if self?.galleryItems.isEmpty == true {
+                self?.galleryCollectionView.isHidden = true
+            }
+        })
+    }
+    
     func containerLayoutUpdated(_ layout: ContainerViewLayout, navigationBarHeight: CGFloat, actualNavigationBarHeight: CGFloat, transition: ContainedViewLayoutTransition) {
         
         self.currentLayoutData = (layout, navigationBarHeight, actualNavigationBarHeight)
@@ -494,63 +482,161 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         
         let paramLabelSize = self.parametersApplyingLabel.measure(CGSize(width: fullWidth, height: .greatestFiniteMagnitude))
         transition.updateFrame(node: self.parametersApplyingLabel, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: paramLabelSize))
-        currentY += paramLabelSize.height + itemSpacing
-        
+
+        var paramsStartY = currentY + paramLabelSize.height + itemSpacing
+
+        if !self.addParametersButton.isHidden {
+            if !self.selectedParameters.isEmpty {
+                let addParamsButtonHeight: CGFloat = 28.0
+                let addParamsButtonWidth: CGFloat = 70.0
+                let buttonX = layout.size.width - sidePadding - addParamsButtonWidth
+                let buttonY = currentY + (paramLabelSize.height - addParamsButtonHeight) / 2.0
+                transition.updateFrame(node: self.addParametersButton, frame: CGRect(x: buttonX, y: buttonY, width: addParamsButtonWidth, height: addParamsButtonHeight))
+            } else {
+                let addParamsButtonWidth: CGFloat = 160.0
+                let addParamsButtonHeight: CGFloat = 35.0
+                transition.updateFrame(node: self.addParametersButton, frame: CGRect(origin: CGPoint(x: sidePadding, y: paramsStartY), size: CGSize(width: addParamsButtonWidth, height: addParamsButtonHeight)))
+                paramsStartY += addParamsButtonHeight + sectionSpacing
+            }
+        }
+
+        currentY = paramsStartY
+
         for param in EventParameter.allCases {
             if selectedParameters.contains(param) {
                 let node = getOrCreateNode(for: param)
-                
+
                 let nodeHeight: CGFloat = (node is DropdownNode) ? 80.0 : 80.0
+
+                let deleteButtonSize: CGFloat = 24.0
+                let deleteButtonFrame = CGRect(x: layout.size.width - sidePadding - deleteButtonSize, y: (node is DropdownNode) ? currentY + (nodeHeight - deleteButtonSize) / 2.0 + 14.0: currentY + (nodeHeight - deleteButtonSize) / 2.0 - 6.0, width: deleteButtonSize, height: deleteButtonSize)
+
+                if let deleteButton = deleteButtons[param] {
+                    transition.updateFrame(node: deleteButton, frame: deleteButtonFrame)
+                }
                 
-                transition.updateFrame(node: node, frame: CGRect(x: sidePadding, y: currentY, width: fullWidth, height: nodeHeight))
+                transition.updateFrame(node: node, frame: CGRect(x: sidePadding, y: currentY, width: fullWidth - deleteButtonSize - 10, height: nodeHeight))
                 currentY += nodeHeight + sectionSpacing
             }
         }
         
-        let addParamsButtonWidth: CGFloat = 160.0
-        let addParamsButtonHeight: CGFloat = 35.0
+        currentY += sectionSpacing
         
-        transition.updateFrame(node: self.addParametersButton, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: addParamsButtonWidth, height: addParamsButtonHeight)))
-        currentY += addParamsButtonHeight + sectionSpacing
+        let galleryLabelSize = self.eventGalleryLabel.measure(CGSize(width: fullWidth, height: .greatestFiniteMagnitude))
+        transition.updateFrame(node: self.eventGalleryLabel, frame: CGRect(x: sidePadding, y: currentY, width: galleryLabelSize.width, height: galleryLabelSize.height))
+        currentY += galleryLabelSize.height + itemSpacing
+        
+        if galleryItems.isEmpty {
+            galleryCollectionView.isHidden = true
+            dashedUploadNode.isHidden = false
+            transition.updateFrame(node: self.dashedUploadNode, frame: CGRect(x: sidePadding, y: currentY, width: fullWidth, height: 100))
+            currentY += 100 + sectionSpacing
+        } else {
+            galleryCollectionView.isHidden = false
+            dashedUploadNode.isHidden = false
+            
+            let itemWidth = floor(layout.size.width / 3.0)
+            let rows = ceil(CGFloat(galleryItems.count) / 3.0)
+            let collectionHeight = (rows * itemWidth) + ((rows - 1) * 4.0)
+            
+            transition.updateFrame(view: self.galleryCollectionView, frame: CGRect(x: 0, y: currentY, width: layout.size.width, height: collectionHeight))
+            currentY += collectionHeight + 12
+            
+            transition.updateFrame(node: self.dashedUploadNode, frame: CGRect(x: sidePadding, y: currentY, width: fullWidth, height: 100))
+            currentY += 100 + sectionSpacing
+        }
         
         if self.applyButton.supernode != nil && !self.applyButton.isHidden {
             let buttonHeight: CGFloat = 50.0
             transition.updateFrame(node: self.applyButton, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: fullWidth, height: buttonHeight)))
             currentY += buttonHeight + sectionSpacing
         }
-        
-        self.scrollNode.view.contentSize = CGSize(width: layout.size.width, height: currentY + 40.0)
-        
+
+        self.scrollNode.view.contentSize = CGSize(width: layout.size.width, height: currentY + 20.0)
+
         self.readyValue = true
+    }
+
+    func configureAppearanceDictionaries(_ dict: AppearanceDictionaryData) {
+        self.appearanceDictionaries = dict
+        self.hairLengthDropdown?.options = dict.hairLength.map { $0.title }
+        self.hairColorDropdown?.options = dict.hairColor.map { $0.title }
+        self.eyeColorDropdown?.options = dict.eyeColor.map { $0.title }
+        self.skinColorDropdown?.options = dict.skinColor.map { $0.title }
+    }
+    
+    func configureGenderDictionaries(_ dict: GenderResponse) {
+        self.genderDictionaries = dict
+        self.genderDropdown?.options = dict.data.map { $0.title }
     }
     
     func updateSelectedParameters(_ params: Set<EventParameter>) {
         self.selectedParameters = params
-        
+
+        let allParametersSet = Set(EventParameter.allCases)
+        let shouldShowAddButton = params != allParametersSet
+        self.addParametersButton.isHidden = !shouldShowAddButton
+
+        if params.isEmpty {
+            if let button = self.addParametersButton as? ButtonWithIconNode {
+                button.setTitle("+ Add parameters")
+            }
+        } else {
+            if let button = self.addParametersButton as? ButtonWithIconNode {
+                button.setTitle("+ Add")
+            }
+        }
+
         for param in params {
             let node = getOrCreateNode(for: param)
             if node.supernode == nil {
                 self.scrollNode.addSubnode(node)
             }
+            
+            if deleteButtons[param] == nil {
+                deleteButtons[param] = makeDeleteButton(for: param)
+            }
+            let deleteButton = deleteButtons[param]!
+            if deleteButton.supernode == nil {
+                self.scrollNode.addSubnode(deleteButton)
+            }
         }
         
-        let allNodes: [ASDisplayNode?] = [genderDropdown, ageSlider, heightSlider, weightSlider, waistSlider, hipsSlider, shoeSizeSlider, hairLengthDropdown, hairColorDropdown]
+        for (param, button) in deleteButtons {
+            if !params.contains(param) {
+                button.removeFromSupernode()
+                deleteButtons.removeValue(forKey: param)
+            }
+        }
+
+        let allNodes: [ASDisplayNode?] = [genderDropdown, ageSlider, heightSlider, weightSlider, waistSlider, hipsSlider, shoeSizeSlider, hairLengthDropdown, hairColorDropdown, eyeColorDropdown, skinColorDropdown]
         for node in allNodes {
             node?.isHidden = true
         }
         for param in params {
             getOrCreateNode(for: param).isHidden = false
         }
-        
+
         if let (layout, navHeight, actualNavHeight) = self.currentLayoutData {
             self.containerLayoutUpdated(layout, navigationBarHeight: navHeight, actualNavigationBarHeight: actualNavHeight, transition: .animated(duration: 0.3, curve: .spring))
         }
+    }
+
+    private func triggerLayoutUpdate() {
+        if let (layout, navHeight, actualNavHeight) = self.currentLayoutData {
+            self.containerLayoutUpdated(layout, navigationBarHeight: navHeight, actualNavigationBarHeight: actualNavHeight, transition: .animated(duration: 0.3, curve: .spring))
+        }
+    }
+
+    private func updateThemeAndStrings() {
+        self.backgroundColor = self.presentationData.theme.chatList.backgroundColor
     }
     
     private func getOrCreateNode(for param: EventParameter) -> ASDisplayNode {
         switch param {
         case .gender:
             if genderDropdown == nil { genderDropdown = DropdownNode(title: "Gender", placeholder: "Select Gender", options: ["Loading..."], backgroundColor: UIColor(hexString: "#EFEFF0"), placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), titleColor: UIColor(hexString: "#3C3C43"), arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), apperTitleColor: UIColor(hexString: "#3C3C43")) }
+            self.genderDropdown?.options = self.genderDictionaries?.data.map { $0.title } ?? []
             return genderDropdown!
         case .age:
             let singleAgeSlider = AgeSliderNode<Int>(
@@ -561,7 +647,10 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
                 maximumValue: 45,
                 configuration: .light
             )
-            if ageSlider == nil { ageSlider = singleAgeSlider }
+            if ageSlider == nil {
+                ageSlider = singleAgeSlider
+                setupSliderTouchHandling(for: ageSlider!)
+            }
             return ageSlider!
         case .height:
             let singleHeightSlider = AgeSliderNode<Double>(
@@ -572,8 +661,11 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
                 maximumValue: 2.50,
                 configuration: .light
             )
-            
-            if heightSlider == nil { heightSlider = singleHeightSlider }
+
+            if heightSlider == nil {
+                heightSlider = singleHeightSlider
+                setupSliderTouchHandling(for: heightSlider!)
+            }
             return heightSlider!
         case .weight:
             let singleWeightSlider = AgeSliderNode<Double>(
@@ -584,8 +676,11 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
                 maximumValue: 90,
                 configuration: .light
             )
-            
-            if weightSlider == nil { weightSlider = singleWeightSlider }
+
+            if weightSlider == nil {
+                weightSlider = singleWeightSlider
+                setupSliderTouchHandling(for: weightSlider!)
+            }
             return weightSlider!
         case .waist:
             let singleWaistSlider = AgeSliderNode<Double>(
@@ -596,8 +691,11 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
                 maximumValue: 90,
                 configuration: .light
             )
-            
-            if waistSlider == nil { waistSlider = singleWaistSlider }
+
+            if waistSlider == nil {
+                waistSlider = singleWaistSlider
+                setupSliderTouchHandling(for: waistSlider!)
+            }
             return waistSlider!
         case .hips:
             let singleHipsSlider = AgeSliderNode<Double>(
@@ -608,8 +706,11 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
                 maximumValue: 110,
                 configuration: .light
             )
-            
-            if hipsSlider == nil { hipsSlider = singleHipsSlider }
+
+            if hipsSlider == nil {
+                hipsSlider = singleHipsSlider
+                setupSliderTouchHandling(for: hipsSlider!)
+            }
             return hipsSlider!
         case .shoeSize:
             let singleShoeSizeSlider = AgeSliderNode<Double>(
@@ -620,20 +721,228 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
                 maximumValue: 42,
                 configuration: .light
             )
-            
-            if shoeSizeSlider == nil { shoeSizeSlider = singleShoeSizeSlider }
+
+            if shoeSizeSlider == nil {
+                shoeSizeSlider = singleShoeSizeSlider
+                setupSliderTouchHandling(for: shoeSizeSlider!)
+            }
             return shoeSizeSlider!
             
             
         case .hairLength:
             if hairLengthDropdown == nil { hairLengthDropdown = DropdownNode(title: "Hair length", placeholder: "Select hair length", options: ["Loading..."], backgroundColor: UIColor(hexString: "#EFEFF0"), placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), titleColor: UIColor(hexString: "#3C3C43"), arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), apperTitleColor: UIColor(hexString: "#3C3C43"))
             }
+            self.hairLengthDropdown?.options = self.appearanceDictionaries?.hairLength.map { $0.title } ?? []
             return hairLengthDropdown!
         case .hairColor:
             if hairColorDropdown == nil { hairColorDropdown = DropdownNode(title: "Hair color", placeholder: "Select hair color", options: ["Loading..."], backgroundColor: UIColor(hexString: "#EFEFF0"), placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), titleColor: UIColor(hexString: "#3C3C43"), arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), apperTitleColor: UIColor(hexString: "#3C3C43"))
             }
+            self.hairColorDropdown?.options = self.appearanceDictionaries?.hairColor.map { $0.title } ?? []
             return hairColorDropdown!
+        case .eyeColor:
+            if eyeColorDropdown == nil { eyeColorDropdown = DropdownNode(title: "Eye color", placeholder: "Select eye color", options: ["Loading..."], backgroundColor: UIColor(hexString: "#EFEFF0"), placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), titleColor: UIColor(hexString: "#3C3C43"), arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), apperTitleColor: UIColor(hexString: "#3C3C43"))
+            }
+            self.eyeColorDropdown?.options = self.appearanceDictionaries?.eyeColor.map { $0.title } ?? []
+            return eyeColorDropdown!
+        case .skinColor:
+            if skinColorDropdown == nil { skinColorDropdown = DropdownNode(title: "Skin color", placeholder: "Select skin color", options: ["Loading..."], backgroundColor: UIColor(hexString: "#EFEFF0"), placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), titleColor: UIColor(hexString: "#3C3C43"), arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), apperTitleColor: UIColor(hexString: "#3C3C43"))
+            }
+            self.skinColorDropdown?.options = self.appearanceDictionaries?.skinColor.map { $0.title } ?? []
+            return skinColorDropdown!
         }
+    }
+    
+    private func makeDeleteButton(for param: EventParameter) -> ASButtonNode {
+        let button = ASButtonNode()
+        button.backgroundColor = .clear
+
+        let basketButtonImg = generateTintedImage(image: UIImage(bundleImageName: "Profile/Basket"), color: UIColor(hexString: "#BF7A54") ?? .white)
+        button.setImage(basketButtonImg, for: .normal)
+        button.addTarget(self, action: #selector(self.deleteParameterTapped(_:)), forControlEvents: .touchUpInside)
+        
+        return button
+    }
+
+    private func setupSliderTouchHandling(for node: ASDisplayNode) {
+        let touchGesture = UITapGestureRecognizer(target: self, action: #selector(self.sliderTouchBegan(_:)))
+        touchGesture.cancelsTouchesInView = false
+        
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(self.sliderPanGesture(_:)))
+        panGesture.cancelsTouchesInView = false
+        panGesture.delaysTouchesBegan = false
+        panGesture.delaysTouchesEnded = false
+        
+        node.view.addGestureRecognizer(touchGesture)
+        node.view.addGestureRecognizer(panGesture)
+    }
+
+    @objc private func addPhotoPressed() {
+        self.addPhoto()
+    }
+
+    @objc func applyButtonTapped() {
+        print("applyButton Tapped!")
+
+        if let nameEventTextField = nameEventTextField.textField.text,
+           nameEventTextField.isEmpty,
+           aboutEventTextField.text.isEmpty,
+           eventTime != 0,
+           eventDate != 0
+        {
+            showAlert?("Please fill in all fields")
+        }
+
+        let unixTimestampDate = TimeInterval(eventDate)
+        let unixTimestampTime = TimeInterval(eventTime)
+        let date = Date(timeIntervalSince1970: unixTimestampDate)
+        let time = Date(timeIntervalSince1970: unixTimestampTime)
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let formattedDate = formatter.string(from: date)
+
+        formatter.dateFormat = "HH:mm"
+        let formattedTime = formatter.string(from: time)
+
+        let _ = Promise<String?>()
+        let _ = EventModel(
+            title: nameEventTextField.textField.text ?? "",
+            description: aboutEventTextField.text,
+            eventDate: formattedDate,
+            eventTime: formattedTime,
+            coverPhoto: nil,
+            enabledParameterKeys: [])
+
+        if currentPhoto != nil {
+            // FIXME DIVO: заменить на REST — закомментирован вызов MTProto (upload + createEvent)
+            // let _ = uploadPhotoToCloud(context: context, image: currentPhoto).start(next: { id in
+            //     if let id = id {
+            //         print("⛳️", id)
+            //         supportPeer.set(self.context.engine.eventsEngine.createEvent(eventModel: eventModel, id: id))
+            //         self.supportPeerDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { peerId in
+            //             print("🔕", peerId ?? "")
+            //             self.showAlert?("event added")
+            //         }))
+            //     }
+            // })
+        }
+    }
+
+    @objc private func addParametersTapped() {
+        onAddParametersTapped?(selectedParameters)
+    }
+
+    @objc func keyboardWillHide(notification: NSNotification) {
+        guard let userInfo = notification.userInfo,
+              let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber,
+              let curve = userInfo[UIResponder.keyboardAnimationCurveUserInfoKey] as? NSNumber else {
+            return
+        }
+
+        var currentInsets = self.scrollNode.view.contentInset
+        currentInsets.bottom = 0
+
+        UIView.animate(withDuration: duration.doubleValue, delay: 0.0, options: UIView.AnimationOptions(rawValue: curve.uintValue << 16), animations: {
+            self.scrollNode.view.contentInset = currentInsets
+            self.scrollNode.view.scrollIndicatorInsets = currentInsets
+        }, completion: nil)
+    }
+
+    @objc private func dismissKeyboard() {
+        self.view.endEditing(true)
+    }
+
+    @objc func keyboardWillShow(notification: NSNotification) {
+        guard let userInfo = notification.userInfo,
+              let keyboardFrame = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue,
+              let duration = userInfo[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber,
+              let curve = userInfo[UIResponder.keyboardAnimationCurveUserInfoKey] as? NSNumber else {
+            return
+        }
+
+        let keyboardHeight = keyboardFrame.cgRectValue.height
+
+        var currentInsets = self.scrollNode.view.contentInset
+
+        currentInsets.bottom = keyboardHeight
+
+        UIView.animate(withDuration: duration.doubleValue, delay: 0.0, options: UIView.AnimationOptions(rawValue: curve.uintValue << 16), animations: {
+            self.scrollNode.view.contentInset = currentInsets
+            self.scrollNode.view.scrollIndicatorInsets = currentInsets
+        }, completion: nil)
+    }
+
+    @objc private func dashedUploadTapped() {
+        onAddGalleryPhotoTapped?()
+    }
+    
+    @objc private func deleteParameterTapped(_ button: ASButtonNode) {
+        guard let param = deleteButtons.first(where: { $0.value === button })?.key else {
+            return
+        }
+
+        self.selectedParameters.remove(param)
+
+        button.removeFromSupernode()
+        deleteButtons.removeValue(forKey: param)
+
+        getOrCreateNode(for: param).isHidden = true
+
+        let allParametersSet = Set(EventParameter.allCases)
+        self.addParametersButton.isHidden = self.selectedParameters == allParametersSet
+        
+        if let addButton = self.addParametersButton as? ButtonWithIconNode {
+            if self.selectedParameters.isEmpty {
+                addButton.setTitle("+ Add parameters")
+            } else {
+                addButton.setTitle("+ Add")
+            }
+        }
+
+        if let (layout, navHeight, actualNavHeight) = self.currentLayoutData {
+            self.containerLayoutUpdated(layout, navigationBarHeight: navHeight, actualNavigationBarHeight: actualNavHeight, transition: .animated(duration: 0.3, curve: .spring))
+        }
+    }
+
+    @objc private func sliderTouchBegan(_ gesture: UITapGestureRecognizer) {
+        if gesture.state == .began {
+            self.scrollNode.view.isScrollEnabled = false
+        }
+    }
+
+    @objc private func sliderPanGesture(_ gesture: UIPanGestureRecognizer) {
+        switch gesture.state {
+        case .ended, .cancelled, .failed:
+            self.scrollNode.view.isScrollEnabled = true
+        default:
+            break
+        }
+    }
+}
+
+
+// MARK: - Расширение UICollectionViewDataSource и Delegate
+
+extension CreateEventNode: UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return galleryItems.count
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "EventGalleryCell", for: indexPath) as! EventGalleryCell
+        let item = galleryItems[indexPath.row]
+        
+        cell.configure(with: item)
+        
+        cell.onDelete = { [weak self, item] in
+            self?.removePhoto(item: item)
+        }
+        return cell
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        let width = floor(collectionView.bounds.width / 3.0)
+        return CGSize(width: width, height: width)
     }
 }
 

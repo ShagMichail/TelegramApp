@@ -15,6 +15,7 @@ import LegacyMediaPickerUI
 import CountrySelectionUI
 import ChatScheduleTimeController
 import Postbox
+import PhotosUI
 
 public class CreateEventController: ViewController, UINavigationControllerDelegate {
     private let context: AccountContext
@@ -31,15 +32,17 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
 
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
 
+        let copperColor = UIColor(hexString: "#BF7A54") ?? .black
+
         let darkNavigationTheme = NavigationBarTheme(
             overallDarkAppearance: true,
-            buttonColor: .black,
-            disabledButtonColor: UIColor(rgb: 0x525252),
+            buttonColor: copperColor,
+            disabledButtonColor: copperColor.withAlphaComponent(0.4),
             primaryTextColor: .white,
             backgroundColor: .clear,
             opaqueBackgroundColor: .clear,
             enableBackgroundBlur: false,
-            separatorColor: .clear,
+            separatorColor: .black,
             badgeBackgroundColor: .clear,
             badgeStrokeColor: .clear,
             badgeTextColor: .clear)
@@ -50,12 +53,37 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
 
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
 
-        self.title = "CREATE EVENT"
+        let titleLabel = UILabel()
+        let titleFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 20) ?? UIFont.systemFont(ofSize: 20, weight: .bold)
+        let titleAttr = NSAttributedString(string: "CREATE EVENT", attributes: [
+            .font: titleFont,
+            .foregroundColor: UIColor.black,
+            .kern: 0.5
+        ])
+        
+        titleLabel.attributedText = titleAttr
+        titleLabel.textAlignment = .center
+        titleLabel.frame = CGRect(x: 0, y: 0, width: 200, height: 44)
+        self.navigationItem.titleView = titleLabel
 
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
 
-        let createItem = UIBarButtonItem(title: "Create", style: .done, target: self, action: #selector(createPressed))
-        self.navigationItem.rightBarButtonItem = createItem
+        let createFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 16) ?? UIFont.systemFont(ofSize: 16, weight: .bold)
+        let createButton = UIBarButtonItem(
+            title: "Create",
+            style: .plain,
+            target: self,
+            action: #selector(createPressed)
+        )
+        createButton.setTitleTextAttributes([
+            .foregroundColor: copperColor,
+            .font: createFont
+        ], for: .normal)
+        createButton.setTitleTextAttributes([
+            .foregroundColor: copperColor.withAlphaComponent(0.5),
+            .font: createFont
+        ], for: .highlighted)
+        self.navigationItem.rightBarButtonItem = createButton
 
         self.presentationDataDisposable = (context.sharedContext.presentationData
                                            |> deliverOnMainQueue).start(next: { [weak self] presentationData in
@@ -78,15 +106,6 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
 
     deinit {
         self.presentationDataDisposable?.dispose()
-    }
-
-    private func updateThemeAndStrings() {
-        self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
-        self.navigationBar?.updatePresentationData(NavigationBarPresentationData(presentationData: self.presentationData), transition: .immediate)
-
-        self.title = "Create event"
-
-        self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
     }
 
     override public func loadDisplayNode() {
@@ -129,7 +148,71 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
         self.createEventNode.onAddParametersTapped = { [weak self] selectedParams in
             self?.showParametersSheet(currentSelection: selectedParams)
         }
+        self.createEventNode.onAddGalleryPhotoTapped = { [weak self] in
+            if #available(iOS 14.0, *) {
+                self?.openMultiPhotoPicker()
+            }
+        }
+
+        self.loadAppearanceDictionary()
+        self.loadGenderDictionary()
+
         self.displayNodeDidLoad()
+    }
+
+    override public func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+    }
+
+    override public func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+    }
+
+    override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
+        super.containerLayoutUpdated(layout, transition: transition)
+
+        self.createEventNode.containerLayoutUpdated(layout, navigationBarHeight: self.cleanNavigationHeight, actualNavigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
+    }
+
+    private func updateThemeAndStrings() {
+        self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
+        self.navigationBar?.updatePresentationData(NavigationBarPresentationData(presentationData: self.presentationData), transition: .immediate)
+
+        self.title = "Create event"
+
+        self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
+    }
+
+    private func loadAppearanceDictionary() {
+        Task { @MainActor in
+            do {
+                let response: AppearanceDictionaryResponse = try await DivoAPIClient.shared.request(
+                    path: "/dictionary/appearances",
+                    method: "GET"
+                )
+                
+                self.createEventNode.configureAppearanceDictionaries(response.data)
+            } catch {
+                print("❌ Error loading appearance dictionary: \(error)")
+                self.showAlert(text: "Failed to load appearance options.")
+            }
+        }
+    }
+    
+    private func loadGenderDictionary() {
+        Task { @MainActor in
+            do {
+                let response: GenderResponse = try await DivoAPIClient.shared.request(
+                    path: "/dictionary/gender",
+                    method: "GET"
+                )
+                
+                self.createEventNode.configureGenderDictionaries(response)
+            } catch {
+                print("❌ Error loading appearance dictionary: \(error)")
+                self.showAlert(text: "Failed to load appearance options.")
+            }
+        }
     }
 
     private func showAlert(text: String) {
@@ -159,19 +242,6 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
             })
         present(controller, in: .window(.root))
     }
-    override public func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-    }
-
-    override public func viewDidDisappear(_ animated: Bool) {
-        super.viewDidDisappear(animated)
-    }
-
-    override public func containerLayoutUpdated(_ layout: ContainerViewLayout, transition: ContainedViewLayoutTransition) {
-        super.containerLayoutUpdated(layout, transition: transition)
-
-        self.createEventNode.containerLayoutUpdated(layout, navigationBarHeight: self.cleanNavigationHeight, actualNavigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
-    }
     
     private func showParametersSheet(currentSelection: Set<EventParameter>) {
         let sheet = EventParametersSheetController(selectedParameters: currentSelection) { [weak self] newSelection in
@@ -182,5 +252,71 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
 
     @objc private func createPressed() {
         self.createEventNode.applyButtonTapped()
+    }
+}
+
+@available(iOS 14.0, *)
+extension CreateEventController: PHPickerViewControllerDelegate {
+    
+    private func openMultiPhotoPicker() {
+        var config = PHPickerConfiguration()
+        config.selectionLimit = 10
+        config.filter = .images
+        
+        let picker = PHPickerViewController(configuration: config)
+        picker.delegate = self
+        self.present(picker, animated: true)
+    }
+    
+    public func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
+        
+        for result in results {
+            if result.itemProvider.canLoadObject(ofClass: UIImage.self) {
+                result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] object, _ in
+                    guard let self = self, let uiImage = object as? UIImage else { return }
+                    
+                    let normalized = uiImage.fixedOrientation()
+                    
+                    DispatchQueue.main.async {
+                        let item = self.createEventNode.startPhotoUpload(image: normalized)
+                        
+                        self.uploadEventPhoto(image: normalized, item: item)
+                    }
+                }
+            }
+        }
+    }
+
+    private func uploadEventPhoto(image: UIImage, item: EventGalleryItem) {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            self.createEventNode.cancelPhotoUpload(item: item)
+            return
+        }
+
+        Task {
+            do {
+                let uploadResponse: FileUploadResponse = try await DivoAPIClient.shared.upload(
+                    path: "/file/upload-file",
+                    fileData: imageData,
+                    fileName: "event_photo.jpg",
+                    mimeType: "image/jpeg"
+                )
+
+                guard let fileUuid = uploadResponse.data?.uuid else {
+                    throw DivoAPIError.unknown
+                }
+
+                await MainActor.run {
+                    self.createEventNode.finishPhotoUpload(item: item, fileUuid: fileUuid)
+                }
+
+            } catch {
+                await MainActor.run {
+                    self.createEventNode.cancelPhotoUpload(item: item)
+                    self.showAlert(text: "Failed to upload photo: \(error.localizedDescription)")
+                }
+            }
+        }
     }
 }
