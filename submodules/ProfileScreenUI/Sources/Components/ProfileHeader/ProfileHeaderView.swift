@@ -282,7 +282,7 @@ class ProfileHeaderView: UIView {
         
         var fullLocationString: String
         if let age = viewModel.age  {
-            fullLocationString = "\(age) y.o • \(viewModel.countryFlag) \(viewModel.location)"
+            fullLocationString = "\(DivoStrings.ageString(age)) • \(viewModel.countryFlag) \(viewModel.location)"
         } else {
             fullLocationString = "\(viewModel.countryFlag) \(viewModel.location)"
         }

@@ -102,26 +102,26 @@ final class EventsSearchControllerNode: ASDisplayNode, UITextFieldDelegate {
         self.scrollNode = ASScrollNode()
 
         self.filterByLabel = ASTextNode()
-        self.filterByLabel.attributedText = NSAttributedString(string: "Filter by:", font: Font.semibold(12), textColor: UIColor(red: 0.24, green: 0.24, blue: 0.26, alpha: 0.6))
+        self.filterByLabel.attributedText = NSAttributedString(string: DivoStrings.filterBy, font: Font.semibold(12), textColor: UIColor(red: 0.24, green: 0.24, blue: 0.26, alpha: 0.6))
 
         self.locationLabel = ASTextNode()
-        self.locationLabel.attributedText = NSAttributedString(string: "Location", font: Font.semibold(16), textColor: UIColor(red: 0.09, green: 0.09, blue: 0.11, alpha: 1.00))
+        self.locationLabel.attributedText = NSAttributedString(string: DivoStrings.location, font: Font.semibold(16), textColor: UIColor(red: 0.09, green: 0.09, blue: 0.11, alpha: 1.00))
 
-        self.locationTextField = getTextFiel(title: "Choose a country")
+        self.locationTextField = getTextFiel(title: DivoStrings.chooseCountry)
 
         self.eventTypeLabel = ASTextNode()
-        self.eventTypeLabel.attributedText = NSAttributedString(string: "Event Type", font: Font.semibold(16), textColor: UIColor(red: 0.09, green: 0.09, blue: 0.11, alpha: 1.00))
+        self.eventTypeLabel.attributedText = NSAttributedString(string: DivoStrings.eventType, font: Font.semibold(16), textColor: UIColor(red: 0.09, green: 0.09, blue: 0.11, alpha: 1.00))
 
-        self.eventTypeTextField = getTextFiel(title: "All Types")
+        self.eventTypeTextField = getTextFiel(title: DivoStrings.allTypes)
 
         self.dateRangeLabel = ASTextNode()
-        self.dateRangeLabel.attributedText = NSAttributedString(string: "Date Range", font: Font.semibold(16), textColor: UIColor(red: 0.09, green: 0.09, blue: 0.11, alpha: 1.00))
+        self.dateRangeLabel.attributedText = NSAttributedString(string: DivoStrings.dateRange, font: Font.semibold(16), textColor: UIColor(red: 0.09, green: 0.09, blue: 0.11, alpha: 1.00))
 
         self.fromDateControl = ASControlNode()
         self.fromDateControl.backgroundColor = .clear
 
         self.fromDateTitle = ASTextNode()
-        self.fromDateTitle.attributedText = NSAttributedString(string: "From", font: Font.regular(17), textColor: .black)
+        self.fromDateTitle.attributedText = NSAttributedString(string: DivoStrings.from, font: Font.regular(17), textColor: .black)
 
         self.fromDateValue = ASTextNode()
         self.fromDateValue.attributedText = NSAttributedString(string: "Today, 24 Jun 2025", font: Font.regular(17), textColor: .black)
@@ -133,7 +133,7 @@ final class EventsSearchControllerNode: ASDisplayNode, UITextFieldDelegate {
         self.toDateControl.backgroundColor = .clear
 
         self.toDateTitle = ASTextNode()
-        self.toDateTitle.attributedText = NSAttributedString(string: "To", font: Font.regular(17), textColor: .black)
+        self.toDateTitle.attributedText = NSAttributedString(string: DivoStrings.to, font: Font.regular(17), textColor: .black)
 
         self.toDateValue = ASTextNode()
         self.toDateValue.attributedText = NSAttributedString(string: "24 Jul, 2025", font: Font.regular(17), textColor: .black)
@@ -141,7 +141,7 @@ final class EventsSearchControllerNode: ASDisplayNode, UITextFieldDelegate {
         self.toDateSeparator = ASControlNode()
         self.toDateSeparator.backgroundColor = UIColor(red: 0.33, green: 0.33, blue: 0.34, alpha: 0.34)
 
-        self.applyButton = ButtonWithIconNode(title: "Apply filter", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
+        self.applyButton = ButtonWithIconNode(title: DivoStrings.applyFilter, icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
         self.applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
 
         super.init()
@@ -255,7 +255,7 @@ final class EventsSearchControllerNode: ASDisplayNode, UITextFieldDelegate {
 
         let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
         let dateFormatter = DateFormatter()
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.locale = Locale(identifier: DivoStrings.current.localeIdentifier)
         dateFormatter.dateFormat = "d MMM yyyy"
         let dateString = dateFormatter.string(from: date)
 

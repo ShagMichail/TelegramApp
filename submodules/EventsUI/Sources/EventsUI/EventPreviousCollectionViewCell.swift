@@ -93,7 +93,7 @@ final class EventPreviousCollectionViewCell: UICollectionViewCell {
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(subtitleLabel)
         
-        applyButton.setTitle("Apply", for: .normal)
+        applyButton.setTitle(DivoStrings.apply, for: .normal)
         applyButton.titleLabel?.font = Font.helveticaNeue(11)
         applyButton.setTitleColor(.white, for: .normal)
         applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)

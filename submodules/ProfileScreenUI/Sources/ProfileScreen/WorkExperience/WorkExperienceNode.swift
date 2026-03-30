@@ -53,7 +53,7 @@ final class WorkExperience: ASDisplayNode {
         self.context = context
         self.presentationData = presentationData
         self.model = model
-        self.addExperienceButton = ButtonWithIconNode(title: "Add Work Experience", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
+        self.addExperienceButton = ButtonWithIconNode(title: DivoStrings.addWorkExperience, icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
 
         super.init()
 
@@ -82,7 +82,7 @@ final class WorkExperience: ASDisplayNode {
             }
             return WorkExperienceItem(
                 id: item.id,
-                companyName: item.agencyDisplayName ?? item.agencyName ?? "Unknown Agency",
+                companyName: item.agencyDisplayName ?? item.agencyName ?? DivoStrings.unknownAgency,
                 period: Self.formatWorkPeriod(startDate: item.startDate, endDate: item.endDate, isCurrent: item.isCurrent),
                 logoURL: logoURL
             )
@@ -105,7 +105,7 @@ final class WorkExperience: ASDisplayNode {
             WorkExperienceItem(
                 id: index,
                 companyName: name,
-                period: "Past Experience",
+                period: DivoStrings.pastExperience,
                 logoURL: nil
             )
         }
@@ -154,12 +154,12 @@ final class WorkExperience: ASDisplayNode {
         let titleLabel = UILabel()
         titleLabel.numberOfLines = 2
         titleLabel.textAlignment = .center
-        titleLabel.attributedText = Font.helveticaNeue("THERE ARE NO WORK\nEXPERIENCE YET.", 34)
+        titleLabel.attributedText = Font.helveticaNeue(DivoStrings.noWorkExperienceYet, 34)
         titleLabel.textColor = .black
 
         let subLabel = UILabel()
         subLabel.attributedText = NSAttributedString(
-            string: "Click the button below\nto add your work\nexperience",
+            string: DivoStrings.noWorkExperienceSubtitle,
             font: Font.regular(16.0),
             textColor: .white.withAlphaComponent(0.6),
             paragraphAlignment: .center)
@@ -220,7 +220,7 @@ final class WorkExperience: ASDisplayNode {
 
         let displayFormatter = DateFormatter()
         displayFormatter.dateFormat = "MMMM yyyy"
-        displayFormatter.locale = Locale(identifier: "en_US")
+        displayFormatter.locale = Locale(identifier: DivoStrings.current.localeIdentifier)
 
         let startString = displayFormatter.string(from: start)
         let endString: String
@@ -228,13 +228,13 @@ final class WorkExperience: ASDisplayNode {
 
         if isCurrent == true {
             end = Date()
-            endString = "Present"
+            endString = DivoStrings.present
         } else if let endStr = endDate, let endDate = inputFormatter.date(from: endStr) {
             end = endDate
             endString = displayFormatter.string(from: endDate)
         } else {
             end = Date()
-            endString = "Present"
+            endString = DivoStrings.present
         }
 
         let calendar = Calendar.current
@@ -244,16 +244,16 @@ final class WorkExperience: ASDisplayNode {
 
         var durationString = ""
         if years > 0 {
-            durationString += "\(years) year\(years > 1 ? "s" : "")"
+            durationString += DivoStrings.yearsCount(years)
         }
         if months > 0 {
             if !durationString.isEmpty {
                 durationString += " "
             }
-            durationString += "\(months) month\(months > 1 ? "s" : "")"
+            durationString += DivoStrings.monthsCount(months)
         }
         if durationString.isEmpty {
-            durationString = "1 month"
+            durationString = DivoStrings.oneMonth
         }
 
         return "\(startString) - \(endString) · \(durationString)"

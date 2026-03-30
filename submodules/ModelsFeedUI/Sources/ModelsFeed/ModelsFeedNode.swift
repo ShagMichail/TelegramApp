@@ -103,17 +103,19 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
     private var storiesCollectionView: UICollectionView!
     private var mainCollectionView: UICollectionView!
 
-    private let stories: [StoryModel] = [
-        StoryModel(name: "Add Story", avatarName: "Chat List/AddIcon", isLive: false, isAdd: true),
-        StoryModel(name: "Jack D.", avatarName: "Models/image5", isLive: false, isAdd: false),
-        StoryModel(name: "Joshua", avatarName: "", isLive: false, isAdd: false),
-        StoryModel(name: "waggles", avatarName: "", isLive: true, isAdd: false),
-        StoryModel(name: "steve.loves", avatarName: "", isLive: true, isAdd: false),
-    ]
+    private var stories: [StoryModel] {
+        [
+            StoryModel(name: DivoStrings.addStory, avatarName: "Chat List/AddIcon", isLive: false, isAdd: true),
+            StoryModel(name: "Jack D.", avatarName: "Models/image5", isLive: false, isAdd: false),
+            StoryModel(name: "Joshua", avatarName: "", isLive: false, isAdd: false),
+            StoryModel(name: "waggles", avatarName: "", isLive: true, isAdd: false),
+            StoryModel(name: "steve.loves", avatarName: "", isLive: true, isAdd: false),
+        ]
+    }
 
     private var cards: [CardModel] = []
 
-    private let tabTitles = ["SUBSCRIBED MODELS", "ALL USERS", "AGENCIES & PRO MEMBERS"]
+    private var tabTitles: [String] { [DivoStrings.feedSubscribed, DivoStrings.feedAllUsers, DivoStrings.feedAgencies] }
     private var selectedTabIndex = 0
 
     private let tabsScrollView: UIScrollView = {
@@ -210,7 +212,6 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
             mainCollectionView.insertItems(at: indexPaths)
         }
     }
-
     init(controller: ViewController, context: AccountContext, presentationData: PresentationData) {
         self.controller = controller
         self.context = context
@@ -253,7 +254,7 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         self.mainCollectionView.register(PaginationShimmerCell.self, forCellWithReuseIdentifier: "PaginationShimmerCell")
 
 
-        self.titleLabel.text = presentationData.strings.ModelsFeed_TabTitle.uppercased()
+        self.titleLabel.text = DivoStrings.navModels
 
         // Create floating avatars + names for ALL stories (animate 5→3→navbar)
         for i in 0..<stories.count {
@@ -309,6 +310,19 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
 
         self.didSetReady = true
         self._ready.set(true)
+        NotificationCenter.default.addObserver(forName: DivoStrings.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.titleLabel.text = DivoStrings.navModels
+            for (index, view) in self.tabsStackView.arrangedSubviews.enumerated() {
+                if let button = view as? UIButton, index < self.tabTitles.count {
+                    button.setTitle(self.tabTitles[index], for: .normal)
+                }
+            }
+            self.tabsStackView.layoutIfNeeded()
+            self.layoutTabIndicator()
+            self.storiesCollectionView.reloadData()
+            self.mainCollectionView.reloadData()
+        }
     }
 
     @objc private func tabButtonTapped(_ sender: UIButton) {
@@ -680,7 +694,7 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
                     self.cards.remove(at: idx)
                     self.mainCollectionView.deleteItems(at: [indexPath])
                 } else {
-                    let message = isFollowed ? "Subscribed!" : "Unsubscribed"
+                    let message = isFollowed ? DivoStrings.subscribed : DivoStrings.unsubscribed
                     let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
                     alert.addAction(UIAlertAction(title: "OK", style: .default))
                     self.controller?.view.window?.rootViewController?.present(alert, animated: true)
@@ -764,13 +778,13 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         iconLabel.textAlignment = .center
 
         let titleLabel = UILabel()
-        titleLabel.text = "Server Unavailable"
+        titleLabel.text = DivoStrings.serverUnavailable
         titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
         titleLabel.textColor = UIColor(white: 0.1, alpha: 1)
         titleLabel.textAlignment = .center
 
         let subtitleLabel = UILabel()
-        subtitleLabel.text = "Unable to connect to the server.\nTry toggling your VPN on or off."
+        subtitleLabel.text = DivoStrings.serverUnavailableSubtitle
         subtitleLabel.font = .systemFont(ofSize: 14)
         subtitleLabel.textColor = UIColor(white: 0.5, alpha: 1)
         subtitleLabel.textAlignment = .center
@@ -853,7 +867,7 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         container.addSubview(circleView)
 
         let iconLabel = UILabel()
-        iconLabel.text = tabTitles[selectedTabIndex] == "SUBSCRIBED MODELS" ? "♡" : "☰"
+        iconLabel.text = selectedTabIndex == 0 ? "♡" : "☰"
         iconLabel.font = .systemFont(ofSize: 32)
         iconLabel.textColor = UIColor(white: 0.4, alpha: 1.0)
         iconLabel.textAlignment = .center
@@ -877,14 +891,14 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
 
         switch selectedTabIndex {
         case 0:
-            titleLabel.text = "No Subscriptions Yet"
-            subtitleLabel.text = "Subscribe to models to see\nthem here."
+            titleLabel.text = DivoStrings.noSubscriptionsYet
+            subtitleLabel.text = DivoStrings.noSubscriptionsSubtitle
         case 2:
-            titleLabel.text = "No Results"
-            subtitleLabel.text = "No agencies or pro members\nfound at the moment."
+            titleLabel.text = DivoStrings.noResults
+            subtitleLabel.text = DivoStrings.noResultsSubtitle
         default:
-            titleLabel.text = "No Users Found"
-            subtitleLabel.text = "There are no users\nto display right now."
+            titleLabel.text = DivoStrings.noUsersFound
+            subtitleLabel.text = DivoStrings.noUsersFoundSubtitle
         }
 
         NSLayoutConstraint.activate([

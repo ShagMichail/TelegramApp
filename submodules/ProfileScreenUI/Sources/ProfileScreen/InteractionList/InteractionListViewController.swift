@@ -1,5 +1,6 @@
 import UIKit
 import Display
+import TelegramCore
 
 struct InteractionUser {
     let id: Int
@@ -16,9 +17,9 @@ enum InteractionListType {
 
     var title: String {
         switch self {
-        case .likes: return "LIKES"
-        case .views: return "VIEWED"
-        case .saves: return "SAVED"
+        case .likes: return DivoStrings.likes
+        case .views: return DivoStrings.viewed
+        case .saves: return DivoStrings.saved
         }
     }
 }
@@ -70,7 +71,7 @@ final class InteractionListViewController: UIViewController {
 
     private let searchBar: UISearchBar = {
         let searchBar = UISearchBar()
-        searchBar.placeholder = "Search"
+        searchBar.placeholder = DivoStrings.search
         searchBar.searchBarStyle = .minimal
         searchBar.translatesAutoresizingMaskIntoConstraints = false
         searchBar.isHidden = true
@@ -246,11 +247,11 @@ final class InteractionListViewController: UIViewController {
     private func updateEmptyState() {
         if filteredUsers.isEmpty {
             if self.listType == .likes {
-                configure(with: true, emptyTitle: "No likes yet.", emptySubTitle: "Tap the heart icon to like model you enjoy.")
+                configure(with: true, emptyTitle: DivoStrings.noLikesYet, emptySubTitle: DivoStrings.noLikesSubtitle)
             } else if self.listType == .saves {
-                configure(with: true, emptyTitle: "Nothing saved yet.", emptySubTitle: "Save model to easily find them later.")
+                configure(with: true, emptyTitle: DivoStrings.nothingSavedYet, emptySubTitle: DivoStrings.nothingSavedSubtitle)
             } else if self.listType == .views {
-                configure(with: true, emptyTitle: "No profile viewed yet.", emptySubTitle: "Profiles that have been here will be displayed here.")
+                configure(with: true, emptyTitle: DivoStrings.noProfileViewedYet, emptySubTitle: DivoStrings.noProfileViewedSubtitle)
             }
         } else {
             configure(with: false)

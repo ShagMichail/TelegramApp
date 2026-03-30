@@ -51,13 +51,13 @@ public class EditSocialLinksController: ViewController, UINavigationControllerDe
             badgeStrokeColor: .clear,
             badgeTextColor: .clear)
 
-        let navigationBarData = NavigationBarPresentationData(theme: darkNavigationTheme, strings: NavigationBarStrings(back: "Back", close: "Close"))
+        let navigationBarData = NavigationBarPresentationData(theme: darkNavigationTheme, strings: NavigationBarStrings(back: DivoStrings.back, close: DivoStrings.close))
         
         super.init(navigationBarPresentationData: navigationBarData)
         
         self.statusBar.statusBarStyle = presentationData.theme.intro.statusBarStyle.style
         
-        self.title = "EDIT SOCIAL LINKS"
+        self.title = DivoStrings.editSocialLinks
         
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
         
@@ -99,7 +99,7 @@ public class EditSocialLinksController: ViewController, UINavigationControllerDe
             badgeStrokeColor: .clear, 
             badgeTextColor: .clear
         )
-        self.navigationBar?.updatePresentationData(NavigationBarPresentationData(theme: navTheme, strings: NavigationBarStrings(back: "Back", close: "Close")), transition: .immediate)
+        self.navigationBar?.updatePresentationData(NavigationBarPresentationData(theme: navTheme, strings: NavigationBarStrings(back: DivoStrings.back, close: DivoStrings.close)), transition: .immediate)
         
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
     }
@@ -168,7 +168,7 @@ public class EditSocialLinksController: ViewController, UINavigationControllerDe
                 print("✅ Social links successfully saved: \(response.message ?? "OK")")
                 self.delegate?.didUpdateSocialLinksData()
                 self.createEventNode.toggleSpinner(active: false)
-                self.showAlert(text: "Social links updated")
+                self.showAlert(text: DivoStrings.socialLinksUpdated)
                 
                 self.navigationController?.popViewController(animated: true)
                 

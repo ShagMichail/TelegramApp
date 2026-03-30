@@ -43,7 +43,7 @@ public final class DivoSettingsController: TelegramBaseController {
         // Custom title label: HelveticaNeueLTCom-BdCn 20px, centered
         let titleLabel = UILabel()
         let titleFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 20) ?? UIFont.systemFont(ofSize: 20, weight: .bold)
-        let titleAttr = NSAttributedString(string: "SETTINGS", attributes: [
+        let titleAttr = NSAttributedString(string: DivoStrings.settings, attributes: [
             .font: titleFont,
             .foregroundColor: UIColor.black,
             .kern: 0.5
@@ -53,7 +53,7 @@ public final class DivoSettingsController: TelegramBaseController {
         titleLabel.frame = CGRect(x: 0, y: 0, width: 200, height: 44)
         self.navigationItem.titleView = titleLabel
 
-        self.tabBarItem.title = "Settings"
+        self.tabBarItem.title = DivoStrings.tabSettings
         let settingsIcon = generateTintedImage(image: UIImage(bundleImageName: "Chat List/Tabs/IconSettings"), color: UIColor(white: 0.55, alpha: 1))
         let settingsIconSelected = generateTintedImage(image: UIImage(bundleImageName: "Chat List/Tabs/IconSettings"), color: UIColor(white: 0.2, alpha: 1))
         self.tabBarItem.image = settingsIcon
@@ -69,23 +69,28 @@ public final class DivoSettingsController: TelegramBaseController {
         )
         self.navigationItem.leftBarButtonItem = qrButton
 
-        // Edit button (right): HelveticaNeueLTCom-BdCn 16px
+        self.navigationItem.rightBarButtonItem = makeEditButton()
+        NotificationCenter.default.addObserver(forName: DivoStrings.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.tabBarItem.title = DivoStrings.tabSettings
+            let titleFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 20) ?? UIFont.systemFont(ofSize: 20, weight: .bold)
+            let titleAttr = NSAttributedString(string: DivoStrings.settings, attributes: [
+                .font: titleFont,
+                .foregroundColor: UIColor.black,
+                .kern: 0.5
+            ])
+            (self.navigationItem.titleView as? UILabel)?.attributedText = titleAttr
+            self.navigationItem.rightBarButtonItem = self.makeEditButton()
+        }
+    }
+
+    private func makeEditButton() -> UIBarButtonItem {
+        let copperColor = UIColor(red: 191.0/255.0, green: 122.0/255.0, blue: 84.0/255.0, alpha: 1.0)
         let editFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 16) ?? UIFont.systemFont(ofSize: 16, weight: .bold)
-        let editButton = UIBarButtonItem(
-            title: "Edit",
-            style: .plain,
-            target: self,
-            action: #selector(editTapped)
-        )
-        editButton.setTitleTextAttributes([
-            .foregroundColor: copperColor,
-            .font: editFont
-        ], for: .normal)
-        editButton.setTitleTextAttributes([
-            .foregroundColor: copperColor.withAlphaComponent(0.5),
-            .font: editFont
-        ], for: .highlighted)
-        self.navigationItem.rightBarButtonItem = editButton
+        let button = UIBarButtonItem(title: DivoStrings.settingsEdit, style: .plain, target: self, action: #selector(editTapped))
+        button.setTitleTextAttributes([.foregroundColor: copperColor, .font: editFont], for: .normal)
+        button.setTitleTextAttributes([.foregroundColor: copperColor.withAlphaComponent(0.5), .font: editFont], for: .highlighted)
+        return button
     }
 
     required init(coder aDecoder: NSCoder) {
@@ -297,7 +302,7 @@ private final class DivoSettingsNode: ASDisplayNode {
 
         usernameLabel.font = UIFont.systemFont(ofSize: 17, weight: .regular)
         usernameLabel.textColor = .black
-        usernameLabel.text = "Set Username"
+        usernameLabel.text = DivoStrings.settingsSetUsername
         usernameContainer.addSubview(usernameLabel)
 
         // Separator
@@ -306,7 +311,7 @@ private final class DivoSettingsNode: ASDisplayNode {
 
         // MARK: Fill your parameters button
         parametersButton.backgroundColor = DivoSettingsColors.accent
-        parametersButton.setTitle("Fill your parameters", for: .normal)
+        parametersButton.setTitle(DivoStrings.settingsFillParameters, for: .normal)
         parametersButton.setTitleColor(.white, for: .normal)
         parametersButton.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .semibold)
         parametersButton.layer.cornerRadius = 12
@@ -328,19 +333,19 @@ private final class DivoSettingsNode: ASDisplayNode {
         bannerDivoLabel.textColor = DivoSettingsColors.accent.withAlphaComponent(0.7)
         bannerContainer.addSubview(bannerDivoLabel)
 
-        bannerTitleLabel.text = "GET DISCOVERED IN THE FASHION WORLD"
+        bannerTitleLabel.text = DivoStrings.settingsBannerTitle
         bannerTitleLabel.font = UIFont.systemFont(ofSize: 20, weight: .bold)
         bannerTitleLabel.textColor = .white
         bannerTitleLabel.numberOfLines = 0
         bannerContainer.addSubview(bannerTitleLabel)
 
-        bannerDescriptionLabel.text = "Publish your profile as a model, join castings or add events as agency — be part of the global fashion network."
+        bannerDescriptionLabel.text = DivoStrings.settingsBannerDescription
         bannerDescriptionLabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
         bannerDescriptionLabel.textColor = UIColor(white: 0.82, alpha: 1)
         bannerDescriptionLabel.numberOfLines = 0
         bannerContainer.addSubview(bannerDescriptionLabel)
 
-        learnMoreButton.setTitle("LEARN MORE", for: .normal)
+        learnMoreButton.setTitle(DivoStrings.settingsLearnMore, for: .normal)
         learnMoreButton.setTitleColor(.white, for: .normal)
         learnMoreButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .bold)
         learnMoreButton.backgroundColor = DivoSettingsColors.accent
@@ -350,6 +355,14 @@ private final class DivoSettingsNode: ASDisplayNode {
         learnMoreButton.contentEdgeInsets = UIEdgeInsets(top: 10, left: 20, bottom: 10, right: 20)
         learnMoreButton.addTarget(self, action: #selector(learnMoreTapped), for: .touchUpInside)
         bannerContainer.addSubview(learnMoreButton)
+        NotificationCenter.default.addObserver(forName: DivoStrings.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.usernameLabel.text = DivoStrings.settingsSetUsername
+            self.parametersButton.setTitle(DivoStrings.settingsFillParameters, for: .normal)
+            self.bannerTitleLabel.text = DivoStrings.settingsBannerTitle
+            self.bannerDescriptionLabel.text = DivoStrings.settingsBannerDescription
+            self.learnMoreButton.setTitle(DivoStrings.settingsLearnMore, for: .normal)
+        }
     }
 
     // MARK: - Layout

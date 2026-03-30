@@ -28,7 +28,7 @@ final class CurrentAgencyView: UIView {
     
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.text = "Current Agency"
+        label.text = DivoStrings.currentAgency
         label.font = Font.helveticaNeue(12)
         label.textColor = .white
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -57,7 +57,7 @@ final class CurrentAgencyView: UIView {
         let button = UIButton(type: .system)
         button.titleLabel?.font = Font.helveticaNeue(10)
         button.setTitleColor(.white.withAlphaComponent(0.82), for: .normal)
-        button.setTitle("SEE HISTORY", for: .normal)
+        button.setTitle(DivoStrings.seeHistory, for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -119,7 +119,7 @@ final class CurrentAgencyView: UIView {
         // Обновление текста может попасть внутрь чужих animation-блоков (layoutIfNeeded),
         // поэтому делаем его явно без анимации и сразу фиксируем layout.
         UIView.performWithoutAnimation {
-            self.agencyNameLabel.text = name?.uppercased() ?? "UNKNOWN AGENCY"
+            self.agencyNameLabel.text = name?.uppercased() ?? DivoStrings.unknownAgency
             self.agencyNameLabel.layer.removeAllAnimations()
             self.layoutIfNeeded()
         }

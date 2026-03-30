@@ -1,5 +1,6 @@
 import UIKit
 import Display
+import TelegramCore
 
 struct AppearanceAttribute {
     let title: String
@@ -31,7 +32,7 @@ final class ProfileInfoView: UIView {
         let button = UIButton(type: .system)
         button.titleLabel?.font = Font.helveticaNeue(10)
         button.setTitleColor(.white, for: .normal)
-        button.setTitle("BIOGRAPHY", for: .normal)
+        button.setTitle(DivoStrings.biography, for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -40,7 +41,7 @@ final class ProfileInfoView: UIView {
         let button = UIButton(type: .system)
         button.titleLabel?.font = Font.helveticaNeue(10)
         button.setTitleColor(.white, for: .normal)
-        button.setTitle("APPEARANCE", for: .normal)
+        button.setTitle(DivoStrings.appearance, for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -86,7 +87,7 @@ final class ProfileInfoView: UIView {
         let button = UIButton(type: .system)
         button.titleLabel?.font = Font.helveticaNeue(10)
         button.setTitleColor(.white, for: .normal)
-        button.setTitle("SEE MORE", for: .normal)
+        button.setTitle(DivoStrings.seeMore, for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -292,7 +293,7 @@ final class ProfileInfoView: UIView {
             shouldShowSeeMore = appearanceData.count > 4
         }
 
-        let newTitle = isExpanded ? "SEE LESS" : "SEE MORE"
+        let newTitle = isExpanded ? DivoStrings.seeLess : DivoStrings.seeMore
         if animated {
             UIView.transition(with: seeMoreButton, duration: 0.25, options: .transitionCrossDissolve) {
                 self.seeMoreButton.setTitle(newTitle, for: .normal)

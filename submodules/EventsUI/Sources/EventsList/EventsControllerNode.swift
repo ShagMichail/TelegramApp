@@ -50,8 +50,7 @@ final class EventsControllerNode: ASDisplayNode {
 
         self.view.backgroundColor = .white
 
-        titleLabel.text = presentationData.strings.Events_TabTitle.uppercased()
-
+        titleLabel.text = DivoStrings.navEvents
         let flowLayout = UICollectionViewFlowLayout()
 
         self.collectionView = UICollectionView(frame: .zero, collectionViewLayout: flowLayout)
@@ -71,6 +70,9 @@ final class EventsControllerNode: ASDisplayNode {
 
         self.didSetReady = true
         self._ready.set(true)
+        NotificationCenter.default.addObserver(forName: DivoStrings.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.titleLabel.text = DivoStrings.navEvents
+        }
     }
 
     func showShimmer(navigationBarHeight: CGFloat) {

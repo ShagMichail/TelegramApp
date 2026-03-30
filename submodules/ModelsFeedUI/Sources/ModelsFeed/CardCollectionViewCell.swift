@@ -144,7 +144,7 @@ final class CardCollectionViewCell: UICollectionViewCell {
     private let statusLabel: UILabel = {//TODO:
         let label = UILabel()
         label.textColor = .white
-        label.text = "♦️ model"
+        label.text = DivoStrings.statusModel
         label.font = UIFont.systemFont(ofSize: 14)
         return label
     }()
@@ -238,7 +238,7 @@ final class CardCollectionViewCell: UICollectionViewCell {
 
         let label: UILabel = {
             let label = UILabel()
-            label.text = "Send DM"
+            label.text = DivoStrings.sendDM
             label.textColor = .white
             label.font = Font.helveticaNeue(13)
             label.translatesAutoresizingMaskIntoConstraints = false

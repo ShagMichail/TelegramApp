@@ -1,10 +1,11 @@
 import UIKit
+import TelegramCore
 
 final class MyProfilePlaceholderCell: UICollectionViewCell {
 
     private let label: UILabel = {
         let l = UILabel()
-        l.text = "Перейти в мой профиль"
+        l.text = DivoStrings.goToMyProfile
         l.textColor = UIColor(white: 0.15, alpha: 1)
         l.font = UIFont.systemFont(ofSize: 16, weight: .medium)
         l.textAlignment = .left

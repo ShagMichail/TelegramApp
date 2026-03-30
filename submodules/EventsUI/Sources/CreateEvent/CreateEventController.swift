@@ -50,7 +50,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
 
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
 
-        self.title = "Create event"
+        self.title = DivoStrings.createEvent
 
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
 
@@ -81,7 +81,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
         self.navigationBar?.updatePresentationData(NavigationBarPresentationData(presentationData: self.presentationData), transition: .immediate)
 
-        self.title = "Create event"
+        self.title = DivoStrings.createEvent
 
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
     }
