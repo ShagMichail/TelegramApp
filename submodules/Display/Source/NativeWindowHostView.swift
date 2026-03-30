@@ -4,13 +4,7 @@ import SwiftSignalKit
 
 private let orientationChangeDuration: Double = UIDevice.current.userInterfaceIdiom == .pad ? 0.4 : 0.3
 
-private let defaultOrientations: UIInterfaceOrientationMask = {
-    if UIDevice.current.userInterfaceIdiom == .pad {
-        return .all
-    } else {
-        return .allButUpsideDown
-    }
-}()
+private let defaultOrientations: UIInterfaceOrientationMask = UIDevice.current.userInterfaceIdiom == .pad ? .all : .portrait
 
 func getCurrentViewInterfaceOrientation(view: UIView) -> UIInterfaceOrientation {
     var orientation: UIInterfaceOrientation = .portrait
