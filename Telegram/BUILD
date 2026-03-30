@@ -1735,7 +1735,7 @@ ios_application(
     bundle_id = "{telegram_bundle_id}".format(
         telegram_bundle_id = telegram_bundle_id,
     ),
-    families = ["iphone", "ipad"],
+    families = ["iphone"],
     minimum_os_version = minimum_os_version,
     provisioning_profile = select({
         ":disableProvisioningProfilesSetting": None,
