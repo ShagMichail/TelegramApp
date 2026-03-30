@@ -5,6 +5,7 @@ public final class DivoAPIClient {
 
     private let session: URLSession
     private let baseURL: URL
+    private let logger = DivoRequestLogger.shared
 
     private init() {
         self.baseURL = DivoConfig.baseURL
@@ -32,23 +33,54 @@ public final class DivoAPIClient {
         request.setValue(DivoConfig.appPlatform, forHTTPHeaderField: "app-platform")
         request.setValue(DivoConfig.appVersion, forHTTPHeaderField: "app-version")
 
+        var requestBodyString: String?
         if let body = body {
-            request.httpBody = try JSONEncoder().encode(body)
+            let encoded = try JSONEncoder().encode(body)
+            request.httpBody = encoded
+            requestBodyString = String(data: encoded, encoding: .utf8)
         }
 
-        let (data, response) = try await session.data(for: request)
+        let start = CFAbsoluteTimeGetCurrent()
+        do {
+            let (data, response) = try await session.data(for: request)
+            let duration = CFAbsoluteTimeGetCurrent() - start
+            let http = response as? HTTPURLResponse
+            let responseString = String(data: data.prefix(4096), encoding: .utf8)
 
-        guard let http = response as? HTTPURLResponse else {
-            throw DivoAPIError.unknown
+            logger.log(
+                method: method,
+                path: path,
+                statusCode: http?.statusCode,
+                duration: duration,
+                requestBody: requestBodyString,
+                responseBody: responseString
+            )
+
+            guard let http = http else {
+                throw DivoAPIError.unknown
+            }
+
+            guard (200...299).contains(http.statusCode) else {
+                let body = String(data: data, encoding: .utf8) ?? ""
+                print("❌ API Error [\(http.statusCode)] \(url.absoluteString): \(body)")
+                throw DivoAPIError.httpError(statusCode: http.statusCode, body: body)
+            }
+
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            let duration = CFAbsoluteTimeGetCurrent() - start
+            if !(error is DivoAPIError) {
+                logger.log(
+                    method: method,
+                    path: path,
+                    statusCode: nil,
+                    duration: duration,
+                    requestBody: requestBodyString,
+                    error: error.localizedDescription
+                )
+            }
+            throw error
         }
-
-        guard (200...299).contains(http.statusCode) else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            print("❌ API Error [\(http.statusCode)] \(url.absoluteString): \(body)")
-            throw DivoAPIError.httpError(statusCode: http.statusCode, body: body)
-        }
-
-        return try JSONDecoder().decode(T.self, from: data)
     }
 
     public func requestRawData(
@@ -65,22 +97,52 @@ public final class DivoAPIClient {
         request.setValue(DivoConfig.appPlatform, forHTTPHeaderField: "app-platform")
         request.setValue(DivoConfig.appVersion, forHTTPHeaderField: "app-version")
 
+        var requestBodyString: String?
         if let body = body {
-            request.httpBody = try JSONEncoder().encode(body)
+            let encoded = try JSONEncoder().encode(body)
+            request.httpBody = encoded
+            requestBodyString = String(data: encoded, encoding: .utf8)
         }
 
-        let (data, response) = try await session.data(for: request)
+        let start = CFAbsoluteTimeGetCurrent()
+        do {
+            let (data, response) = try await session.data(for: request)
+            let duration = CFAbsoluteTimeGetCurrent() - start
+            let http = response as? HTTPURLResponse
 
-        guard let http = response as? HTTPURLResponse else {
-            throw DivoAPIError.unknown
+            logger.log(
+                method: method,
+                path: path,
+                statusCode: http?.statusCode,
+                duration: duration,
+                requestBody: requestBodyString,
+                responseBody: String(data: data.prefix(4096), encoding: .utf8)
+            )
+
+            guard let http = http else {
+                throw DivoAPIError.unknown
+            }
+
+            guard (200...299).contains(http.statusCode) else {
+                let body = String(data: data, encoding: .utf8) ?? ""
+                throw DivoAPIError.httpError(statusCode: http.statusCode, body: body)
+            }
+
+            return data
+        } catch {
+            let duration = CFAbsoluteTimeGetCurrent() - start
+            if !(error is DivoAPIError) {
+                logger.log(
+                    method: method,
+                    path: path,
+                    statusCode: nil,
+                    duration: duration,
+                    requestBody: requestBodyString,
+                    error: error.localizedDescription
+                )
+            }
+            throw error
         }
-
-        guard (200...299).contains(http.statusCode) else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            throw DivoAPIError.httpError(statusCode: http.statusCode, body: body)
-        }
-
-        return data
     }
 
     public func upload<T: Decodable>(
@@ -92,40 +154,68 @@ public final class DivoAPIClient {
         let url = URL(string: baseURL.absoluteString + path)!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        
+
         let boundary = "Boundary-\(UUID().uuidString)"
-        
+
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(DivoConfig.accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue(DivoConfig.appPlatform, forHTTPHeaderField: "app-platform")
         request.setValue(DivoConfig.appVersion, forHTTPHeaderField: "app-version")
-        
+
         var body = Data()
-        
+
         let fieldName = "file"
-        
+
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
-        
+
         body.append(fileData)
         body.append("\r\n".data(using: .utf8)!)
-        
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-        let (data, response) = try await session.upload(for: request, from: body)
-        
-        guard let http = response as? HTTPURLResponse else {
-            throw DivoAPIError.unknown
-        }
-        
-        guard (200...299).contains(http.statusCode) else {
-            let body = String(data: data, encoding: .utf8) ?? ""
-            print("❌ Upload Error [\(http.statusCode)]: \(body)")
-            throw DivoAPIError.httpError(statusCode: http.statusCode, body: body)
-        }
 
-        return try JSONDecoder().decode(T.self, from: data)
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+
+        let start = CFAbsoluteTimeGetCurrent()
+        do {
+            let (data, response) = try await session.upload(for: request, from: body)
+            let duration = CFAbsoluteTimeGetCurrent() - start
+            let http = response as? HTTPURLResponse
+
+            logger.log(
+                method: "POST (upload)",
+                path: path,
+                statusCode: http?.statusCode,
+                duration: duration,
+                requestBody: "\(fileName) (\(fileData.count) bytes)",
+                responseBody: String(data: data.prefix(4096), encoding: .utf8)
+            )
+
+            guard let http = http else {
+                throw DivoAPIError.unknown
+            }
+
+            guard (200...299).contains(http.statusCode) else {
+                let body = String(data: data, encoding: .utf8) ?? ""
+                print("❌ Upload Error [\(http.statusCode)]: \(body)")
+                throw DivoAPIError.httpError(statusCode: http.statusCode, body: body)
+            }
+
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            let duration = CFAbsoluteTimeGetCurrent() - start
+            if !(error is DivoAPIError) {
+                logger.log(
+                    method: "POST (upload)",
+                    path: path,
+                    statusCode: nil,
+                    duration: duration,
+                    requestBody: "\(fileName) (\(fileData.count) bytes)",
+                    error: error.localizedDescription
+                )
+            }
+            throw error
+        }
     }
 }
 

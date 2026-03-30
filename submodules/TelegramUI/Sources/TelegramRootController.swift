@@ -33,6 +33,7 @@ import PeerInfoScreen
 import PeerInfoStoryGridScreen
 import ShareWithPeersScreen
 import ChatEmptyNode
+import DebugScreenUI
 
 private class DetailsChatPlaceholderNode: ASDisplayNode, NavigationDetailsPlaceholderNode {
     private var presentationData: PresentationData
@@ -93,6 +94,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     
     private var applicationInFocusDisposable: Disposable?
     private var storyUploadEventsDisposable: Disposable?
+    private var debugShakeObserver: NSObjectProtocol?
     
     override public var minimizedContainer: MinimizedContainer? {
         didSet {
@@ -140,6 +142,14 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
                 moveStorySource(engine: self.context.engine, peerId: self.context.account.peerId, from: Int64(stableId), to: Int64(id))
             })
         }
+
+        self.debugShakeObserver = NotificationCenter.default.addObserver(
+            forName: Notification.Name("DivoDebugShake"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.openDebugScreen()
+        }
     }
     
     required public init(coder aDecoder: NSCoder) {
@@ -151,6 +161,14 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         self.presentationDataDisposable?.dispose()
         self.applicationInFocusDisposable?.dispose()
         self.storyUploadEventsDisposable?.dispose()
+        if let observer = self.debugShakeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    private func openDebugScreen() {
+        let controller = DebugMenuController(context: self.context)
+        self.pushViewController(controller, animated: true)
     }
     
     public func getContactsController() -> ViewController? {
