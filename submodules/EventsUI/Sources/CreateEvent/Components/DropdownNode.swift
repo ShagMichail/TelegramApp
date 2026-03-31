@@ -1,6 +1,7 @@
 import UIKit
 import AsyncDisplayKit
 import Display
+import TelegramCore
 
 final class DropdownNode: ASDisplayNode {
 
@@ -100,7 +101,7 @@ final class DropdownNode: ASDisplayNode {
     private func updateTitleText() {
         let text: String
         if isLoading {
-            text = "Loading..."
+            text = DivoStrings.loading
         } else if allowsMultipleSelection {
             if selectedValues.isEmpty {
                 text = placeholder

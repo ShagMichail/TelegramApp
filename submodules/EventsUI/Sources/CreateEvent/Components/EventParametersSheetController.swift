@@ -1,9 +1,10 @@
 import UIKit
 import Display
+import TelegramCore
 
 final class EventParametersSheetController: UIViewController, UITableViewDelegate, UITableViewDataSource {
     
-    private let sheetTitle = "PARAMETERS"
+    private var sheetTitle: String { DivoStrings.parametersTitle }
     private var allParameters = EventParameter.allCases
     private var selectedParameters: Set<EventParameter>
     private let onSave: (Set<EventParameter>) -> Void
@@ -39,20 +40,20 @@ final class EventParametersSheetController: UIViewController, UITableViewDelegat
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(titleLabel)
         
-        cancelButton.setTitle("Cancel", for: .normal)
+        cancelButton.setTitle(DivoStrings.cancel, for: .normal)
         cancelButton.setTitleColor(accentColor, for: .normal)
         cancelButton.translatesAutoresizingMaskIntoConstraints = false
         cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
         view.addSubview(cancelButton)
         
-        saveButton.setTitle("Save", for: .normal)
+        saveButton.setTitle(DivoStrings.save, for: .normal)
         saveButton.setTitleColor(accentColor, for: .normal)
         saveButton.translatesAutoresizingMaskIntoConstraints = false
         saveButton.addTarget(self, action: #selector(saveTapped), for: .touchUpInside)
         view.addSubview(saveButton)
         
         let subtitle = UILabel()
-        subtitle.text = "Choose Parameters for Applying"
+        subtitle.text = DivoStrings.chooseParametersForApplying
         subtitle.font = Font.semibold(16)
         subtitle.textColor = UIColor(hexString: "#17181C")
         subtitle.translatesAutoresizingMaskIntoConstraints = false
@@ -106,7 +107,7 @@ final class EventParametersSheetController: UIViewController, UITableViewDelegat
         
         if indexPath.row == 0 {
             let isAllSelected = selectedParameters.count == allParameters.count
-            cell.configure(title: "All Members", isSelected: isAllSelected)
+            cell.configure(title: DivoStrings.allMembers, isSelected: isAllSelected)
         } else {
             let param = allParameters[indexPath.row - 1]
             let isSelected = selectedParameters.contains(param)

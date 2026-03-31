@@ -416,6 +416,25 @@ public enum DivoStrings {
     public static var debugHips: String { L(en: "Hips", ru: "Бёдра", es: "Caderas", pt: "Quadris", zh: "臀围") }
     public static var debugShoes: String { L(en: "Shoes", ru: "Обувь", es: "Zapatos", pt: "Sapatos", zh: "鞋码") }
 
+    // MARK: - Create/Edit Event
+
+    public static var uploadPhoto: String { L(en: "Upload photo", ru: "Загрузить фото", es: "Subir foto", pt: "Enviar foto", zh: "上传照片") }
+    public static var descriptionEvent: String { L(en: "Description event", ru: "Описание мероприятия", es: "Descripción del evento", pt: "Descrição do evento", zh: "活动描述") }
+    public static var eventGallery: String { L(en: "Event Gallery", ru: "Галерея мероприятия", es: "Galería del evento", pt: "Galeria do evento", zh: "活动相册") }
+    public static var parametersTitle: String { L(en: "PARAMETERS", ru: "ПАРАМЕТРЫ", es: "PARÁMETROS", pt: "PARÂMETROS", zh: "参数") }
+    public static var chooseParametersForApplying: String { L(en: "Choose Parameters for Applying", ru: "Выберите параметры для подачи заявки", es: "Elija parámetros para la solicitud", pt: "Escolha parâmetros para candidatura", zh: "选择申请参数") }
+    public static var allMembers: String { L(en: "All Members", ru: "Все участники", es: "Todos los miembros", pt: "Todos os membros", zh: "所有成员") }
+    public static var breastCm: String { L(en: "Breast (cm)", ru: "Грудь (см)", es: "Pecho (cm)", pt: "Busto (cm)", zh: "胸围（厘米）") }
+    public static var eventSuccessfullyCreated: String { L(en: "Event successfully created!", ru: "Мероприятие успешно создано!", es: "¡Evento creado con éxito!", pt: "Evento criado com sucesso!", zh: "活动创建成功！") }
+    public static var eventSuccessfullyUpdated: String { L(en: "Event successfully updated!", ru: "Мероприятие успешно обновлено!", es: "¡Evento actualizado con éxito!", pt: "Evento atualizado com sucesso!", zh: "活动更新成功！") }
+    public static var unknownError: String { L(en: "Unknown error", ru: "Неизвестная ошибка", es: "Error desconocido", pt: "Erro desconhecido", zh: "未知错误") }
+    public static var failedToLoadEventData: String { L(en: "Failed to load event data", ru: "Не удалось загрузить данные мероприятия", es: "Error al cargar datos del evento", pt: "Falha ao carregar dados do evento", zh: "无法加载活动数据") }
+    public static var failedToUploadCover: String { L(en: "Failed to upload cover photo", ru: "Не удалось загрузить обложку", es: "Error al subir la foto de portada", pt: "Falha ao enviar a foto de capa", zh: "上传封面照片失败") }
+    public static var unknownCity: String { L(en: "Unknown city", ru: "Неизвестный город", es: "Ciudad desconocida", pt: "Cidade desconhecida", zh: "未知城市") }
+    public static var tbd: String { "TBD" }
+    public static var failedToUpdateEvent: String { L(en: "Failed to update event", ru: "Не удалось обновить мероприятие", es: "Error al actualizar el evento", pt: "Falha ao atualizar o evento", zh: "更新活动失败") }
+    public static var failedToCreateEvent: String { L(en: "Failed to create event", ru: "Не удалось создать мероприятие", es: "Error al crear el evento", pt: "Falha ao criar o evento", zh: "创建活动失败") }
+
     // MARK: - Helpers
 
     private static func pluralRu(_ n: Int, _ one: String, _ few: String, _ many: String) -> String {

@@ -216,7 +216,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         self.aboutEventLabel = ASTextNode()
         self.aboutEventLabel.attributedText = NSAttributedString(string: DivoStrings.aboutEvent, font: regularFont, textColor: labelColor)
 
-        self.aboutEventTextField = getEditableText(placeholder: "Description event")
+        self.aboutEventTextField = getEditableText(placeholder: DivoStrings.descriptionEvent)
 
         let eventTypeDropdown = DropdownNode(
             title: DivoStrings.eventType,
@@ -256,7 +256,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         self.applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
 
         self.eventGalleryLabel = ASTextNode()
-        self.eventGalleryLabel.attributedText = NSAttributedString(string: "Event Gallery", font: semiboldFont, textColor: headerColor)
+        self.eventGalleryLabel.attributedText = NSAttributedString(string: DivoStrings.eventGallery, font: semiboldFont, textColor: headerColor)
 
         super.init()
         self.nameEventTextField.textField.delegate = self
@@ -840,8 +840,8 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         case .gender:
             if genderDropdown == nil {
                 genderDropdown = DropdownNode(
-                    title: "Gender",
-                    placeholder: "Select Gender",
+                    title: DivoStrings.gender,
+                    placeholder: DivoStrings.selectGender,
                     options: [],
                     backgroundColor: UIColor(hexString: "#EFEFF0"),
                     placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
@@ -855,7 +855,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
             return genderDropdown!
         case .age:
             let singleAgeSlider = AgeSliderNode<Int>(
-                title: "Age (y.o)",
+                title: DivoStrings.ageYo,
                 type: "y.o",
                 mode: .range(minValue: 17, maxValue: 30),
                 minimumValue: 14,
@@ -869,7 +869,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
             return ageSlider!
         case .height:
             let singleHeightSlider = AgeSliderNode<Double>(
-                title: "Height (cm)",
+                title: DivoStrings.heightCm,
                 type: "cm",
                 mode: .range(minValue: 1.78, maxValue: 2.20),
                 minimumValue: 1.68,
@@ -884,7 +884,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
             return heightSlider!
         case .weight:
             let singleWeightSlider = AgeSliderNode<Double>(
-                title: "Weight (kg)",
+                title: DivoStrings.weightKg,
                 type: "kg",
                 mode: .range(minValue: 50, maxValue: 70),
                 minimumValue: 48,
@@ -899,7 +899,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
             return weightSlider!
         case .breast:
             let singleBreastSlider = AgeSliderNode<Double>(
-                title: "Breast (cm)",
+                title: DivoStrings.breastCm,
                 type: "cm",
                 mode: .range(minValue: 70, maxValue: 100),
                 minimumValue: 60,
@@ -914,7 +914,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
             return breastSlider!
         case .waist:
             let singleWaistSlider = AgeSliderNode<Double>(
-                title: "Waist (cm)",
+                title: DivoStrings.waistCm,
                 type: "cm",
                 mode: .range(minValue: 55, maxValue: 85),
                 minimumValue: 48,
@@ -929,7 +929,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
             return waistSlider!
         case .hips:
             let singleHipsSlider = AgeSliderNode<Double>(
-                title: "Hips (cm)",
+                title: DivoStrings.hipsCm,
                 type: "cm",
                 mode: .range(minValue: 90, maxValue: 100),
                 minimumValue: 80,
@@ -944,7 +944,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
             return hipsSlider!
         case .shoeSize:
             let singleShoeSizeSlider = AgeSliderNode<Double>(
-                title: "Shoe size (EU)",
+                title: DivoStrings.shoeSizeEU,
                 type: "",
                 mode: .range(minValue: 37, maxValue: 38),
                 minimumValue: 36,
@@ -964,8 +964,8 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         case .hairLength:
             if hairLengthDropdown == nil {
                 hairLengthDropdown = DropdownNode(
-                    title: "Hair length",
-                    placeholder: "Select hair length",
+                    title: DivoStrings.hairLength,
+                    placeholder: DivoStrings.chooseHairLength,
                     options: [],
                     backgroundColor: UIColor(hexString: "#EFEFF0"),
                     placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
@@ -980,8 +980,8 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         case .hairColor:
             if hairColorDropdown == nil {
                 hairColorDropdown = DropdownNode(
-                    title: "Hair color",
-                    placeholder: "Select hair color",
+                    title: DivoStrings.hairColor,
+                    placeholder: DivoStrings.chooseHairColor,
                     options: [],
                     backgroundColor: UIColor(hexString: "#EFEFF0"),
                     placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
@@ -996,8 +996,8 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         case .eyeColor:
             if eyeColorDropdown == nil {
                 eyeColorDropdown = DropdownNode(
-                    title: "Eye color",
-                    placeholder: "Select eye color",
+                    title: DivoStrings.eyeColor,
+                    placeholder: DivoStrings.chooseEyeColor,
                     options: [],
                     backgroundColor: UIColor(hexString: "#EFEFF0"),
                     placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
@@ -1012,8 +1012,8 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         case .skinColor:
             if skinColorDropdown == nil {
                 skinColorDropdown = DropdownNode(
-                    title: "Skin color",
-                    placeholder: "Select skin color",
+                    title: DivoStrings.skinColor,
+                    placeholder: DivoStrings.chooseSkinColor,
                     options: [],
                     backgroundColor: UIColor(hexString: "#EFEFF0"),
                     placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),

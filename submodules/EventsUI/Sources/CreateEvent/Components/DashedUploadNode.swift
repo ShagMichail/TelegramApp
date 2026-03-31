@@ -1,5 +1,6 @@
 import AsyncDisplayKit
 import Display
+import TelegramCore
 
 final class DashedUploadNode: ASControlNode {
     private let titleNode = ASTextNode()
@@ -18,7 +19,7 @@ final class DashedUploadNode: ASControlNode {
         
         // Настройка текста
         titleNode.attributedText = NSAttributedString(
-            string: "Upload photo",
+            string: DivoStrings.uploadPhoto,
             font: Font.regular(16),
             textColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6) ?? .gray
         )

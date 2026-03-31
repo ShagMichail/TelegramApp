@@ -64,7 +64,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
 
         let createFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 16) ?? UIFont.systemFont(ofSize: 16, weight: .bold)
-        let buttonTitle = isEditMode ? "Save" : "Create"
+        let buttonTitle = isEditMode ? DivoStrings.save : DivoStrings.createEventButton
         let createButton = UIBarButtonItem(
             title: buttonTitle,
             style: .plain,
@@ -229,7 +229,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
                 self.createEventNode.configureAppearanceDictionaries(response.data)
             } catch {
                 print("❌ Error loading appearance dictionary: \(error)")
-                self.showAlert(text: "Failed to load appearance options.")
+                self.showAlert(text: DivoStrings.failedToLoadAppearance)
             }
         }
     }
@@ -245,7 +245,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
                 self.createEventNode.configureGenderDictionaries(response)
             } catch {
                 print("❌ Error loading appearance dictionary: \(error)")
-                self.showAlert(text: "Failed to load appearance options.")
+                self.showAlert(text: DivoStrings.failedToLoadAppearance)
             }
         }
     }
@@ -263,7 +263,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
                 }
             } catch {
                 print("❌ Error loading event data: \(error)")
-                self.showAlert(text: "Failed to load event data: \(error.localizedDescription)")
+                self.showAlert(text: DivoStrings.failedToLoadEventData + ": \(error.localizedDescription)")
             }
         }
     }
@@ -292,7 +292,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
             } catch {
                 await MainActor.run {
                     self.createEventNode.currentPhoto = nil
-                    self.showAlert(text: "Failed to upload cover photo: \(error.localizedDescription)")
+                    self.showAlert(text: DivoStrings.failedToUploadCover + ": \(error.localizedDescription)")
                 }
             }
         }
@@ -342,7 +342,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
                     if response.errors == nil || response.errors?.isEmpty == true {
                         self.onEventCreated?()
 
-                        let successMessage = isEditMode ? "Event successfully updated!" : "Event successfully created!"
+                        let successMessage = isEditMode ? DivoStrings.eventSuccessfullyUpdated : DivoStrings.eventSuccessfullyCreated
                         self.showAlert(text: successMessage) { [weak self] in
                             guard let self = self else { return }
                             if let nav = self.navigationController as? NavigationController {
@@ -352,14 +352,15 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
                             }
                         }
                     } else {
-                        let errorMsg = response.errors?.joined(separator: "\n") ?? "Unknown error"
+                        let errorMsg = response.errors?.joined(separator: "\n") ?? DivoStrings.unknownError
                         self.showAlert(text: errorMsg)
                     }
 
                 } catch {
                     self.navigationItem.rightBarButtonItem?.isEnabled = true
                     print("❌ Error \(isEditMode ? "updating" : "creating") event: \(error)")
-                    self.showAlert(text: "Failed to \(isEditMode ? "update" : "create") event: \(error.localizedDescription)")
+                    let failMsg = isEditMode ? DivoStrings.failedToUpdateEvent : DivoStrings.failedToCreateEvent
+                    self.showAlert(text: failMsg + ": \(error.localizedDescription)")
                 }
             }
 
@@ -451,7 +452,7 @@ extension CreateEventController: PHPickerViewControllerDelegate {
             } catch {
                 await MainActor.run {
                     self.createEventNode.cancelPhotoUpload(item: item)
-                    self.showAlert(text: "Failed to upload photo: \(error.localizedDescription)")
+                    self.showAlert(text: DivoStrings.failedToUploadPhoto + ": \(error.localizedDescription)")
                 }
             }
         }

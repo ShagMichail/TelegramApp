@@ -909,9 +909,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
             addWorkHistoryContainer.trailingAnchor.constraint(equalTo: contentViewStack.trailingAnchor, constant: -16),
             addWorkHistoryContainer.heightAnchor.constraint(equalToConstant: 36),
             addWorkHistoryButton.leadingAnchor.constraint(equalTo: addWorkHistoryContainer.leadingAnchor),
+            addWorkHistoryButton.trailingAnchor.constraint(lessThanOrEqualTo: addWorkHistoryContainer.trailingAnchor),
             addWorkHistoryButton.centerYAnchor.constraint(equalTo: addWorkHistoryContainer.centerYAnchor),
             addWorkHistoryButton.heightAnchor.constraint(equalToConstant: 36),
-            addWorkHistoryButton.widthAnchor.constraint(equalToConstant: 160),
         ])
         
         addWorkHistoryButton.addTarget(self, action: #selector(addWorkHistoryTapped), for: .touchUpInside)
