@@ -150,19 +150,19 @@ public final class PublicProfileScreenController: TelegramBaseController {
         // debug: removed
 
         var items: [EditMenuViewController.MenuItem] = [
-            .init(title: "Edit Profile", action: { [weak self] in
+            .init(title: DivoStrings.editProfile, action: { [weak self] in
                 self?.navigateToEditProfile()
             }),
-            .init(title: "Change Profile Background", action: { [weak self] in
+            .init(title: DivoStrings.changeBackground, action: { [weak self] in
                 self?.navigateToChangeBackground()
             }),
-            .init(title: "Edit Social Links", action: { [weak self] in
+            .init(title: DivoStrings.editSocialLinksMenu, action: { [weak self] in
                 self?.navigateToEditSocialLinks()
             })
         ]
 
         if self.userRole != .agency {
-            items.append(.init(title: "Manage Work Experience", action: { [weak self] in
+            items.append(.init(title: DivoStrings.manageWorkExperience, action: { [weak self] in
                 self?.navigateToManageExperience()
             }))
         } else {
@@ -171,13 +171,13 @@ public final class PublicProfileScreenController: TelegramBaseController {
             }))
         }
 
-        items.append(.init(title: "Add Photo", action: { [weak self] in
+        items.append(.init(title: DivoStrings.addPhoto, action: { [weak self] in
             if #available(iOS 14, *) {
                 self?.navigateToAddPhoto()
             }
         }))
 
-        items.append(.init(title: "Add Video", action: { [weak self] in
+        items.append(.init(title: DivoStrings.addVideo, action: { [weak self] in
             if #available(iOS 14, *) {
                 self?.navigateToAddVideo()
             }

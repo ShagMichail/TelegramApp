@@ -77,16 +77,18 @@ final class EditProfileNode: ASDisplayNode {
     
     private let biographyButton: UIButton = {
         let button = UIButton(type: .system)
-        button.setTitle("BIOGRAPHY", for: .normal)
+        button.setTitle(DivoStrings.biography, for: .normal)
         button.titleLabel?.font = Font.helveticaNeue(12)
+        button.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 22).isActive = true
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
-    
+
     private let appearanceButton: UIButton = {
         let button = UIButton(type: .system)
-        button.setTitle("APPEARANCE", for: .normal)
+        button.setTitle(DivoStrings.appearance, for: .normal)
         button.titleLabel?.font = Font.helveticaNeue(12)
+        button.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 22).isActive = true
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -245,18 +247,18 @@ final class EditProfileNode: ASDisplayNode {
         var bioTitle = ""
         var bio = ""
         if model?.role == "agency_employee" {
-            name = model?.agency?.title ?? "Name"
-            placeholder = "Agency name"
-            bioTitle = "Description"
-            bio = model?.agency?.description ?? "Fill in the information about the agency"
-            self.biographyButton.setTitle("DESCRIPTION", for: .normal)
+            name = model?.agency?.title ?? DivoStrings.name
+            placeholder = DivoStrings.agencyName
+            bioTitle = DivoStrings.descriptionTitle
+            bio = model?.agency?.description ?? DivoStrings.fillInInfoAboutAgency
+            self.biographyButton.setTitle(DivoStrings.description_, for: .normal)
             self.biographyButton.isUserInteractionEnabled = false
         } else {
-            name = model?.fullName ?? "Name"
-            placeholder = "Full name"
-            bioTitle = "Biography"
-            bio = model?.model?.description ?? "Fill in the information about you"
-            self.biographyButton.setTitle("BIOGRAPHY", for: .normal)
+            name = model?.fullName ?? DivoStrings.name
+            placeholder = DivoStrings.fullName
+            bioTitle = DivoStrings.biographyTitle
+            bio = model?.model?.description ?? DivoStrings.fillInInfoAboutYou
+            self.biographyButton.setTitle(DivoStrings.biography, for: .normal)
             self.biographyButton.isUserInteractionEnabled = true
         }
         
@@ -267,57 +269,57 @@ final class EditProfileNode: ASDisplayNode {
         
         self.aboutEventTextField = DivoTextView(title: bioTitle, initialText: bio)
 
-        let currentGender = model?.gender?.title ?? "Loading..."
-        self.genderDropdown = DropdownNode(title: "Gender", placeholder: "Select a Gender", options: [currentGender])
+        let currentGender = model?.gender?.title ?? DivoStrings.loading
+        self.genderDropdown = DropdownNode(title: DivoStrings.gender, placeholder: DivoStrings.selectGender, options: [currentGender])
         self.genderDropdown.selectedValue = self.model?.gender?.title
         
         self.ageSlider = AgeSliderNode<Int>(
-            title: "Age (y.o)",
+            title: DivoStrings.ageYo,
             type: "y.o",
             mode: .single(value: 17),
             minimumValue: 14,
             maximumValue: 45,
             configuration: .default
         )
-        
+
         self.heightSlider = AgeSliderNode<Double>(
-            title: "Height (cm)",
+            title: DivoStrings.heightCm,
             type: "cm",
             mode: .single(value: Float(model?.model?.appearance?.height ?? 1.68)),
             minimumValue: 1.68,
             maximumValue: 2.50,
             configuration: .default
         )
-        
+
         self.weightSlider = AgeSliderNode<Double>(
-            title: "Weight (kg)",
+            title: DivoStrings.weightKg,
             type: "kg",
             mode: .single(value: Float(model?.model?.appearance?.weight ?? 50)),
             minimumValue: 48,
             maximumValue: 90,
             configuration: .default
         )
-        
+
         self.waistSlider = AgeSliderNode<Double>(
-            title: "Waist (cm)",
+            title: DivoStrings.waistCm,
             type: "cm",
             mode: .single(value: Float(model?.model?.appearance?.waist ?? 60)),
             minimumValue: 48,
             maximumValue: 90,
             configuration: .default
         )
-        
+
         self.hipsSlider = AgeSliderNode<Double>(
-            title: "Hips (cm)",
+            title: DivoStrings.hipsCm,
             type: "cm",
             mode: .single(value: Float(model?.model?.appearance?.hips ?? 91)),
             minimumValue: 80,
             maximumValue: 110,
             configuration: .default
         )
-        
+
         self.shoeSizeSlider = AgeSliderNode<Double>(
-            title: "Shoe size (EU)",
+            title: DivoStrings.shoeSizeEU,
             type: "",
             mode: .single(value: Float(model?.model?.appearance?.shoesSize ?? 37)),
             minimumValue: 36,
@@ -325,24 +327,24 @@ final class EditProfileNode: ASDisplayNode {
             configuration: .default
         )
 
-        let currentHairLength = model?.model?.appearance?.hairLength?.title ?? "Loading..."
-        let currentHairColor = model?.model?.appearance?.hairColor?.title ?? "Loading..."
-        let currentEyeColor = model?.model?.appearance?.eyeColor?.title ?? "Loading..."
-        let currentSkinColor = model?.model?.appearance?.skinColor?.title ?? "Loading..."
-        
-        self.hairLengthDropdown = DropdownNode(title: "Length hair", placeholder: "Choose your length hair", options: [currentHairLength])
-        self.hairColorDropdown = DropdownNode(title: "Hair color", placeholder: "Choose your hair color", options: [currentHairColor])
-        self.eyeColorDropdown = DropdownNode(title: "Eye color", placeholder: "Choose your eye color", options: [currentEyeColor])
-        self.skinColorDropdown = DropdownNode(title: "Skin color", placeholder: "Choose your skin color", options: [currentSkinColor])
+        let currentHairLength = model?.model?.appearance?.hairLength?.title ?? DivoStrings.loading
+        let currentHairColor = model?.model?.appearance?.hairColor?.title ?? DivoStrings.loading
+        let currentEyeColor = model?.model?.appearance?.eyeColor?.title ?? DivoStrings.loading
+        let currentSkinColor = model?.model?.appearance?.skinColor?.title ?? DivoStrings.loading
+
+        self.hairLengthDropdown = DropdownNode(title: DivoStrings.hairLength, placeholder: DivoStrings.chooseHairLength, options: [currentHairLength])
+        self.hairColorDropdown = DropdownNode(title: DivoStrings.hairColor, placeholder: DivoStrings.chooseHairColor, options: [currentHairColor])
+        self.eyeColorDropdown = DropdownNode(title: DivoStrings.eyeColor, placeholder: DivoStrings.chooseEyeColor, options: [currentEyeColor])
+        self.skinColorDropdown = DropdownNode(title: DivoStrings.skinColor, placeholder: DivoStrings.chooseSkinColor, options: [currentSkinColor])
         
         self.hairLengthDropdown.selectedValue = model?.model?.appearance?.hairLength?.title
         self.hairColorDropdown.selectedValue = model?.model?.appearance?.hairColor?.title
         self.eyeColorDropdown.selectedValue = model?.model?.appearance?.eyeColor?.title
         self.skinColorDropdown.selectedValue = model?.model?.appearance?.skinColor?.title
         
-        self.applyButton = ButtonWithIconNode(title: "Save", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
+        self.applyButton = ButtonWithIconNode(title: DivoStrings.save, icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
         self.applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
-        self.applyButtonAppearance = ButtonWithIconNode(title: "Save", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
+        self.applyButtonAppearance = ButtonWithIconNode(title: DivoStrings.save, icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
         self.applyButtonAppearance.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
         
         super.init()

@@ -1,5 +1,6 @@
 import UIKit
 import Display
+import TelegramCore
 import AccountContext
 
 struct ProfileChannelItem {
@@ -28,6 +29,7 @@ final class ChannelListCell: UICollectionViewCell {
         label.font = Font.helveticaNeue(16)
         label.textColor = UIColor(hex: "#222222")
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 26).isActive = true
         return label
     }()
 
@@ -45,6 +47,7 @@ final class ChannelListCell: UICollectionViewCell {
         label.font = Font.helveticaNeue(14)
         label.textColor = UIColor(hex: "#222222").withAlphaComponent(0.6)
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 24).isActive = true
         return label
     }()
 
@@ -92,7 +95,7 @@ final class ChannelListCell: UICollectionViewCell {
 
     func configure(with item: ProfileChannelItem, context: AccountContext) {
         titleLabel.text = item.title
-        subtitleLabel.text = "\(item.followersCount) followers"
+        subtitleLabel.text = DivoStrings.followersString(item.followersCount)
         premiumBadge.isHidden = !item.isPremium
         if let urlString = item.customAvatarURL, let url = URL(string: urlString) {
             avatarImageView.loadImage(from: url)

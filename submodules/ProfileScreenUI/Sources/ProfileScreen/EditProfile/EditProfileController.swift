@@ -61,7 +61,7 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
         
         self.statusBar.statusBarStyle = presentationData.theme.intro.statusBarStyle.style
         
-        self.title = "MY PROFILE"
+        self.title = DivoStrings.myProfile
         
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
         
@@ -104,13 +104,13 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
             badgeTextColor: .clear
         )
 
-        self.navigationBar?.updatePresentationData(NavigationBarPresentationData(theme: navTheme, strings: NavigationBarStrings(back: "Back", close: "Close")), transition: .immediate)
+        self.navigationBar?.updatePresentationData(NavigationBarPresentationData(theme: navTheme, strings: NavigationBarStrings(back: DivoStrings.back, close: DivoStrings.close)), transition: .immediate)
         
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
     }
     
     override public func loadDisplayNode() {
-        self.title = userDetailData?.role == "agency_employee" ? "AGENCY PROFILE" : "MY PROFILE"
+        self.title = userDetailData?.role == "agency_employee" ? DivoStrings.agencyProfile : DivoStrings.myProfile
 
         self.displayNode = EditProfileNode(
             context: self.context,
@@ -156,7 +156,7 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
             } catch {
                 print("❌ Error loading appearance dictionary: \(error)")
                 self.createEventNode.toggleSpinner(active: false)
-                self.showAlert(text: "Failed to load appearance options.")
+                self.showAlert(text: DivoStrings.failedToLoadAppearance)
             }
         }
     }
@@ -177,7 +177,7 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
             } catch {
                 print("❌ Error loading appearance dictionary: \(error)")
                 self.createEventNode.toggleSpinner(active: false)
-                self.showAlert(text: "Failed to load appearance options.")
+                self.showAlert(text: DivoStrings.failedToLoadAppearance)
             }
         }
     }
@@ -238,7 +238,7 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
             } catch {
                 self.createEventNode.setAvatarLoading(false)
                 print("❌ Avatar upload error: \(error)")
-                self.showAlert(text: "Failed to upload photo: \(error.localizedDescription)")
+                self.showAlert(text: "\(DivoStrings.failedToUploadPhoto): \(error.localizedDescription)")
             }
         }
     }
@@ -265,7 +265,7 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
                 print("✅ Profile successfully saved: \(response.message ?? "OK")")
                 self.delegate?.didUpdateProfileData()
                 self.createEventNode.toggleSpinner(active: false)
-                self.showAlert(text: "Profile updated")
+                self.showAlert(text: DivoStrings.profileUpdated)
                 
                 self.navigationController?.popViewController(animated: true)
                 
@@ -298,7 +298,7 @@ public class EditProfileController: ViewController, UINavigationControllerDelega
                 print("✅ Profile successfully saved: \(response.message ?? "OK")")
                 self.delegate?.didUpdateProfileData()
                 self.createEventNode.toggleSpinner(active: false)
-                self.showAlert(text: "Profile updated")
+                self.showAlert(text: DivoStrings.profileUpdated)
                 
                 self.navigationController?.popViewController(animated: true)
                 

@@ -64,6 +64,7 @@ final class VideoGalleryCell: UICollectionViewCell {
         label.numberOfLines = 2
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 22).isActive = true
         return label
     }()
 
@@ -82,6 +83,7 @@ final class VideoGalleryCell: UICollectionViewCell {
         label.textColor = .white
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 20).isActive = true
         return label
     }()
 
@@ -120,7 +122,8 @@ final class VideoGalleryCell: UICollectionViewCell {
         label.textAlignment = .center
         label.numberOfLines = 2
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.text = "Видео недоступно"
+        label.text = DivoStrings.videoUnavailable
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 20).isActive = true
         return label
     }()
 
@@ -450,7 +453,7 @@ final class VideoGalleryCell: UICollectionViewCell {
         guard retryCount < maxRetries, let url = currentVideoUrl else {
             shimmerTimeoutWorkItem?.cancel()
             hideShimmer()
-            showFallback(message: "Видео недоступно")
+            showFallback(message: DivoStrings.videoUnavailable)
             return
         }
 

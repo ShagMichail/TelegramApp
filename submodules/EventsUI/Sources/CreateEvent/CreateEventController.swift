@@ -59,19 +59,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
 
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
 
-        let titleLabel = UILabel()
-        let titleFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 20) ?? UIFont.systemFont(ofSize: 20, weight: .bold)
-        let titleText = isEditMode ? "EDIT EVENT" : "CREATE EVENT"
-        let titleAttr = NSAttributedString(string: titleText, attributes: [
-            .font: titleFont,
-            .foregroundColor: UIColor.black,
-            .kern: 0.5
-        ])
-
-        titleLabel.attributedText = titleAttr
-        titleLabel.textAlignment = .center
-        titleLabel.frame = CGRect(x: 0, y: 0, width: 200, height: 44)
-        self.navigationItem.titleView = titleLabel
+        self.title = DivoStrings.createEvent
 
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
 
@@ -114,6 +102,15 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
 
     deinit {
         self.presentationDataDisposable?.dispose()
+    }
+
+    private func updateThemeAndStrings() {
+        self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
+        self.navigationBar?.updatePresentationData(NavigationBarPresentationData(presentationData: self.presentationData), transition: .immediate)
+
+        self.title = DivoStrings.createEvent
+
+        self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
     }
 
     override public func loadDisplayNode() {
@@ -196,15 +193,6 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
         super.containerLayoutUpdated(layout, transition: transition)
 
         self.createEventNode.containerLayoutUpdated(layout, navigationBarHeight: self.cleanNavigationHeight, actualNavigationBarHeight: self.navigationLayout(layout: layout).navigationFrame.maxY, transition: transition)
-    }
-
-    private func updateThemeAndStrings() {
-        self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
-        self.navigationBar?.updatePresentationData(NavigationBarPresentationData(presentationData: self.presentationData), transition: .immediate)
-
-        self.title = "Create event"
-
-        self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
     }
 
     private func loadEventTypesList(offset: Int, limit: Int) {

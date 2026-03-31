@@ -121,7 +121,7 @@ final class EventDetailControllerNode: ASDisplayNode {
             direction: .vertical
         )
 
-        castingBadgeLabel.text = "Casting"
+        castingBadgeLabel.text = DivoStrings.casting
         castingBadgeLabel.font = .systemFont(ofSize: 12)
         castingBadgeLabel.textColor = .white
         castingBadgeLabel.backgroundColor = UIColor(white: 1.0, alpha: 0.3)
@@ -134,6 +134,7 @@ final class EventDetailControllerNode: ASDisplayNode {
         eventTitleLabel.font = Font.helveticaNeue(30)
         eventTitleLabel.textColor = .white
         eventTitleLabel.textAlignment = .center
+        eventTitleLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 42).isActive = true
 
         eventSubtitleLabel.text = "May 27 · 5:00 PM · 🇺🇸 New York"
         eventSubtitleLabel.font = .systemFont(ofSize: 14)
@@ -144,7 +145,7 @@ final class EventDetailControllerNode: ASDisplayNode {
         participantsLabel.font = .systemFont(ofSize: 24, weight: .regular)
         participantsLabel.textColor = .white
 
-        participantsSubtitleLabel.text = "participants"
+        participantsSubtitleLabel.text = DivoStrings.participants
         participantsSubtitleLabel.font = .systemFont(ofSize: 14)
         participantsSubtitleLabel.textColor = .white.withAlphaComponent(0.5)
 
@@ -152,12 +153,13 @@ final class EventDetailControllerNode: ASDisplayNode {
         viewsLabel.font = .systemFont(ofSize: 24, weight: .regular)
         viewsLabel.textColor = .white
 
-        viewsSubtitleLabel.text = "views"
+        viewsSubtitleLabel.text = DivoStrings.views
         viewsSubtitleLabel.font = .systemFont(ofSize: 14)
         viewsSubtitleLabel.textColor = .white.withAlphaComponent(0.5)
 
-        applyButton.setTitle("Apply", for: .normal)
+        applyButton.setTitle(DivoStrings.apply, for: .normal)
         applyButton.titleLabel?.font = Font.helveticaNeue(14)
+        applyButton.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 24).isActive = true
         applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
         applyButton.setTitleColor(.white, for: .normal)
         applyButton.layer.cornerRadius = 6
@@ -176,15 +178,15 @@ final class EventDetailControllerNode: ASDisplayNode {
         profileNameLabel.font = .systemFont(ofSize: 14, weight: .regular)
         profileNameLabel.textColor = UIColor(red: 0.73, green: 0.44, blue: 0.28, alpha: 1)
 
-        onlineStatusLabel.text = "Online"
+        onlineStatusLabel.text = DivoStrings.online
         onlineStatusLabel.font = .systemFont(ofSize: 14)
         onlineStatusLabel.textColor = UIColor(red: 0.55, green: 0.55, blue: 0.55, alpha: 1.00)
 
-        organizationLabel.text = "Organizatior"
+        organizationLabel.text = DivoStrings.organizer
         organizationLabel.font = .systemFont(ofSize: 14)
         organizationLabel.textColor = UIColor(red: 0.55, green: 0.55, blue: 0.55, alpha: 1.00)
 
-        aboutTitleLabel.text = "About"
+        aboutTitleLabel.text = DivoStrings.about
         aboutTitleLabel.font = .systemFont(ofSize: 10, weight: .regular)
         aboutTitleLabel.textColor = UIColor(red: 0.55, green: 0.55, blue: 0.55, alpha: 1.00)
 
@@ -193,11 +195,11 @@ final class EventDetailControllerNode: ASDisplayNode {
         aboutDescriptionLabel.textColor = UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.00)
         aboutDescriptionLabel.numberOfLines = 0
 
-        parametersTitleLabel.text = "Parameters for Applying"
+        parametersTitleLabel.text = DivoStrings.parametersForApplying
         parametersTitleLabel.font = .systemFont(ofSize: 10, weight: .regular)
         parametersTitleLabel.textColor = UIColor(red: 0.55, green: 0.55, blue: 0.55, alpha: 1.00)
 
-        heightLabel.text = "Height"
+        heightLabel.text = DivoStrings.height
         heightLabel.font = .systemFont(ofSize: 14)
         heightLabel.textColor = .black
         heightValueLabel.text = "1,72 - 2,1 cm"
@@ -206,7 +208,7 @@ final class EventDetailControllerNode: ASDisplayNode {
         heightIcon.image = UIImage(bundleImageName: "Chat/heightIcon")
         heightIcon.tintColor = .black
 
-        ageLabel.text = "Age"
+        ageLabel.text = DivoStrings.age
         ageLabel.font = .systemFont(ofSize: 14)
         ageLabel.textColor = .black
         ageValueLabel.text = "20-25 y.o"
@@ -215,7 +217,7 @@ final class EventDetailControllerNode: ASDisplayNode {
         ageIcon.image = UIImage(bundleImageName: "Chat/ageIcon")
         ageIcon.tintColor = .black
 
-        genderLabel.text = "Gender"
+        genderLabel.text = DivoStrings.gender
         genderLabel.font = .systemFont(ofSize: 14)
         genderLabel.textColor = .black
         genderValueLabel.text = "Only womans"
@@ -237,9 +239,10 @@ final class EventDetailControllerNode: ASDisplayNode {
         genderView.addSubview(genderLabel)
         genderView.addSubview(genderValueLabel)
 
-        previousEventsTitleLabel.text = "PREVIOUS EVENTS"
+        previousEventsTitleLabel.text = DivoStrings.previousEvents
         previousEventsTitleLabel.font = Font.helveticaNeue(20)
         previousEventsTitleLabel.textColor = UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.00)
+        previousEventsTitleLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 30).isActive = true
 
         previousEventsCollectionView.backgroundColor = .clear
         previousEventsCollectionView.dataSource = self

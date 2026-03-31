@@ -49,7 +49,7 @@ public final class EventsController: TelegramBaseController {
 
         let icon: UIImage?
         icon = UIImage(bundleImageName: "Chat List/Tabs/IconEvents")
-        self.tabBarItem.title = self.presentationData.strings.Events_TabTitle
+        self.tabBarItem.title = DivoStrings.tabEvents
         self.tabBarItem.image = icon
         self.tabBarItem.selectedImage = icon
 
@@ -69,6 +69,9 @@ public final class EventsController: TelegramBaseController {
         ) { [weak self] _ in
             self?.hasLoadedOnce = false
             self?.getEvents()
+        }
+        NotificationCenter.default.addObserver(forName: DivoStrings.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.tabBarItem.title = DivoStrings.tabEvents
         }
     }
 

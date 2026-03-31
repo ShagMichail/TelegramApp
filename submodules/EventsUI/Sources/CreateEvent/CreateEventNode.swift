@@ -206,21 +206,21 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         let semiboldFont = Font.semibold(16)
 
         self.eventInfoLabel = ASTextNode()
-        self.eventInfoLabel.attributedText = NSAttributedString(string: "Event info", font: semiboldFont, textColor: headerColor)
+        self.eventInfoLabel.attributedText = NSAttributedString(string: DivoStrings.eventInfo, font: semiboldFont, textColor: headerColor)
 
         self.nameEventLabel = ASTextNode()
-        self.nameEventLabel.attributedText = NSAttributedString(string: "Name event", font: regularFont, textColor: labelColor)
+        self.nameEventLabel.attributedText = NSAttributedString(string: DivoStrings.nameEvent, font: regularFont, textColor: labelColor)
 
-        self.nameEventTextField = getTextFiel(title: "Enter name event")
+        self.nameEventTextField = getTextFiel(title: DivoStrings.enterNameEvent)
 
         self.aboutEventLabel = ASTextNode()
-        self.aboutEventLabel.attributedText = NSAttributedString(string: "About event", font: regularFont, textColor: labelColor)
+        self.aboutEventLabel.attributedText = NSAttributedString(string: DivoStrings.aboutEvent, font: regularFont, textColor: labelColor)
 
         self.aboutEventTextField = getEditableText(placeholder: "Description event")
 
         let eventTypeDropdown = DropdownNode(
-            title: "Event type",
-            placeholder: "Choose event type",
+            title: DivoStrings.eventType,
+            placeholder: DivoStrings.chooseEventType,
             options: [],
             backgroundColor: UIColor(hexString: "#EFEFF0"),
             placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
@@ -233,26 +233,26 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         self.eventTypeDropdown = eventTypeDropdown
 
         self.eventDateLabel = ASTextNode()
-        self.eventDateLabel.attributedText = NSAttributedString(string: "Event Date", font: regularFont, textColor: labelColor)
+        self.eventDateLabel.attributedText = NSAttributedString(string: DivoStrings.eventDate, font: regularFont, textColor: labelColor)
         self.eventDateTextField = getTextFiel(title: "27 Jun 2025")
 
         self.eventTimeLabel = ASTextNode()
-        self.eventTimeLabel.attributedText = NSAttributedString(string: "Event Time", font: regularFont, textColor: labelColor)
+        self.eventTimeLabel.attributedText = NSAttributedString(string: DivoStrings.eventTime, font: regularFont, textColor: labelColor)
         self.eventTimeTextField = getTextFiel(title: "00:00")
 
         self.venueEventLabel = ASTextNode()
-        self.venueEventLabel.attributedText = NSAttributedString(string: "Venue of the event", font: regularFont, textColor: labelColor)
-        self.venueEventTextField = getTextFiel(title: "Choose a country")
+        self.venueEventLabel.attributedText = NSAttributedString(string: DivoStrings.venueOfEvent, font: regularFont, textColor: labelColor)
+        self.venueEventTextField = getTextFiel(title: DivoStrings.chooseCountry)
 
         self.parametersApplyingLabel = ASTextNode()
-        self.parametersApplyingLabel.attributedText = NSAttributedString(string: "Parameters for Applying", font: semiboldFont, textColor: headerColor)
+        self.parametersApplyingLabel.attributedText = NSAttributedString(string: DivoStrings.parametersForApplying, font: semiboldFont, textColor: headerColor)
 
-        self.addParametersButton = ButtonWithIconNode(title: "+ Add parameters", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
+        self.addParametersButton = ButtonWithIconNode(title: DivoStrings.addParameters, icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
         self.addParametersButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
         self.addParametersButton.cornerRadius = 4.0
         self.addParametersButton.clipsToBounds = true
 
-        self.applyButton = ButtonWithIconNode(title: "Create Event", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
+        self.applyButton = ButtonWithIconNode(title: DivoStrings.createEventButton, icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
         self.applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
 
         self.eventGalleryLabel = ASTextNode()
@@ -520,7 +520,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
 
         let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
         let dateFormatter = DateFormatter()
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.locale = Locale(identifier: DivoStrings.current.localeIdentifier)
         dateFormatter.dateFormat = "d MMM yyyy"
         let dateString = dateFormatter.string(from: date)
         dateFormatter.dateFormat = "HH:mm"

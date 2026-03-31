@@ -96,6 +96,7 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     private var storyUploadEventsDisposable: Disposable?
     private var debugShakeObserver: NSObjectProtocol?
     private var tokenChangeObserver: NSObjectProtocol?
+    private var languageChangeObserver: NSObjectProtocol?
     
     override public var minimizedContainer: MinimizedContainer? {
         didSet {
@@ -144,6 +145,9 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
             })
         }
 
+        // TODO: When MTProto is connected, force Telegram localization to one of the supported DIVO languages:
+        // context.engine.localization.downloadAndApplyLocalization(accountManager:languageCode:)
+
         if DivoConfig.isDebugEnabled {
             self.debugShakeObserver = NotificationCenter.default.addObserver(
                 forName: Notification.Name("DivoDebugShake"),
@@ -160,6 +164,14 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
             queue: .main
         ) { [weak self] _ in
             self?.resetNavigationOnTokenChange()
+        }
+
+        self.languageChangeObserver = NotificationCenter.default.addObserver(
+            forName: DivoStrings.didChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.refreshDivoTabTitles()
         }
     }
     
@@ -178,6 +190,20 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         if let observer = self.tokenChangeObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        if let observer = self.languageChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    private func refreshDivoTabTitles() {
+        self.modelsFeedNode?.tabBarItem.title = DivoStrings.tabModels
+        self.eventsController?.tabBarItem.title = DivoStrings.tabEvents
+        self.divoSettingsController?.tabBarItem.title = DivoStrings.tabSettings
+        if let tabController = self.rootTabController {
+            let index = tabController.selectedIndex
+            tabController.selectedIndex = index
+        }
+        self.popToRoot(animated: false)
     }
 
     private func resetNavigationOnTokenChange() {

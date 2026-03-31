@@ -71,7 +71,7 @@ public final class WorkExperienceController: TelegramBaseController {
     private func updateNavigation() {
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
 
-        self.title = "Work experience"
+        self.title = DivoStrings.workExperience
 
         if model.isMyProfile {
             let addItem = UIBarButtonItem(image: UIImage(bundleImageName: "Models/addIcon"), style: .plain, target: self, action: #selector(self.addPressed))
@@ -164,14 +164,14 @@ public final class WorkExperienceController: TelegramBaseController {
         let name = item.agencyDisplayName ?? item.agencyName ?? "Unknown"
         let alertController = textAlertController(
             context: context, title: name,
-            text: "Choose an action", actions: [
-                TextAlertAction(type: .genericAction, title: "Edit", action: {
+            text: DivoStrings.chooseAnAction, actions: [
+                TextAlertAction(type: .genericAction, title: DivoStrings.edit, action: {
                     self.editWorkExperience(item)
                 }),
-                TextAlertAction(type: .destructiveAction, title: "Delete", action: {
+                TextAlertAction(type: .destructiveAction, title: DivoStrings.delete, action: {
                     self.deleteWorkHistory(id: item.id)
                 }),
-                TextAlertAction(type: .defaultAction, title: "Cancel", action: {})
+                TextAlertAction(type: .defaultAction, title: DivoStrings.cancel, action: {})
             ])
         present(alertController, in: .window(.root))
     }

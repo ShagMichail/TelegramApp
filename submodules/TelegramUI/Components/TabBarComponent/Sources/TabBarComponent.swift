@@ -249,24 +249,29 @@ public final class NavigationSearchView: UIView {
 public final class TabBarComponent: Component {
     public final class Item: Equatable {
         public let item: UITabBarItem
+        public let titleSnapshot: String?
         public let action: (Bool) -> Void
         public let contextAction: ((ContextGesture, ContextExtractedContentContainingView) -> Void)?
-        
+
         fileprivate var id: AnyHashable {
             return AnyHashable(ObjectIdentifier(self.item))
         }
-        
+
         public init(item: UITabBarItem, action: @escaping (Bool) -> Void, contextAction: ((ContextGesture, ContextExtractedContentContainingView) -> Void)?) {
             self.item = item
+            self.titleSnapshot = item.title
             self.action = action
             self.contextAction = contextAction
         }
-        
+
         public static func ==(lhs: Item, rhs: Item) -> Bool {
             if lhs === rhs {
                 return true
             }
             if lhs.item !== rhs.item {
+                return false
+            }
+            if lhs.titleSnapshot != rhs.titleSnapshot {
                 return false
             }
             if (lhs.contextAction == nil) != (rhs.contextAction == nil) {

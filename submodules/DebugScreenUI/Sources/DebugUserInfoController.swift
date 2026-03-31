@@ -23,7 +23,7 @@ public final class DebugUserInfoController: TelegramBaseController {
             )
         )
 
-        self.title = "Пользователь"
+        self.title = DivoStrings.debugUser
     }
 
     required init(coder aDecoder: NSCoder) {
@@ -96,10 +96,10 @@ private final class DebugUserInfoNode: ASDisplayNode, UITableViewDataSource, UIT
                    let dataObj = json["data"] as? [String: Any] {
                     self.parseUserInfo(dataObj)
                 } else {
-                    self.rows = [("Ошибка", "Не удалось распарсить ответ")]
+                    self.rows = [(DivoStrings.error, DivoStrings.debugFailedToParse)]
                 }
             } catch {
-                self.rows = [("Ошибка", error.localizedDescription)]
+                self.rows = [(DivoStrings.error, error.localizedDescription)]
             }
             self.activityIndicator.stopAnimating()
             self.tableView.reloadData()
@@ -109,29 +109,29 @@ private final class DebugUserInfoNode: ASDisplayNode, UITableViewDataSource, UIT
     private func parseUserInfo(_ data: [String: Any]) {
         var result: [(String, String)] = []
 
-        if let id = data["id"] { result.append(("ID", "\(id)")) }
-        if let name = data["fullName"] as? String { result.append(("Имя", name)) }
-        if let phone = data["phone"] as? String { result.append(("Телефон", phone)) }
-        if let email = data["email"] as? String { result.append(("Email", email)) }
+        if let id = data["id"] { result.append((DivoStrings.debugId, "\(id)")) }
+        if let name = data["fullName"] as? String { result.append((DivoStrings.name, name)) }
+        if let phone = data["phone"] as? String { result.append((DivoStrings.debugPhone, phone)) }
+        if let email = data["email"] as? String { result.append((DivoStrings.debugEmail, email)) }
         if let role = data["role"] as? [String: Any], let title = role["title"] as? String {
-            result.append(("Роль", title))
+            result.append((DivoStrings.debugRole, title))
         }
-        if let gender = data["gender"] as? String { result.append(("Пол", gender)) }
+        if let gender = data["gender"] as? String { result.append((DivoStrings.gender, gender)) }
         if let city = data["city"] as? [String: Any], let title = city["title"] as? String {
-            result.append(("Город", title))
+            result.append((DivoStrings.debugCity, title))
         }
         if let country = data["country"] as? [String: Any], let title = country["title"] as? String {
-            result.append(("Страна", title))
+            result.append((DivoStrings.debugCountry, title))
         }
-        if let birthday = data["birthday"] as? String { result.append(("Дата рождения", birthday)) }
+        if let birthday = data["birthday"] as? String { result.append((DivoStrings.debugDateOfBirth, birthday)) }
 
         if let params = data["params"] as? [String: Any] {
-            if let height = params["height"] { result.append(("Рост", "\(height)")) }
-            if let weight = params["weight"] { result.append(("Вес", "\(weight)")) }
-            if let bust = params["bust"] { result.append(("Грудь", "\(bust)")) }
-            if let waist = params["waist"] { result.append(("Талия", "\(waist)")) }
-            if let hips = params["hips"] { result.append(("Бёдра", "\(hips)")) }
-            if let shoes = params["shoes"] { result.append(("Обувь", "\(shoes)")) }
+            if let height = params["height"] { result.append((DivoStrings.height, "\(height)")) }
+            if let weight = params["weight"] { result.append((DivoStrings.debugWeight, "\(weight)")) }
+            if let bust = params["bust"] { result.append((DivoStrings.debugBust, "\(bust)")) }
+            if let waist = params["waist"] { result.append((DivoStrings.debugWaist, "\(waist)")) }
+            if let hips = params["hips"] { result.append((DivoStrings.debugHips, "\(hips)")) }
+            if let shoes = params["shoes"] { result.append((DivoStrings.debugShoes, "\(shoes)")) }
         }
 
         rows = result
@@ -155,8 +155,8 @@ private final class DebugUserInfoNode: ASDisplayNode, UITableViewDataSource, UIT
     }
 
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        if section == 0 { return "ДАННЫЕ ПОЛЬЗОВАТЕЛЯ" }
-        return "RAW JSON"
+        if section == 0 { return DivoStrings.debugUserData }
+        return DivoStrings.debugRawJson
     }
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -175,7 +175,7 @@ private final class DebugUserInfoNode: ASDisplayNode, UITableViewDataSource, UIT
         } else {
             let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
             cell.backgroundColor = DebugTheme.cellBackground
-            cell.textLabel?.text = "Скопировать JSON"
+            cell.textLabel?.text = DivoStrings.debugCopyJson
             cell.textLabel?.textColor = DebugTheme.accent
             cell.textLabel?.textAlignment = .center
             return cell
@@ -188,7 +188,7 @@ private final class DebugUserInfoNode: ASDisplayNode, UITableViewDataSource, UIT
             UIPasteboard.general.string = json
             if let cell = tableView.cellForRow(at: indexPath) {
                 let original = cell.textLabel?.text
-                cell.textLabel?.text = "Скопировано!"
+                cell.textLabel?.text = DivoStrings.debugCopied
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                     cell.textLabel?.text = original
                 }

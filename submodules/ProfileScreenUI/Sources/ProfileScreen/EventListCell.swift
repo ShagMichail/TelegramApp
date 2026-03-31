@@ -1,6 +1,7 @@
 import UIKit
 import AsyncDisplayKit
 import Display
+import TelegramCore
 import AccountContext
 
 struct EventItem {
@@ -50,7 +51,7 @@ final class EventListCell: UICollectionViewCell {
 
     private var applyButton: UIButton = {
         let button = UIButton()
-        button.setTitle("Apply", for: .normal)
+        button.setTitle(DivoStrings.apply, for: .normal)
         button.titleLabel?.font = Font.helveticaNeue(14)
         button.backgroundColor = UIColor(hex: "#BF7A54")
         button.setTitleColor(.white, for: .normal)
