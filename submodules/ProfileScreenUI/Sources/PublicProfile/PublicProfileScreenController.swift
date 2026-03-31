@@ -196,7 +196,28 @@ public final class PublicProfileScreenController: TelegramBaseController {
 
     private func navigateToCreateEvent() {
         let createEventController = CreateEventController(context: self.context)
+        
+        createEventController.onEventCreated = { [weak self] in
+            self?.loadEvents()
+        }
+        
         self.push(createEventController)
+    }
+    
+    private func navigateToEditEvent(eventId: Int) {
+        // Открываем CreateEventController в режиме редактирования
+        let editEventController = CreateEventController(context: self.context, eventId: eventId)
+        
+        // Обновляем список событий после успешного сохранения
+        editEventController.onEventCreated = { [weak self] in
+            self?.loadEvents()
+        }
+        
+        self.push(editEventController)
+    }
+    
+    private func onEventApplyTapped(eventId: Int) {
+        print("Apply to event with id: \(eventId)")
     }
 
     @available(iOS 14, *)
@@ -316,6 +337,14 @@ public final class PublicProfileScreenController: TelegramBaseController {
 
         self.controllerNode.onAddEventTapped = { [weak self] in
             self?.navigateToCreateEvent()
+        }
+        
+        self.controllerNode.onEventButtonTapped = { [weak self] eventId in
+            if self?.isMyProfile == true {
+                self?.navigateToEditEvent(eventId: eventId)
+            } else {
+                self?.onEventApplyTapped(eventId: eventId)
+            }
         }
 
         self.controllerNode.onSocialLinkTapped = { [weak self] url in
@@ -660,39 +689,137 @@ extension PublicProfileScreenController {
 // Загрузка событий через feedline/search (event/list недоступен для всех ролей)
 extension PublicProfileScreenController {
     func loadEvents() {
-        guard let userId = model.userId else {
-            controllerNode.updateEventsList([])
-            return
-        }
-
-        Task { @MainActor in
+        let body = EventListRequest(offset: 0, limit: 30)
+        Task {
             do {
-                let body = FeedlineSearchEventsRequest(offset: 0, limit: 50, isEvents: true)
-                let response: FeedlineResponse = try await DivoAPIClient.shared.request(
-                    path: "/feedline/search",
+                let response: EventListProfileResponse = try await DivoAPIClient.shared.request(
+                    path: "/event/list",
                     method: "POST",
                     body: body
                 )
-                let items = response.data.items.filter { $0.user.id == userId }
-                let events = items.map { item -> EventItem in
-                    let desc = item.description ?? ""
-                    let avatarURL: String? = item.files.first.flatMap {
-                        CDNURLHelper.convertToCDNURL($0.fullUrl)?.absoluteString
+                
+                let items = response.data.items.filter({ $0.creator?.id == self.userID })
+                
+                if items.isEmpty {
+                    await MainActor.run {
+                        self.controllerNode.updateEventsList([])
                     }
+                    return
+                }
+                
+                let detailedEvents = await fetchEventDetails(for: items.compactMap { $0.id })
+
+                let eventDataArray: [EventItem] = detailedEvents.map { detail in
+
+                    let (formattedDate, formattedTime) = self.formatEventDateAndTime(dateString: detail.date)
+
+                    let city = detail.address?.city?.name ?? "Unknown city"
+                    let flag = self.emojiFlag(from: detail.address?.city?.countryCode)
+
+                    let avatarUrl = detail.files?.first?.fullUrl
+                    let finalAvatarUrl = avatarUrl != nil ? CDNURLHelper.convertToCDNURL(avatarUrl!)?.absoluteString : nil
+
                     return EventItem(
-                        name: item.title,
-                        data: desc,
-                        time: "",
-                        countryFlag: "",
-                        city: "",
-                        customAvatarURL: avatarURL
+                        name: detail.title ?? "Event",
+                        data: formattedDate,
+                        time: formattedTime,
+                        countryFlag: flag,
+                        city: city,
+                        customAvatarURL: finalAvatarUrl,
+                        originalDate: detail.date,
+                        eventId: detail.id
                     )
                 }
-                self.controllerNode.updateEventsList(events)
+                
+                let sortedEvents = eventDataArray.sorted { event1, event2 in
+                    guard let date1 = self.parseEventDate(event1.originalDate),
+                          let date2 = self.parseEventDate(event2.originalDate) else {
+                        return false
+                    }
+                    return date1 > date2
+                }
+
+                await MainActor.run {
+                    self.controllerNode.updateEventsList(sortedEvents)
+                }
+                
             } catch {
                 print("❌ [EVENTS] Error: \(error)")
-                self.controllerNode.updateEventsList([])
+                await MainActor.run {
+                    self.controllerNode.updateEventsList([])
+                }
             }
+        }
+    }
+    
+    /// Асинхронно скачивает детали по списку ID
+    private func fetchEventDetails(for ids: [Int]) async -> [EventDetailData] {
+        return await withTaskGroup(of: EventDetailData?.self) { group in
+            for id in ids {
+                group.addTask {
+                    do {
+                        let response: EventDetailProfileResponse = try await DivoAPIClient.shared.request(
+                            path: "/event/\(id)",
+                            method: "GET"
+                        )
+                        return response.data
+                    } catch {
+                        print("❌ [EVENT DETAIL] Error loading event \(id): \(error)")
+                        return nil
+                    }
+                }
+            }
+            
+            var results: [EventDetailData] = []
+            for await detail in group {
+                if let validDetail = detail {
+                    results.append(validDetail)
+                }
+            }
+            return results
+        }
+    }
+    
+    private func formatEventDateAndTime(dateString: String?) -> (date: String, time: String) {
+        guard let dateString = dateString else {
+            return ("TBD", "TBD")
+        }
+
+        let serverFormatter = DateFormatter()
+        serverFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        serverFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+        guard let date = serverFormatter.date(from: dateString) else {
+            return (dateString, "")
+        }
+
+        let dateUIFormatter = DateFormatter()
+        dateUIFormatter.dateFormat = "d MMM"
+        let formattedDate = dateUIFormatter.string(from: date)
+
+        let timeUIFormatter = DateFormatter()
+        timeUIFormatter.dateFormat = "HH:mm"
+        let formattedTime = timeUIFormatter.string(from: date)
+
+        return (formattedDate, formattedTime)
+    }
+    
+    private func parseEventDate(_ dateString: String?) -> Date? {
+        guard let dateString = dateString else {
+            return nil
+        }
+
+        let serverFormatter = DateFormatter()
+        serverFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        serverFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+        return serverFormatter.date(from: dateString)
+    }
+    
+    private func emojiFlag(from countryCode: String?) -> String {
+        guard let code = countryCode, code.count == 2 else { return "🌍" }
+        return code.uppercased().unicodeScalars.reduce("") { result, scalar in
+            result + String(UnicodeScalar(127397 + scalar.value)!)
         }
     }
 }

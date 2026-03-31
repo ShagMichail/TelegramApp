@@ -610,6 +610,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     var onAddEventTapped: (() -> Void)?
     var onGalleryItemTapped: ((Int, Int) -> Void)? 
     var onSocialLinkTapped: ((String) -> Void)?
+    var onEventButtonTapped: ((Int) -> Void)?
 
     private var socialLinksMap: [UIButton: String] = [:]
 
@@ -2747,7 +2748,12 @@ extension PublicProfileScreenNode: UICollectionViewDataSource {
                 return UICollectionViewCell()
             }
             let item = eventGalleryItems[indexPath.item]
-            cell.configure(with: item, context: self.context)
+            cell.configure(with: item, context: self.context, isMyProfile: self.model.isMyProfile)
+            cell.onButtonTap = { [weak self] eventId in
+                if let eventId = eventId {
+                    self?.onEventButtonTapped?(eventId)
+                }
+            }
             return cell
         }
         return UICollectionViewCell()

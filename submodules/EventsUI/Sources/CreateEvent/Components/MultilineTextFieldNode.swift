@@ -40,4 +40,17 @@ final class MultilineTextFieldNode: ASDisplayNode, ASEditableTextNodeDelegate {
     var text: String {
         return textNode.textView.text ?? ""
     }
+
+    func setText(_ newText: String) {
+        if newText.isEmpty {
+            textNode.attributedText = nil
+        } else {
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: Font.regular(16.0),
+                .foregroundColor: UIColor(red: 0.24, green: 0.24, blue: 0.26, alpha: 1.0)
+            ]
+            
+            textNode.attributedText = NSAttributedString(string: newText, attributes: attributes)
+        }
+    }
 }

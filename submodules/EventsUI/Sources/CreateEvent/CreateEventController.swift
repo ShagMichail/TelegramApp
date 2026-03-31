@@ -19,6 +19,8 @@ import PhotosUI
 
 public class CreateEventController: ViewController, UINavigationControllerDelegate {
     private let context: AccountContext
+    private let eventId: Int?
+    private let isEditMode: Bool
 
     private var createEventNode: CreateEventNode {
         return self.displayNode as! CreateEventNode
@@ -27,8 +29,12 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
     private var presentationData: PresentationData
     private var presentationDataDisposable: Disposable?
 
-    public init(context: AccountContext) {
+    public var onEventCreated: (() -> Void)?
+
+    public init(context: AccountContext, eventId: Int? = nil) {
         self.context = context
+        self.eventId = eventId
+        self.isEditMode = (eventId != nil)
 
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
 
@@ -55,12 +61,13 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
 
         let titleLabel = UILabel()
         let titleFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 20) ?? UIFont.systemFont(ofSize: 20, weight: .bold)
-        let titleAttr = NSAttributedString(string: "CREATE EVENT", attributes: [
+        let titleText = isEditMode ? "EDIT EVENT" : "CREATE EVENT"
+        let titleAttr = NSAttributedString(string: titleText, attributes: [
             .font: titleFont,
             .foregroundColor: UIColor.black,
             .kern: 0.5
         ])
-        
+
         titleLabel.attributedText = titleAttr
         titleLabel.textAlignment = .center
         titleLabel.frame = CGRect(x: 0, y: 0, width: 200, height: 44)
@@ -69,8 +76,9 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
 
         let createFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 16) ?? UIFont.systemFont(ofSize: 16, weight: .bold)
+        let buttonTitle = isEditMode ? "Save" : "Create"
         let createButton = UIBarButtonItem(
-            title: "Create",
+            title: buttonTitle,
             style: .plain,
             target: self,
             action: #selector(createPressed)
@@ -170,6 +178,9 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
 
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        if isEditMode, let eventId = self.eventId {
+            self.loadEventData(eventId: eventId)
+        }
     }
 
     override public func viewDidAppear(_ animated: Bool) {
@@ -251,6 +262,23 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
         }
     }
     
+    private func loadEventData(eventId: Int) {
+        Task { @MainActor in
+            do {
+                let response: EventFullDetailResponse = try await DivoAPIClient.shared.request(
+                    path: "/event/\(eventId)",
+                    method: "GET"
+                )
+                
+                if let detail = response.data {
+                    self.createEventNode.populate(with: detail)
+                }
+            } catch {
+                print("❌ Error loading event data: \(error)")
+                self.showAlert(text: "Failed to load event data: \(error.localizedDescription)")
+            }
+        }
+    }
     
     private func uploadAvatarPhoto(_ image: UIImage) {
         guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
@@ -300,24 +328,34 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
     
     @objc private func createPressed() {
         self.view.endEditing(true)
-        
+
         do {
             let requestPayload = try self.createEventNode.collectEventData()
-            
+
             self.navigationItem.rightBarButtonItem?.isEnabled = false
-            
+
             Task { @MainActor in
-                do {
+                do {     
+                    var path = ""
+                    if isEditMode, let eventId = self.eventId {
+                        path = "/event/update/\(eventId)"
+                    } else {
+                        path = "/event/create"
+                    }
+                                   
                     let response: CreateEventResponse = try await DivoAPIClient.shared.request(
-                        path: "/event/create",
+                        path: path,
                         method: "POST",
                         body: requestPayload
                     )
-                    
+
                     self.navigationItem.rightBarButtonItem?.isEnabled = true
-                    
+
                     if response.errors == nil || response.errors?.isEmpty == true {
-                        self.showAlert(text: "Event successfully created!") { [weak self] in
+                        self.onEventCreated?()
+
+                        let successMessage = isEditMode ? "Event successfully updated!" : "Event successfully created!"
+                        self.showAlert(text: successMessage) { [weak self] in
                             guard let self = self else { return }
                             if let nav = self.navigationController as? NavigationController {
                                 _ = nav.popViewController(animated: true)
@@ -329,14 +367,14 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
                         let errorMsg = response.errors?.joined(separator: "\n") ?? "Unknown error"
                         self.showAlert(text: errorMsg)
                     }
-                    
+
                 } catch {
                     self.navigationItem.rightBarButtonItem?.isEnabled = true
-                    print("❌ Error creating event: \(error)")
-                    self.showAlert(text: "Failed to create event: \(error.localizedDescription)")
+                    print("❌ Error \(isEditMode ? "updating" : "creating") event: \(error)")
+                    self.showAlert(text: "Failed to \(isEditMode ? "update" : "create") event: \(error.localizedDescription)")
                 }
             }
-            
+
         } catch {
             self.showAlert(text: error.localizedDescription)
         }

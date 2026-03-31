@@ -364,18 +364,156 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         return true
     }
 
-    func uploadPhotoToCloud(context: AccountContext, image: UIImage) -> Signal<Int64?, NoError> {
-        guard image.jpegData(compressionQuality: 0.9) != nil else {
-            return .single(nil)
-        }
-        // FIXME DIVO: заменить на REST — закомментирован вызов MTProto
-        // return context.engine.engineDivo.uploadedPhoto(resource: data)
-        return .single(nil)
-    }
-
     func updateCountry(countryId: String, countryName: String) {
         venueEventTextField.textField.text = countryName
         self.countryId = countryId
+    }
+    
+    func populate(with detail: EventFullDetailData) {
+        
+        // 1. Основная информация
+        nameEventTextField.textField.text = detail.title
+        aboutEventTextField.setText(detail.description ?? "")
+        
+        // 2. Тип эвента
+        if let typeTitle = detail.type?.title {
+            eventTypeDropdown.selectedValue = typeTitle
+        }
+        
+        // 3. Локация
+        if let address = detail.address {
+            venueEventTextField.textField.text = address.formatted ?? address.city?.name
+            if let cityId = address.city?.id {
+                self.countryId = "\(cityId)"
+            }
+        }
+        
+        // 4. Дата и время
+        if let dateString = detail.date {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            
+            if let dateObj = formatter.date(from: dateString) {
+                let timestamp = Int32(dateObj.timeIntervalSince1970)
+                // Используем уже готовый метод для обновления UI и внутренних переменных
+                self.updateTime(timestamp, .date)
+                self.updateTime(timestamp, .time)
+            }
+        }
+        
+        // 5. Динамические параметры (Слайдеры и Дропдауны)
+        var paramsToActivate: Set<EventParameter> = []
+        
+        if let attrs = detail.modelAttributes {
+            // Определяем, какие параметры активны
+            if attrs.age != nil { paramsToActivate.insert(.age) }
+            if attrs.height != nil { paramsToActivate.insert(.height) }
+            if attrs.weight != nil { paramsToActivate.insert(.weight) }
+            if attrs.breastSize != nil { paramsToActivate.insert(.breast) }
+            if attrs.waist != nil { paramsToActivate.insert(.waist) }
+            if attrs.hips != nil { paramsToActivate.insert(.hips) }
+            if attrs.shoesSize != nil { paramsToActivate.insert(.shoeSize) }
+            
+            if let gender = attrs.gender, !gender.isEmpty { paramsToActivate.insert(.gender) }
+            if let hairColor = attrs.hairColor, !hairColor.isEmpty { paramsToActivate.insert(.hairColor) }
+            if let hairLength = attrs.hairLength, !hairLength.isEmpty { paramsToActivate.insert(.hairLength) }
+            if let eyeColor = attrs.eyeColor, !eyeColor.isEmpty { paramsToActivate.insert(.eyeColor) }
+            if let skinColor = attrs.skinColor, !skinColor.isEmpty { paramsToActivate.insert(.skinColor) }
+            
+            // Активируем нужные UI элементы (вызовет перестроение интерфейса)
+            self.updateSelectedParameters(paramsToActivate)
+            
+            // Заполняем слайдеры значениями
+            if let age = attrs.age, let min = age.from, let max = age.to {
+                self.ageSlider?.setRange(min: Int(min), max: Int(max))
+            }
+            if let height = attrs.height, let min = height.from, let max = height.to {
+                // Если сервер возвращает в см (170), а вы храните в метрах (1.70), разделите на 100
+                self.heightSlider?.setRange(min: Double(min / 100.0), max: Double(max / 100.0))
+            }
+            if let weight = attrs.weight, let min = weight.from, let max = weight.to {
+                self.weightSlider?.setRange(min: Double(min), max: Double(max))
+            }
+            if let breast = attrs.breastSize, let min = breast.from, let max = breast.to {
+                self.breastSlider?.setRange(min: Double(min), max: Double(max))
+            }
+            if let waist = attrs.waist, let min = waist.from, let max = waist.to {
+                self.waistSlider?.setRange(min: Double(min), max: Double(max))
+            }
+            if let hips = attrs.hips, let min = hips.from, let max = hips.to {
+                self.hipsSlider?.setRange(min: Double(min), max: Double(max))
+            }
+            if let shoes = attrs.shoesSize, let min = shoes.from, let max = shoes.to {
+                self.shoeSizeSlider?.setRange(min: Double(min), max: Double(max))
+            }
+            
+            // Заполняем мульти-выбор (дропдауны)
+            if let gender = attrs.gender {
+                self.genderDropdown?.selectedValues = gender.compactMap { $0.title }
+            }
+            if let hairColor = attrs.hairColor {
+                self.hairColorDropdown?.selectedValues = hairColor.compactMap { $0.title }
+            }
+            if let hairLength = attrs.hairLength {
+                self.hairLengthDropdown?.selectedValues = hairLength.compactMap { $0.title }
+            }
+            if let eyeColor = attrs.eyeColor {
+                self.eyeColorDropdown?.selectedValues = eyeColor.compactMap { $0.title }
+            }
+            if let skinColor = attrs.skinColor {
+                self.skinColorDropdown?.selectedValues = skinColor.compactMap { $0.title }
+            }
+        }
+        
+        // 6. Галерея и Обложка (Фотографии)
+        if let files = detail.files {
+            loadExistingFiles(files)
+        }
+    }
+    
+    private func loadExistingFiles(_ files: [EventFullDetailFile]) {
+        // Очищаем текущие файлы на случай повторной загрузки
+        self.galleryItems.removeAll()
+        self.avatarFileUuid = nil
+        
+        // Сортируем по order (0 - это обычно обложка/аватарка)
+        let sortedFiles = files.sorted { ($0.order ?? 99) < ($1.order ?? 99) }
+        
+        for file in sortedFiles {
+            guard let urlString = file.fullUrl, let url = URL(string: urlString), let fileUuid = file.fileUuid else { continue }
+            
+            if file.order == 0 {
+                // Это обложка (аватар эвента)
+                self.avatarFileUuid = fileUuid
+                
+                // Используем ваш ImageLoader или URLSession для загрузки
+                Task { @MainActor in
+                    do {
+                        let (data, _) = try await URLSession.shared.data(from: url)
+                        if let image = UIImage(data: data) {
+                            self.currentPhoto = image
+                        }
+                    } catch { print("Error loading cover image") }
+                }
+            } else {
+                // Это картинка для галереи
+                Task { @MainActor in
+                    do {
+                        let (data, _) = try await URLSession.shared.data(from: url)
+                        if let image = UIImage(data: data) {
+                            // Создаем готовый item (isUploading: false), так как он уже есть на сервере
+                            let item = EventGalleryItem(image: image, isUploading: false, fileUuid: fileUuid)
+                            self.galleryItems.append(item)
+                            self.galleryCollectionView.reloadData()
+                            
+                            // Вызываем перерасчет UI, чтобы сетка раздвинулась
+                            self.triggerLayoutUpdate()
+                        }
+                    } catch { print("Error loading gallery image") }
+                }
+            }
+        }
     }
 
     func updateTime(_ timestamp: Int32, _ mode: TimeControllerMode) {
