@@ -517,7 +517,7 @@ final class EventDetailControllerNode: ASDisplayNode {
     func updateEventData(_ newEventData: EventData) {
         self.eventData = newEventData
 
-        setImage(newEventData.coverPhoto, for: backgroundImageView)
+        setImage(newEventData.coverPhoto, urlString: newEventData.coverPhotoURL, for: backgroundImageView)
 
         eventTitleLabel.text = newEventData.title
         eventSubtitleLabel.text = newEventData.timeRemaining
@@ -526,15 +526,16 @@ final class EventDetailControllerNode: ASDisplayNode {
 
         profileNameLabel.text = newEventData.profileName
 
-        setImage(newEventData.profilePhoto, for: profileImageView)
+        setImage(newEventData.profilePhoto, urlString: newEventData.profilePhotoURL, for: profileImageView)
     }
 
-    private func setImage(_ image: TelegramMediaImage?, for imageView: UIImageView) {
-        if let image = image {
+    private func setImage(_ image: TelegramMediaImage?, urlString: String? = nil, for imageView: UIImageView) {
+        if let urlString = urlString, let url = URL(string: urlString) {
+            imageView.loadImage(from: url)
+        } else if let image = image {
             guard let representation = largestImageRepresentation(image.representations) else {
                 return
             }
-
             let resourceData = context.account.postbox.mediaBox.resourceData(representation.resource)
             let _ = (resourceData
                      |> deliverOnMainQueue).start(next: { data in
@@ -547,7 +548,6 @@ final class EventDetailControllerNode: ASDisplayNode {
                             imageView.image = uiImage
                         }, completion: nil)
                     }
-
                 } else {
                     let _ = self.context.account.postbox.mediaBox.fetchedResource(representation.resource, parameters: nil).start()
                 }

@@ -34,6 +34,8 @@ public final class EventsController: TelegramBaseController {
     private let peerViewDisposable = MetaDisposable()
 
     private var isEmpty: Bool?
+    private var hasLoadedOnce = false
+    private var tokenChangeObserver: NSObjectProtocol?
 
     private let createActionDisposable = MetaDisposable()
     private let clearDisposable = MetaDisposable()
@@ -42,7 +44,8 @@ public final class EventsController: TelegramBaseController {
         self.context = context
         self.presentationData = context.sharedContext.currentPresentationData.with { $0 }
 
-        super.init(context: context, navigationBarPresentationData: NavigationBarPresentationData(presentationData: self.presentationData))
+        let navTheme = NavigationBarTheme(overallDarkAppearance: true, buttonColor: .black, disabledButtonColor: UIColor(rgb: 0x525252), primaryTextColor: .white, backgroundColor: .clear, opaqueBackgroundColor: .clear, enableBackgroundBlur: false, separatorColor: .clear, badgeBackgroundColor: .clear, badgeStrokeColor: .clear, badgeTextColor: .clear)
+        super.init(context: context, navigationBarPresentationData: NavigationBarPresentationData(theme: navTheme, strings: NavigationBarStrings(presentationStrings: self.presentationData.strings)))
 
         let icon: UIImage?
         icon = UIImage(bundleImageName: "Chat List/Tabs/IconEvents")
@@ -58,29 +61,31 @@ public final class EventsController: TelegramBaseController {
                 strongSelf.presentationData = presentationData
             }
         }).strict()
+
+        self.tokenChangeObserver = NotificationCenter.default.addObserver(
+            forName: DivoConfig.tokenDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.hasLoadedOnce = false
+            self?.getEvents()
+        }
     }
 
     private func updateNavigation() {
         self.statusBar.statusBarStyle = self.presentationData.theme.rootController.statusBarStyle.style
 
-        let searchButton = UIBarButtonItem(image: PresentationResourcesRootController.navigationSearchIcon(self.presentationData.theme), style: .plain, target: self, action: #selector(self.searchPressed))
-        let addButton = UIBarButtonItem(image: PresentationResourcesRootController.navigationAddIcon(self.presentationData.theme), style: .plain, target: self, action: #selector(self.addPressed))
+        let copperColor = UIColor(rgb: 0xBF7A54)
 
-        self.navigationItem.rightBarButtonItems = [searchButton, addButton]
+        let searchIcon = generateTintedImage(image: PresentationResourcesRootController.navigationSearchIcon(self.presentationData.theme), color: copperColor)
+        let searchButton = UIBarButtonItem(image: searchIcon?.withRenderingMode(.alwaysOriginal), style: .plain, target: self, action: #selector(self.searchPressed))
 
-        let titleLabel = UILabel()
-        titleLabel.text = self.presentationData.strings.Events_TabTitle.uppercased()
-        titleLabel.font = Font.helveticaNeue(34)
-        titleLabel.textColor = self.presentationData.theme.rootController.navigationBar.primaryTextColor
-        titleLabel.sizeToFit()
+        let addIcon = generateTintedImage(image: PresentationResourcesRootController.navigationAddIcon(self.presentationData.theme), color: copperColor)
+        let addButton = UIBarButtonItem(image: addIcon?.withRenderingMode(.alwaysOriginal), style: .plain, target: self, action: #selector(self.addPressed))
 
-        let containerView = UIView(frame: CGRect(x: 0, y: 0, width: 200, height: 40))
-        containerView.addSubview(titleLabel)
-        titleLabel.frame.origin.x = -50
-        titleLabel.frame.origin.y = 10
+        self.navigationItem.rightBarButtonItems = [addButton, searchButton]
 
-        self.navigationItem.titleView = containerView
-        self.navigationController?.hidesBarsOnSwipe = true
+        self.navigationItem.titleView = UIView()
     }
 
     private var lastContentOffset: CGPoint = .zero
@@ -90,36 +95,54 @@ public final class EventsController: TelegramBaseController {
 
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        getEvents()
+        if !hasLoadedOnce {
+            hasLoadedOnce = true
+            getEvents()
+        }
     }
 
     private func getEvents() {
-        //        displayNode.
-        let supportPeer = Promise<[EventModel]?>()
-        // FIXME DIVO: заменить на REST — закомментирован вызов MTProto
-        // supportPeer.set(context.engine.eventsEngine.getEvents())
-        self.supportPeerDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { events in
-            print("🔕", events ?? "")//displayNode
-            if let events = events {
-                let eventDataArray: [EventData] = events.map { model in
-                    let datePartPrefix = model.eventDate.prefix(while: { $0 != "T" })
-
-                    return EventData(
-                        id: model.id,
-                        title: model.title,
-                        subtitle: model.title,
-                        imageName: "Components/Model",
-                        profileImageName: "Components/Model",
-                        profileName: "@" + (model.creatorName ?? ""),
-                        timeRemaining: String(datePartPrefix),
-                        coverPhoto: model.coverPhoto,
-                        profilePhoto: model.creatorPhoto
-                    )
+        let body = EventListRequest(offset: 0, limit: 30)
+        Task {
+            do {
+                let response: EventListResponse = try await DivoAPIClient.shared.request(
+                    path: "/event/list",
+                    method: "POST",
+                    body: body
+                )
+                let items = response.data.items
+                if !items.isEmpty {
+                    let eventDataArray: [EventData] = items.map { item in
+                        let dateString = item.date?.prefix(while: { $0 != "T" }).description ?? ""
+                        let coverURL = item.files?.first?.fullUrl
+                        let avatarURL = item.user?.avatar?.fullUrl
+                        let cityName = item.address?.city?.title ?? ""
+                        return EventData(
+                            id: item.id,
+                            title: item.title,
+                            subtitle: item.type?.title ?? "",
+                            profileName: "@" + (item.user?.fullName ?? ""),
+                            timeRemaining: "4d : 4h : 0m",
+                            type: item.type?.title ?? "",
+                            coverPhotoURL: coverURL,
+                            profilePhotoURL: avatarURL,
+                            location: cityName,
+                            eventDateFormatted: dateString
+                        )
+                    }
+                    await MainActor.run {
+                        self.controllerNode.reloadEvents(events: eventDataArray)
+                    }
+                    return
                 }
-
-                self.controllerNode.reloadEvents(events: eventDataArray)
+            } catch {
+                // API failed or empty — fall through to mocks
             }
-        }))
+            // Show mocks when API returns empty or fails
+            await MainActor.run {
+                self.controllerNode.reloadEvents(events: EventData.mockEvents())
+            }
+        }
     }
 
     @objc private func searchPressed() {
@@ -150,6 +173,9 @@ public final class EventsController: TelegramBaseController {
         self.peerViewDisposable.dispose()
         self.clearDisposable.dispose()
         self.supportPeerDisposable.dispose()
+        if let observer = self.tokenChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     override public func loadDisplayNode() {

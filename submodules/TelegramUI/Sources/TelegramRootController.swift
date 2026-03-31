@@ -33,6 +33,7 @@ import PeerInfoScreen
 import PeerInfoStoryGridScreen
 import ShareWithPeersScreen
 import ChatEmptyNode
+import DebugScreenUI
 
 private class DetailsChatPlaceholderNode: ASDisplayNode, NavigationDetailsPlaceholderNode {
     private var presentationData: PresentationData
@@ -93,6 +94,8 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
     
     private var applicationInFocusDisposable: Disposable?
     private var storyUploadEventsDisposable: Disposable?
+    private var debugShakeObserver: NSObjectProtocol?
+    private var tokenChangeObserver: NSObjectProtocol?
     
     override public var minimizedContainer: MinimizedContainer? {
         didSet {
@@ -140,6 +143,24 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
                 moveStorySource(engine: self.context.engine, peerId: self.context.account.peerId, from: Int64(stableId), to: Int64(id))
             })
         }
+
+        if DivoConfig.isDebugEnabled {
+            self.debugShakeObserver = NotificationCenter.default.addObserver(
+                forName: Notification.Name("DivoDebugShake"),
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.openDebugScreen()
+            }
+        }
+
+        self.tokenChangeObserver = NotificationCenter.default.addObserver(
+            forName: DivoConfig.tokenDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.resetNavigationOnTokenChange()
+        }
     }
     
     required public init(coder aDecoder: NSCoder) {
@@ -151,6 +172,21 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         self.presentationDataDisposable?.dispose()
         self.applicationInFocusDisposable?.dispose()
         self.storyUploadEventsDisposable?.dispose()
+        if let observer = self.debugShakeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = self.tokenChangeObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    private func resetNavigationOnTokenChange() {
+        self.popToRoot(animated: false)
+    }
+
+    private func openDebugScreen() {
+        let controller = DebugMenuController(context: self.context)
+        self.pushViewController(controller, animated: true)
     }
     
     public func getContactsController() -> ViewController? {
@@ -245,6 +281,10 @@ public final class TelegramRootController: NavigationController, TelegramRootCon
         self.divoSettingsController = divoSettingsController
         self.rootTabController = tabBarController
         self.pushViewController(tabBarController, animated: false)
+
+        if DivoConfig.isDebugEnabled {
+            DivoNetworkOverlay.shared.restoreIfNeeded()
+        }
     }
         
     public func updateRootControllers(showCallsTab: Bool) {

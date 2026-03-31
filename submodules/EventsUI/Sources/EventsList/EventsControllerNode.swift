@@ -25,6 +25,21 @@ final class EventsControllerNode: ASDisplayNode {
 
     private var collectionView: UICollectionView!
     private var events: [EventData] = []
+    private var isLoading = true
+    private var shimmerViews: [ShimmerView] = []
+
+    private let navBackgroundView: UIView = {
+        let v = UIView()
+        v.backgroundColor = .white
+        return v
+    }()
+
+    private let titleLabel: UILabel = {
+        let label = UILabel()
+        label.font = Font.helveticaNeue(34)
+        label.textColor = .black
+        return label
+    }()
 
     init(controller: ViewController, context: AccountContext, presentationData: PresentationData) {
         self.controller = controller
@@ -33,7 +48,9 @@ final class EventsControllerNode: ASDisplayNode {
 
         super.init()
 
-        self.view.backgroundColor = .black
+        self.view.backgroundColor = .white
+
+        titleLabel.text = presentationData.strings.Events_TabTitle.uppercased()
 
         let flowLayout = UICollectionViewFlowLayout()
 
@@ -41,32 +58,88 @@ final class EventsControllerNode: ASDisplayNode {
         self.collectionView.backgroundColor = .clear
         self.collectionView.dataSource = self
         self.collectionView.delegate = self
-        self.collectionView.translatesAutoresizingMaskIntoConstraints = false
+        self.collectionView.showsVerticalScrollIndicator = false
 
         self.collectionView.register(EventCollectionViewCell.self, forCellWithReuseIdentifier: "EventCollectionViewCell")
 
         self.view.addSubview(self.collectionView)
+        self.view.addSubview(self.navBackgroundView)
+        self.navBackgroundView.addSubview(self.titleLabel)
 
         self.events = []
-
         self.collectionView.reloadData()
 
         self.didSetReady = true
         self._ready.set(true)
     }
 
+    func showShimmer(navigationBarHeight: CGFloat) {
+        removeShimmer()
+        isLoading = true
+        collectionView.isHidden = true
+
+        let width = self.view.bounds.width
+        guard width > 0 else { return }
+        let spacing: CGFloat = 10
+        let itemWidth = floor((width - spacing * 3) / 2.0)
+        let itemHeight = floor(itemWidth * 1.35)
+
+        for i in 0..<6 {
+            let shimmer = ShimmerView()
+            shimmer.layer.cornerRadius = 12
+            shimmer.layer.masksToBounds = true
+            let col = i % 2
+            let row = i / 2
+            let x: CGFloat = spacing + CGFloat(col) * (itemWidth + spacing)
+            let y: CGFloat = navigationBarHeight + spacing + CGFloat(row) * (itemHeight + spacing)
+            shimmer.frame = CGRect(x: x, y: y, width: itemWidth, height: itemHeight)
+            self.view.addSubview(shimmer)
+            shimmer.startShimmer()
+            shimmerViews.append(shimmer)
+        }
+    }
+
+    private func removeShimmer() {
+        for v in shimmerViews {
+            v.stopShimmer()
+            v.removeFromSuperview()
+        }
+        shimmerViews.removeAll()
+    }
+
     public func reloadEvents(events: [EventData]) {
-        let oldEvents = self.events
         self.events = events
+        self.isLoading = false
+        removeShimmer()
+        collectionView.isHidden = false
+        self.collectionView.reloadData()
+    }
 
-        let oldIds = Set(oldEvents.map { $0.id })
-        let newOnly = events.enumerated().filter { !oldIds.contains($0.element.id) }
+    public func showError(_ message: String) {
+        self.isLoading = false
+        removeShimmer()
+        collectionView.isHidden = true
 
-        collectionView.performBatchUpdates({
-            for (index, _) in newOnly {
-                collectionView.insertItems(at: [IndexPath(item: index, section: 0)])
-            }
-        }, completion: nil)
+        self.view.viewWithTag(999)?.removeFromSuperview()
+
+        let textView = UITextView()
+        textView.text = message
+        textView.textColor = .darkGray
+        textView.font = .systemFont(ofSize: 13)
+        textView.textAlignment = .left
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.backgroundColor = .clear
+        textView.tag = 999
+        textView.translatesAutoresizingMaskIntoConstraints = false
+        self.view.addSubview(textView)
+        let navH = containerLayout?.1 ?? 100
+        NSLayoutConstraint.activate([
+            textView.topAnchor.constraint(equalTo: self.view.topAnchor, constant: navH + 10),
+            textView.leadingAnchor.constraint(equalTo: self.view.leadingAnchor, constant: 16),
+            textView.trailingAnchor.constraint(equalTo: self.view.trailingAnchor, constant: -16),
+            textView.bottomAnchor.constraint(equalTo: self.view.bottomAnchor, constant: -10)
+        ])
     }
 
     override func layout() {
@@ -82,15 +155,31 @@ final class EventsControllerNode: ASDisplayNode {
         let insets = layout.insets(options: [.input])
         let safeAreaInsets = layout.safeInsets
 
-        let itemWidth = floor((layout.size.width - safeAreaInsets.left - safeAreaInsets.right - 30) / 2.0)
-//        let itemHeight = itemWidth * 1.5
+        // Nav background + title (same pattern as ModelsFeedNode)
+        navBackgroundView.frame = CGRect(x: 0, y: 0, width: layout.size.width, height: navigationBarHeight)
+
+        titleLabel.sizeToFit()
+        let titleX: CGFloat = 16 + safeAreaInsets.left
+        let titleY: CGFloat = navigationBarHeight - titleLabel.frame.height - 10
+        titleLabel.frame = CGRect(x: titleX, y: titleY, width: ceil(titleLabel.frame.width), height: ceil(titleLabel.frame.height) + 2)
+
+        // Collection
+        let spacing: CGFloat = 10
+        let itemWidth = floor((layout.size.width - safeAreaInsets.left - safeAreaInsets.right - spacing * 3) / 2.0)
+        let itemHeight = floor(itemWidth * 1.35)
 
         if let flowLayout = self.collectionView.collectionViewLayout as? UICollectionViewFlowLayout {
-            flowLayout.itemSize = CGSize(width: itemWidth, height: 230)
-            flowLayout.sectionInset = UIEdgeInsets(top: navigationBarHeight + 10, left: safeAreaInsets.left + 10, bottom: insets.bottom + 10, right: safeAreaInsets.right + 10)
+            flowLayout.itemSize = CGSize(width: itemWidth, height: itemHeight)
+            flowLayout.minimumInteritemSpacing = spacing
+            flowLayout.minimumLineSpacing = spacing
+            flowLayout.sectionInset = UIEdgeInsets(top: navigationBarHeight + spacing, left: safeAreaInsets.left + spacing, bottom: insets.bottom + spacing, right: safeAreaInsets.right + spacing)
         }
 
         self.collectionView.frame = CGRect(origin: .zero, size: layout.size)
+
+        if isLoading && shimmerViews.isEmpty {
+            showShimmer(navigationBarHeight: navigationBarHeight)
+        }
     }
 }
 
@@ -109,7 +198,7 @@ extension EventsControllerNode: UICollectionViewDataSource, UICollectionViewDele
         return cell
     }
 
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) { //TODO: move to EventsController
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let selectedEvent = events[indexPath.item]
         let detailController = EventDetailController(context: context, eventData: selectedEvent)
 
@@ -117,11 +206,4 @@ extension EventsControllerNode: UICollectionViewDataSource, UICollectionViewDele
             navigationController.pushViewController(detailController, animated: true)
         }
     }
-
-//    func scrollViewDidScroll(_ scrollView: UIScrollView) {
-////        self.controller?.updateContentOffset(offset: scrollView.contentOffset)
-////        let hide = scrollView.panGestureRecognizer.translation(in: scrollView.superview).y < 0
-////
-////        self.controller?.navigationController?.setNavigationBarHidden(hide, animated: true)
-//    }
 }

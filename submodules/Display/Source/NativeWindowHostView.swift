@@ -4,13 +4,7 @@ import SwiftSignalKit
 
 private let orientationChangeDuration: Double = UIDevice.current.userInterfaceIdiom == .pad ? 0.4 : 0.3
 
-private let defaultOrientations: UIInterfaceOrientationMask = {
-    if UIDevice.current.userInterfaceIdiom == .pad {
-        return .all
-    } else {
-        return .allButUpsideDown
-    }
-}()
+private let defaultOrientations: UIInterfaceOrientationMask = UIDevice.current.userInterfaceIdiom == .pad ? .all : .portrait
 
 func getCurrentViewInterfaceOrientation(view: UIView) -> UIInterfaceOrientation {
     var orientation: UIInterfaceOrientation = .portrait
@@ -203,7 +197,14 @@ private final class WindowRootViewController: UIViewController, UIWindowSceneDel
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-    
+
+    override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+        super.motionEnded(motion, with: event)
+        if motion == .motionShake {
+            NotificationCenter.default.post(name: Notification.Name("DivoDebugShake"), object: nil)
+        }
+    }
+
     deinit {
         if let voiceOverStatusObserver = self.voiceOverStatusObserver {
             NotificationCenter.default.removeObserver(voiceOverStatusObserver)

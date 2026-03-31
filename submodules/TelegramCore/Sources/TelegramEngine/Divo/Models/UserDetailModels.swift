@@ -416,45 +416,7 @@ public struct AgencyModelsPaginationMeta: Decodable {
     public let totalCount: Int?
 }
 
-// MARK: - Events List
-
-public struct EventListResponse: Decodable {
-    public let message: String?
-    public let data: EventListData?
-}
-
-public struct EventListData: Decodable {
-    public let items: [EventListItem]
-    public let pagination: AgencyModelsPagination?
-}
-
-public struct EventListItem: Decodable {
-    public let id: Int
-    public let title: String?
-    public let description: String?
-    public let date: String?
-    public let dateTo: String?
-    public let address: EventAddress?
-    public let files: [UserFile]?
-}
-
-public struct EventAddress: Decodable {
-    public let street: String?
-    public let house: String?
-    public let formatted: String?
-    public let city: UserCity?
-}
-
 public struct AgencyModelsListRequest: Encodable {
-    public let offset: Int
-    public let limit: Int
-    public init(offset: Int, limit: Int) {
-        self.offset = offset
-        self.limit = limit
-    }
-}
-
-public struct EventListRequest: Encodable {
     public let offset: Int
     public let limit: Int
     public init(offset: Int, limit: Int) {
