@@ -59,7 +59,7 @@ public final class ModelsFeedController: TelegramBaseController {
 
         let icon: UIImage?
         icon = UIImage(bundleImageName: "Models/IconModels")
-        self.tabBarItem.title = self.presentationData.strings.ModelsFeed_TabTitle
+        self.tabBarItem.title = DivoStrings.tabModels
         self.tabBarItem.image = icon
         self.tabBarItem.selectedImage = icon
 
@@ -80,6 +80,9 @@ public final class ModelsFeedController: TelegramBaseController {
             guard let self = self else { return }
             self.tabStates = [TabState(), TabState(), TabState()]
             self.loadFeedline(tabIndex: self.selectedTabIndex, reset: true)
+        }
+        NotificationCenter.default.addObserver(forName: DivoStrings.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.tabBarItem.title = DivoStrings.tabModels
         }
     }
 

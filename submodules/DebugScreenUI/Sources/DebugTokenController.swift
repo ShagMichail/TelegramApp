@@ -23,7 +23,7 @@ public final class DebugTokenController: TelegramBaseController {
             )
         )
 
-        self.title = "Токен доступа"
+        self.title = DivoStrings.debugAccessToken
     }
 
     required init(coder aDecoder: NSCoder) {
@@ -80,7 +80,7 @@ private final class DebugTokenNode: ASDisplayNode {
         self.view.addSubview(scrollView)
 
         // MARK: Current Token
-        setupSectionHeader(currentHeader, text: "ТЕКУЩИЙ ТОКЕН")
+        setupSectionHeader(currentHeader, text: DivoStrings.debugCurrentToken)
         scrollView.addSubview(currentHeader)
 
         currentTokenContainer.backgroundColor = DebugTheme.cellBackground
@@ -93,14 +93,14 @@ private final class DebugTokenNode: ASDisplayNode {
         currentTokenLabel.numberOfLines = 0
         currentTokenContainer.addSubview(currentTokenLabel)
 
-        copyButton.setTitle("Скопировать", for: .normal)
+        copyButton.setTitle(DivoStrings.debugCopy, for: .normal)
         copyButton.setTitleColor(DebugTheme.accent, for: .normal)
         copyButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .medium)
         copyButton.addTarget(self, action: #selector(copyTapped), for: .touchUpInside)
         currentTokenContainer.addSubview(copyButton)
 
         // MARK: Presets
-        setupSectionHeader(presetsHeader, text: "ПРЕСЕТЫ")
+        setupSectionHeader(presetsHeader, text: DivoStrings.debugPresets)
         scrollView.addSubview(presetsHeader)
 
         presetsContainer.backgroundColor = DebugTheme.cellBackground
@@ -108,19 +108,19 @@ private final class DebugTokenNode: ASDisplayNode {
         presetsContainer.clipsToBounds = true
         scrollView.addSubview(presetsContainer)
 
-        agencyRow.configure(title: "Агентство", tokenPreview: tokenPreview(DivoConfig.agencyToken))
+        agencyRow.configure(title: DivoStrings.debugAgency, tokenPreview: tokenPreview(DivoConfig.agencyToken))
         agencyRow.onTap = { [weak self] in self?.selectPreset(.agency) }
         presetsContainer.addSubview(agencyRow)
 
         presetSeparator.backgroundColor = DebugTheme.separator
         presetsContainer.addSubview(presetSeparator)
 
-        modelRow.configure(title: "Модель", tokenPreview: tokenPreview(DivoConfig.modelToken))
+        modelRow.configure(title: DivoStrings.debugModel, tokenPreview: tokenPreview(DivoConfig.modelToken))
         modelRow.onTap = { [weak self] in self?.selectPreset(.model) }
         presetsContainer.addSubview(modelRow)
 
         // MARK: Custom Token
-        setupSectionHeader(customHeader, text: "СВОЙ ТОКЕН")
+        setupSectionHeader(customHeader, text: DivoStrings.debugCustomToken)
         scrollView.addSubview(customHeader)
 
         customContainer.backgroundColor = DebugTheme.cellBackground
@@ -131,7 +131,7 @@ private final class DebugTokenNode: ASDisplayNode {
         customTextField.font = .monospacedSystemFont(ofSize: 14, weight: .regular)
         customTextField.textColor = DebugTheme.primaryText
         customTextField.attributedPlaceholder = NSAttributedString(
-            string: "Вставьте токен...",
+            string: DivoStrings.debugPasteToken,
             attributes: [.foregroundColor: DebugTheme.separator]
         )
         customTextField.backgroundColor = .clear
@@ -139,7 +139,7 @@ private final class DebugTokenNode: ASDisplayNode {
         customTextField.autocapitalizationType = .none
         customContainer.addSubview(customTextField)
 
-        applyButton.setTitle("Применить свой токен", for: .normal)
+        applyButton.setTitle(DivoStrings.debugApplyCustomToken, for: .normal)
         applyButton.setTitleColor(.white, for: .normal)
         applyButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
         applyButton.backgroundColor = DebugTheme.accent
@@ -202,7 +202,7 @@ private final class DebugTokenNode: ASDisplayNode {
     @objc private func copyTapped() {
         UIPasteboard.general.string = DivoConfig.accessToken
         let original = copyButton.title(for: .normal)
-        copyButton.setTitle("Скопировано!", for: .normal)
+        copyButton.setTitle(DivoStrings.debugCopied, for: .normal)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
             self?.copyButton.setTitle(original, for: .normal)
         }

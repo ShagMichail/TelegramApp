@@ -38,6 +38,7 @@ final class ProfileNavigationBarTitleView: UIView {
         label.adjustsFontSizeToFitWidth = true
         label.minimumScaleFactor = 0.7
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 20).isActive = true
         return label
     }()
     

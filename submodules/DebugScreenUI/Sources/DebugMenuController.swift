@@ -23,7 +23,7 @@ public final class DebugMenuController: TelegramBaseController {
             )
         )
 
-        self.title = "Debug"
+        self.title = DivoStrings.debug
     }
 
     required init(coder aDecoder: NSCoder) {
@@ -98,6 +98,10 @@ private final class DebugMenuNode: ASDisplayNode, UITableViewDataSource, UITable
         self.view.addSubview(tableView)
 
         buildSections()
+
+        NotificationCenter.default.addObserver(forName: DivoStrings.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.refresh()
+        }
     }
 
     func refresh() {
@@ -109,13 +113,13 @@ private final class DebugMenuNode: ASDisplayNode, UITableViewDataSource, UITable
         let overlayEnabled = UserDefaults.standard.bool(forKey: "DivoNetworkOverlay.enabled")
 
         sections = [
-            (header: "ИНСТРУМЕНТЫ", rows: [
-                Row(icon: "key.fill", title: "Токен доступа", subtitle: { self.currentTokenLabel() }, accessory: .chevron, action: { [weak self] in
+            (header: DivoStrings.debugTools, rows: [
+                Row(icon: "key.fill", title: DivoStrings.debugAccessToken, subtitle: { self.currentTokenLabel() }, accessory: .chevron, action: { [weak self] in
                     guard let self = self else { return }
                     let c = DebugTokenController(context: self.context)
                     self.onPush?(c)
                 }),
-                Row(icon: "list.bullet.rectangle", title: "Логи запросов", subtitle: {
+                Row(icon: "list.bullet.rectangle", title: DivoStrings.debugRequestLogs, subtitle: {
                     let count = DivoRequestLogger.shared.getEntries().count
                     return "\(count)"
                 }, accessory: .chevron, action: { [weak self] in
@@ -123,14 +127,14 @@ private final class DebugMenuNode: ASDisplayNode, UITableViewDataSource, UITable
                     let c = DebugRequestLogsController(context: self.context)
                     self.onPush?(c)
                 }),
-                Row(icon: "person.crop.circle", title: "Пользователь", subtitle: { "" }, accessory: .chevron, action: { [weak self] in
+                Row(icon: "person.crop.circle", title: DivoStrings.debugUser, subtitle: { "" }, accessory: .chevron, action: { [weak self] in
                     guard let self = self else { return }
                     let c = DebugUserInfoController(context: self.context)
                     self.onPush?(c)
                 }),
             ]),
-            (header: "СЕТЬ", rows: [
-                Row(icon: "speedometer", title: "Сетевой оверлей", subtitle: { "" }, accessory: .toggle(overlayEnabled, { [weak self] enabled in
+            (header: DivoStrings.debugNetwork, rows: [
+                Row(icon: "speedometer", title: DivoStrings.debugNetworkOverlay, subtitle: { "" }, accessory: .toggle(overlayEnabled, { [weak self] enabled in
                     UserDefaults.standard.set(enabled, forKey: "DivoNetworkOverlay.enabled")
                     if enabled {
                         DivoNetworkOverlay.shared.show()
@@ -140,20 +144,20 @@ private final class DebugMenuNode: ASDisplayNode, UITableViewDataSource, UITable
                     self?.buildSections()
                     self?.tableView.reloadData()
                 }), action: {}),
-                Row(icon: "tortoise.fill", title: "Замедление сети", subtitle: {
+                Row(icon: "tortoise.fill", title: DivoStrings.debugNetworkDelay, subtitle: {
                     self.delayLabel()
                 }, accessory: .chevron, action: { [weak self] in
                     self?.showDelayPicker()
                 }),
             ]),
-            (header: "КЕШ", rows: [
-                Row(icon: "photo.on.rectangle", title: "Кеш изображений", subtitle: {
+            (header: DivoStrings.debugCache, rows: [
+                Row(icon: "photo.on.rectangle", title: DivoStrings.debugImageCache, subtitle: {
                     self.cacheSizeLabel()
                 }, accessory: .chevron, action: { [weak self] in
                     self?.clearImageCache()
                 }),
             ]),
-            (header: "ИНФОРМАЦИЯ", rows:
+            (header: DivoStrings.debugInfo, rows:
                 self.infoRows()
             ),
         ]
@@ -187,7 +191,7 @@ private final class DebugMenuNode: ASDisplayNode, UITableViewDataSource, UITable
             cell.configure(icon: row.icon, title: row.title, isOn: isOn, onToggle: handler)
             return cell
         case .chevron:
-            if sections[indexPath.section].header == "ИНФОРМАЦИЯ" {
+            if sections[indexPath.section].header == DivoStrings.debugInfo {
                 let cell = tableView.dequeueReusableCell(withIdentifier: "Info", for: indexPath) as! DebugInfoTableCell
                 cell.configure(title: row.title, value: row.subtitle())
                 return cell
@@ -215,22 +219,22 @@ private final class DebugMenuNode: ASDisplayNode, UITableViewDataSource, UITable
 
     private func currentTokenLabel() -> String {
         let token = DivoConfig.accessToken
-        if token == DivoConfig.agencyToken { return "Агентство" }
-        if token == DivoConfig.modelToken { return "Модель" }
-        return "Свой"
+        if token == DivoConfig.agencyToken { return DivoStrings.debugAgency }
+        if token == DivoConfig.modelToken { return DivoStrings.debugModel }
+        return DivoStrings.debugCustom
     }
 
     private func delayLabel() -> String {
         let d = DivoConfig.simulatedDelay
-        if d <= 0 { return "Выкл" }
-        if d < 1 { return "\(Int(d * 1000))мс" }
-        return "\(Int(d))с"
+        if d <= 0 { return DivoStrings.debugOff }
+        if d < 1 { return DivoStrings.debugDelayMs(Int(d * 1000)) }
+        return DivoStrings.debugDelaySec(Int(d))
     }
 
     private func cacheSizeLabel() -> String {
         let cache = URLCache.shared
         let bytes = cache.currentDiskUsage + cache.currentMemoryUsage
-        if bytes == 0 { return "Пусто" }
+        if bytes == 0 { return DivoStrings.debugEmpty }
         let formatter = ByteCountFormatter()
         formatter.allowedUnits = [.useMB, .useKB]
         formatter.countStyle = .file
@@ -240,25 +244,34 @@ private final class DebugMenuNode: ASDisplayNode, UITableViewDataSource, UITable
     private func infoRows() -> [Row] {
         let items: [(String, String, String)] = [
             ("link", "Base URL", DivoConfig.baseURL.absoluteString),
-            ("info.circle", "Версия", DivoConfig.appVersion),
-            ("apple.logo", "Платформа", DivoConfig.appPlatform),
+            ("info.circle", DivoStrings.debugVersion, DivoConfig.appVersion),
+            ("apple.logo", DivoStrings.debugPlatform, DivoConfig.appPlatform),
             ("number", "Bundle ID", Bundle.main.bundleIdentifier ?? "—"),
-            ("iphone", "Устройство", deviceName()),
+            ("iphone", DivoStrings.debugDevice, deviceName()),
             ("gear", "iOS", UIDevice.current.systemVersion),
         ]
-        return items.map { item in
+        var rows = items.map { item in
             Row(icon: item.0, title: item.1, subtitle: { item.2 }, accessory: .chevron, action: {})
         }
+        let localeSubtitle = DivoStrings.isOverridden
+            ? "\(DivoStrings.current.displayName) (override)"
+            : "\(DivoStrings.current.displayName) (auto)"
+        rows.append(Row(icon: "globe", title: DivoStrings.debugLocale, subtitle: { localeSubtitle }, accessory: .chevron, action: { [weak self] in
+            guard let self = self else { return }
+            let c = DebugLanguageController(context: self.context)
+            self.onPush?(c)
+        }))
+        return rows
     }
 
     private func showDelayPicker() {
-        let alert = UIAlertController(title: "Замедление сети", message: "Искусственная задержка перед каждым запросом", preferredStyle: .actionSheet)
+        let alert = UIAlertController(title: DivoStrings.debugNetworkDelayTitle, message: DivoStrings.debugNetworkDelayMessage, preferredStyle: .actionSheet)
         let options: [(String, TimeInterval)] = [
-            ("Выкл", 0),
-            ("100мс", 0.1),
-            ("500мс", 0.5),
-            ("2 секунды", 2.0),
-            ("5 секунд", 5.0),
+            (DivoStrings.debugOff, 0),
+            (DivoStrings.debugDelayMs(100), 0.1),
+            (DivoStrings.debugDelayMs(500), 0.5),
+            (DivoStrings.debugDelaySec(2), 2.0),
+            (DivoStrings.debugDelaySec(5), 5.0),
         ]
         let current = DivoConfig.simulatedDelay
         for (title, value) in options {
@@ -269,7 +282,7 @@ private final class DebugMenuNode: ASDisplayNode, UITableViewDataSource, UITable
                 self?.tableView.reloadData()
             })
         }
-        alert.addAction(UIAlertAction(title: "Отмена", style: .cancel))
+        alert.addAction(UIAlertAction(title: DivoStrings.cancel, style: .cancel))
 
         if let popover = alert.popoverPresentationController {
             popover.sourceView = self.view
@@ -290,13 +303,13 @@ private final class DebugMenuNode: ASDisplayNode, UITableViewDataSource, UITable
         formatter.countStyle = .file
         let sizeStr = formatter.string(fromByteCount: Int64(bytes))
 
-        let alert = UIAlertController(title: "Очистить кеш?", message: "Текущий размер: \(sizeStr)", preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Очистить", style: .destructive) { [weak self] _ in
+        let alert = UIAlertController(title: DivoStrings.debugClearCache, message: DivoStrings.debugCurrentSize(sizeStr), preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: DivoStrings.debugClear, style: .destructive) { [weak self] _ in
             URLCache.shared.removeAllCachedResponses()
             self?.buildSections()
             self?.tableView.reloadData()
         })
-        alert.addAction(UIAlertAction(title: "Отмена", style: .cancel))
+        alert.addAction(UIAlertAction(title: DivoStrings.cancel, style: .cancel))
 
         if let vc = self.closestViewController {
             vc.present(alert, animated: true)

@@ -76,12 +76,12 @@ final class EditSocialLinksNode: ASDisplayNode, UITextFieldDelegate {
         
         self.websiteTextField = DivoTextField(title: website, prefix: "")
         self.websiteTextField.textField.attributedPlaceholder = NSAttributedString(
-            string: "Enter your website",
+            string: DivoStrings.enterYourWebsite,
             font: Font.bold(16),
             textColor: UIColor(red: 1, green: 1, blue: 1, alpha: 0.5)
         )
         
-        self.applyButton = ButtonWithIconNode(title: "Save", icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
+        self.applyButton = ButtonWithIconNode(title: DivoStrings.save, icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
         self.applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
         
         super.init()

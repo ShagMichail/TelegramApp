@@ -50,8 +50,7 @@ final class EventsControllerNode: ASDisplayNode {
 
         self.view.backgroundColor = .white
 
-        titleLabel.text = presentationData.strings.Events_TabTitle.uppercased()
-
+        titleLabel.text = DivoStrings.navEvents
         let flowLayout = UICollectionViewFlowLayout()
 
         self.collectionView = UICollectionView(frame: .zero, collectionViewLayout: flowLayout)
@@ -71,6 +70,13 @@ final class EventsControllerNode: ASDisplayNode {
 
         self.didSetReady = true
         self._ready.set(true)
+        NotificationCenter.default.addObserver(forName: DivoStrings.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self = self else { return }
+            self.titleLabel.text = DivoStrings.navEvents
+            if let (layout, navigationBarHeight) = self.containerLayout {
+                self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .immediate)
+            }
+        }
     }
 
     func showShimmer(navigationBarHeight: CGFloat) {
@@ -161,7 +167,8 @@ final class EventsControllerNode: ASDisplayNode {
         titleLabel.sizeToFit()
         let titleX: CGFloat = 16 + safeAreaInsets.left
         let titleY: CGFloat = navigationBarHeight - titleLabel.frame.height - 10
-        titleLabel.frame = CGRect(x: titleX, y: titleY, width: ceil(titleLabel.frame.width), height: ceil(titleLabel.frame.height) + 2)
+        let titleH: CGFloat = ceil(titleLabel.frame.height) + 6 // +4pt top / +2pt bottom for CJK
+        titleLabel.frame = CGRect(x: titleX, y: titleY - 4, width: ceil(titleLabel.frame.width), height: titleH)
 
         // Collection
         let spacing: CGFloat = 10

@@ -23,9 +23,9 @@ public final class DebugRequestLogsController: TelegramBaseController {
             )
         )
 
-        self.title = "Логи запросов"
+        self.title = DivoStrings.debugRequestLogs
 
-        let clearButton = UIBarButtonItem(title: "Очистить", style: .plain, target: self, action: #selector(clearLogs))
+        let clearButton = UIBarButtonItem(title: DivoStrings.debugClear, style: .plain, target: self, action: #selector(clearLogs))
         clearButton.setTitleTextAttributes([.foregroundColor: DebugTheme.accent], for: .normal)
         self.navigationItem.rightBarButtonItem = clearButton
     }

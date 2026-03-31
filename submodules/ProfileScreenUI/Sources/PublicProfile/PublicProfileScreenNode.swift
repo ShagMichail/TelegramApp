@@ -25,16 +25,16 @@ public enum Role {
 
     var title: String {
         switch self {
-        case .model: "model"
-        case .newFace: "new face"
-        case .agency: "agency"
+        case .model: DivoStrings.roleModel
+        case .newFace: DivoStrings.roleNewFace
+        case .agency: DivoStrings.roleAgency
         }
     }
 }
 
 final class PublicProfileScreenNode: ASDisplayNode {
-    private static let mockBiographyText = "No biograpy"
-    private static let mockBiographyMyProfileText = "Fill in the information about you"
+    private static let mockBiographyText = DivoStrings.noBiography
+    private static let mockBiographyMyProfileText = DivoStrings.fillInInfoAboutYou
     private let model: ProfileModel
     private var modelRole: Role = .model
     /// myProfile, но НЕ agency (у agency свой набор табов)
@@ -259,9 +259,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     private let addWorkHistoryButton: UIButton = {
         let button = UIButton(type: .system)
-        button.setTitle("+  Add work history", for: .normal)
+        button.setTitle(DivoStrings.addWorkHistory, for: .normal)
         button.setTitleColor(.white.withAlphaComponent(0.88), for: .normal)
         button.titleLabel?.font = Font.helveticaNeue(13)
+        button.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 24).isActive = true
         button.contentHorizontalAlignment = .left
         button.contentEdgeInsets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
         button.backgroundColor = .black.withAlphaComponent(0.15)
@@ -296,19 +297,21 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private let editLinksButton: UIButton = {
         let button = UIButton(type: .system)
         button.titleLabel?.font = Font.helveticaNeue(10)
+        button.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 20).isActive = true
         button.setTitleColor(.white, for: .normal)
-        button.setTitle("EDIT LINKS", for: .normal)
+        button.setTitle(DivoStrings.editLinks, for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
-    
+
     private let editLinksLabel: UILabel = {
         let label = UILabel()
         label.font = Font.helveticaNeue(14)
         label.textColor = .white
         label.numberOfLines = 0
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.text = "My Links"
+        label.text = DivoStrings.myLinks
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 24).isActive = true
         return label
     }()
     
@@ -575,10 +578,11 @@ final class PublicProfileScreenNode: ASDisplayNode {
     
     private let similarProfilesTitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "You may be interested in similar profiles"
+        label.text = DivoStrings.similarProfiles
         label.font = Font.helveticaNeue(18)
         label.textColor = UIColor(hex: "#222222")
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 30).isActive = true
         return label
     }()
     
@@ -1012,7 +1016,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         ])
         galleryCollectionView.isHidden = true
         galleryStatusView.isHidden = false
-        galleryStatusView.configure(isLoading: true, text: "Uploading Photos...", isMyProfile: false)
+        galleryStatusView.configure(isLoading: true, text: DivoStrings.uploadingPhotos, isMyProfile: false)
         galleryStatusView.addTarget(self, action: #selector(galleryStatusTapped), for: .touchUpInside)
 
         // --- VIDEO ---
@@ -1035,7 +1039,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         ])
         videoGalleryCollectionView.isHidden = true
         videoGalleryStatusView.isHidden = false
-        videoGalleryStatusView.configure(isLoading: true, text: "Uploading Videos...", isMyProfile: false)
+        videoGalleryStatusView.configure(isLoading: true, text: DivoStrings.uploadingVideos, isMyProfile: false)
         videoGalleryStatusView.addTarget(self, action: #selector(videoGalleryStatusTapped), for: .touchUpInside)
 
         // --- CHANNELS ---
@@ -1057,7 +1061,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         ])
         channelGalleryCollectionView.isHidden = true
         channelGalleryStatusView.isHidden = false
-        channelGalleryStatusView.configure(isLoading: true, text: "Loading channels...", isMyProfile: false)
+        channelGalleryStatusView.configure(isLoading: true, text: DivoStrings.loadingChannels, isMyProfile: false)
         
         // --- MODELS ---
         // ЗАМЕНА: Сохраняем констрейнт высоты
@@ -1078,7 +1082,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         ])
         modelGalleryCollectionView.isHidden = true
         modelGalleryStatusView.isHidden = false
-        modelGalleryStatusView.configure(isLoading: true, text: "Loading models...", isMyProfile: false)
+        modelGalleryStatusView.configure(isLoading: true, text: DivoStrings.loadingModels, isMyProfile: false)
         
         // --- EVENTS ---
         // ЗАМЕНА: Сохраняем констрейнт высоты
@@ -1099,7 +1103,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         ])
         eventGalleryCollectionView.isHidden = true
         eventGalleryStatusView.isHidden = false
-        eventGalleryStatusView.configure(isLoading: true, text: "Loading events...", isMyProfile: false)
+        eventGalleryStatusView.configure(isLoading: true, text: DivoStrings.loadingEvents, isMyProfile: false)
     }
     
     private func setupSimilarProfiles() {
@@ -1237,10 +1241,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
     // Настройка кнопки чата/загрузки фотографии
     private func setupDmButtonContent() {
         var iconImageName = "Chat/Context Menu/MessageBubble"
-        var labelText = "Send DM"
+        var labelText = DivoStrings.sendDM
         if model.isMyProfile {
             iconImageName = "Avatar/AddAvatarIconLarge"
-            labelText = "Upload your photos"
+            labelText = DivoStrings.uploadYourPhotos
         }
 
         // Важно: не пересоздаем subviews каждый раз (иначе UI заметно дергается при обновлениях)
@@ -1289,10 +1293,11 @@ final class PublicProfileScreenNode: ASDisplayNode {
             stackView.centerXAnchor.constraint(equalTo: dmButton.centerXAnchor),
             stackView.centerYAnchor.constraint(equalTo: dmButton.centerYAnchor),
             iconImageView.widthAnchor.constraint(equalToConstant: 20),
-            iconImageView.heightAnchor.constraint(equalToConstant: 20)
+            iconImageView.heightAnchor.constraint(equalToConstant: 20),
+            label.heightAnchor.constraint(greaterThanOrEqualToConstant: 24)
         ])
     }
-    
+
     // Создание кнопок счетчиков (лайки, просмотры, сохраненки)
     private func setupCounterView(_ container: UIControl, count: String, name: String, iconName: String) {
         // Важно: не пересоздаем subviews/constraints каждый раз.
@@ -1499,39 +1504,39 @@ final class PublicProfileScreenNode: ASDisplayNode {
         var items: [AppearanceAttribute] = []
         
         if let gender = gender {
-            items.append(.init(title: "Gender", value: "\(gender.title)"))
+            items.append(.init(title: DivoStrings.attrGender, value: "\(gender.title)"))
         }
-        
+
         if let appearance = appearance {
             if let height = appearance.height {
-                items.append(.init(title: "Height", value: "\(height.clean) cm"))
+                items.append(.init(title: DivoStrings.attrHeight, value: "\(height.clean) \(DivoStrings.unitCm)"))
             }
             if let weight = appearance.weight {
-                items.append(.init(title: "Weight", value: "\(weight.clean) kg"))
+                items.append(.init(title: DivoStrings.attrWeight, value: "\(weight.clean) \(DivoStrings.unitKg)"))
             }
             if let bust = appearance.breastSize {
-                items.append(.init(title: "Bust", value: bust))
+                items.append(.init(title: DivoStrings.attrBust, value: bust))
             }
             if let waist = appearance.waist {
-                items.append(.init(title: "Waist", value: "\(waist.clean) cm"))
+                items.append(.init(title: DivoStrings.attrWaist, value: "\(waist.clean) \(DivoStrings.unitCm)"))
             }
             if let hips = appearance.hips {
-                items.append(.init(title: "Hips", value: "\(hips.clean) cm"))
+                items.append(.init(title: DivoStrings.attrHips, value: "\(hips.clean) \(DivoStrings.unitCm)"))
             }
             if let shoesSize = appearance.shoesSize {
-                items.append(.init(title: "Shoes", value: "\(shoesSize.clean) EU"))
+                items.append(.init(title: DivoStrings.attrShoes, value: "\(shoesSize.clean) \(DivoStrings.unitEU)"))
             }
             if let hairColor = appearance.hairColor?.title {
-                items.append(.init(title: "Hair Color", value: hairColor))
+                items.append(.init(title: DivoStrings.attrHairColor, value: hairColor))
             }
             if let hairLength = appearance.hairLength?.title {
-                items.append(.init(title: "Hair Length", value: hairLength))
+                items.append(.init(title: DivoStrings.attrHairLength, value: hairLength))
             }
             if let eyeColor = appearance.eyeColor?.title {
-                items.append(.init(title: "Eye Color", value: eyeColor))
+                items.append(.init(title: DivoStrings.attrEyeColor, value: eyeColor))
             }
             if let skinColor = appearance.skinColor?.title {
-                items.append(.init(title: "Skin Color", value: skinColor))
+                items.append(.init(title: DivoStrings.attrSkinColor, value: skinColor))
             }
         }
         
@@ -1764,7 +1769,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.modelRole = Role(apiRole: detail.role)
 
         if self.modelRole == .agency {
-            setupNavigationBarTitle(name: detail.agency?.title ?? "No name")
+            setupNavigationBarTitle(name: detail.agency?.title ?? DivoStrings.noName)
             
             if let photoURLString = detail.agency?.background?.fullUrl, let photoURL = CDNURLHelper.convertToCDNURL(photoURLString) {
                 headerImageView.loadImage(from: photoURL)
@@ -1793,7 +1798,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             }
         } else {
             let age = detail.birthday.flatMap { calculateAge(from: $0) } ?? 0
-            setupNavigationBarTitle(name: detail.fullName ?? "No name", info: "\(age) y.o • \(detail.city?.name ?? "")")
+            setupNavigationBarTitle(name: detail.fullName ?? DivoStrings.noName, info: "\(DivoStrings.ageString(age)) • \(detail.city?.name ?? "")")
             
             if let photoURLString = detail.photo?.fullUrl, let photoURL = CDNURLHelper.convertToCDNURL(photoURLString) {
                 headerImageView.loadImage(from: photoURL)
@@ -1852,7 +1857,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         UIView.performWithoutAnimation {
             if self.modelRole == .agency {
                 let viewModel = UserProfileViewModel(
-                    name: detail.agency?.title ?? "No name",
+                    name: detail.agency?.title ?? DivoStrings.noName,
                     age: nil,
                     location: detail.agency?.address?.city?.name ?? "",
                     countryFlag: Self.flag(for: detail.agency?.address?.city?.countryCode),
@@ -1865,7 +1870,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
             } else {
                 let age = detail.birthday.flatMap { calculateAge(from: $0) } ?? 0
                 let viewModel = UserProfileViewModel(
-                    name: detail.fullName ?? "No name",
+                    name: detail.fullName ?? DivoStrings.noName,
                     age: age,
                     location: detail.city?.name ?? "",
                     countryFlag: Self.flag(for: detail.city?.countryCode),
@@ -1882,9 +1887,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
     }
 
     func updateEngagementStats(likes: Int, views: Int, saves: Int) {
-        setupCounterView(likesView, count: "\(likes)", name: "Like", iconName: "Instant View/Favorite")
-        setupCounterView(viewsView, count: "\(views)", name: "Viewed", iconName: "Instant View/Visibility")
-        setupCounterView(savesView, count: "\(saves)", name: "Save", iconName: "Instant View/Bookmark")
+        setupCounterView(likesView, count: "\(likes)", name: DivoStrings.counterLike, iconName: "Instant View/Favorite")
+        setupCounterView(viewsView, count: "\(views)", name: DivoStrings.counterViewed, iconName: "Instant View/Visibility")
+        setupCounterView(savesView, count: "\(saves)", name: DivoStrings.counterSave, iconName: "Instant View/Bookmark")
     }
     
     // Добавление фотографий в галерею пагинацией
@@ -1912,9 +1917,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
             let hasPhotos = !self.galleryPhotos.isEmpty
             self.galleryStatusView.isHidden = hasPhotos
             if isMyProfile {
-                self.galleryStatusView.configure(isLoading: false, text: "Upload your photos", isMyProfile: true)
+                self.galleryStatusView.configure(isLoading: false, text: DivoStrings.uploadYourPhotos, isMyProfile: true)
             } else {
-                self.galleryStatusView.configure(isLoading: false, text: "No videos yet", isMyProfile: false)
+                self.galleryStatusView.configure(isLoading: false, text: DivoStrings.noVideosYet, isMyProfile: false)
             }
             self.galleryCollectionView.isHidden = !hasPhotos
             self.galleryCollectionView.reloadData()
@@ -2198,9 +2203,9 @@ final class PublicProfileScreenNode: ASDisplayNode {
             let hasVideos = !self.videoGalleryItems.isEmpty
             self.videoGalleryStatusView.isHidden = hasVideos
             if isMyProfile {
-                self.videoGalleryStatusView.configure(isLoading: false, text: "Upload your videos", isMyProfile: true)
+                self.videoGalleryStatusView.configure(isLoading: false, text: DivoStrings.uploadYourVideos, isMyProfile: true)
             } else {
-                self.videoGalleryStatusView.configure(isLoading: false, text: "No videos yet", isMyProfile: false)
+                self.videoGalleryStatusView.configure(isLoading: false, text: DivoStrings.noVideosYet, isMyProfile: false)
             }
             self.videoGalleryCollectionView.isHidden = !hasVideos
             self.videoGalleryCollectionView.reloadData()
@@ -2421,7 +2426,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.channelGalleryStatusView.isHidden = hasItems
         self.channelGalleryCollectionView.isHidden = !hasItems
         if !hasItems {
-            self.channelGalleryStatusView.configure(isLoading: false, text: model.isMyProfile ? "Add channel" : "No channels yet", isMyProfile: model.isMyProfile)
+            self.channelGalleryStatusView.configure(isLoading: false, text: model.isMyProfile ? DivoStrings.addChannel : DivoStrings.noChannelsYet, isMyProfile: model.isMyProfile)
         }
         self.channelGalleryCollectionView.reloadData()
         
@@ -2464,7 +2469,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.modelGalleryStatusView.isHidden = hasItems
         self.modelGalleryCollectionView.isHidden = !hasItems
         if !hasItems {
-            self.modelGalleryStatusView.configure(isLoading: false, text: model.isMyProfile ? "Add model" : "No models yet", isMyProfile: model.isMyProfile)
+            self.modelGalleryStatusView.configure(isLoading: false, text: model.isMyProfile ? DivoStrings.addModel : DivoStrings.noModelsYet, isMyProfile: model.isMyProfile)
         }
         self.modelGalleryCollectionView.reloadData()
         
@@ -2505,7 +2510,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         self.eventGalleryStatusView.isHidden = hasItems
         self.eventGalleryCollectionView.isHidden = !hasItems
         if !hasItems {
-            self.eventGalleryStatusView.configure(isLoading: false, text: model.isMyProfile ? "Add event" : "No events yet", isMyProfile: model.isMyProfile)
+            self.eventGalleryStatusView.configure(isLoading: false, text: model.isMyProfile ? DivoStrings.addEvent : DivoStrings.noEventsYet, isMyProfile: model.isMyProfile)
         }
         self.eventGalleryCollectionView.reloadData()
         

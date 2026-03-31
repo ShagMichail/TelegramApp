@@ -20,9 +20,9 @@ import AppBundle
 public class OnboardingScreenController: UIViewController {
     
     private let pagesData: [OnboardingPage] = [
-        OnboardingPage(imageName: "Onboarding/OnboardingFirst", title: "STEP INTO THE FASHION WORLD"),
-        OnboardingPage(imageName: "Onboarding/OnboardingSecond", title: "FROM SELFIE TO SPOTLIGHT"),
-        OnboardingPage(imageName: "Onboarding/OnboardingThird", title: "WHERE NEW MODELS ARE BORN")
+        OnboardingPage(imageName: "Onboarding/OnboardingFirst", title: DivoStrings.onboardingTitle1),
+        OnboardingPage(imageName: "Onboarding/OnboardingSecond", title: DivoStrings.onboardingTitle2),
+        OnboardingPage(imageName: "Onboarding/OnboardingThird", title: DivoStrings.onboardingTitle3)
     ]
     
     public var onFinish: (() -> Void)?
@@ -87,7 +87,7 @@ public class OnboardingScreenController: UIViewController {
         
         setupIndicators()
         
-        continueButton.setTitle("Continue", for: .normal)
+        continueButton.setTitle(DivoStrings.continueButton, for: .normal)
         continueButton.titleLabel?.font = Font.helveticaNeue(20)
         continueButton.backgroundColor = brandColor
         continueButton.setTitleColor(.white, for: .normal)

@@ -152,6 +152,7 @@ class ProfileHeaderView: UIView {
         label.translatesAutoresizingMaskIntoConstraints = false
         label.setContentHuggingPriority(.required, for: .horizontal)
         label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 24).isActive = true
         return label
     }()
     
@@ -176,7 +177,7 @@ class ProfileHeaderView: UIView {
         
         onlineStatusView.layer.cornerRadius = 8
         crownIconView.layer.cornerRadius = 12
-        tagContainer.layer.cornerRadius = 10
+        tagContainer.layer.cornerRadius = 12
     }
     
     private func setupViews() {
@@ -228,7 +229,7 @@ class ProfileHeaderView: UIView {
             crownIconView.heightAnchor.constraint(equalToConstant: 24),
             
             tagContainer.leadingAnchor.constraint(equalTo: nameLabel.leadingAnchor),
-            tagContainer.heightAnchor.constraint(equalToConstant: 20),
+            tagContainer.heightAnchor.constraint(equalToConstant: 24),
             tagContainer.centerYAnchor.constraint(equalTo: infoLabel.centerYAnchor),
             
             tagIcon.leadingAnchor.constraint(equalTo: tagContainer.leadingAnchor, constant: 4),
@@ -282,7 +283,7 @@ class ProfileHeaderView: UIView {
         
         var fullLocationString: String
         if let age = viewModel.age  {
-            fullLocationString = "\(age) y.o • \(viewModel.countryFlag) \(viewModel.location)"
+            fullLocationString = "\(DivoStrings.ageString(age)) • \(viewModel.countryFlag) \(viewModel.location)"
         } else {
             fullLocationString = "\(viewModel.countryFlag) \(viewModel.location)"
         }

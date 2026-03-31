@@ -89,7 +89,7 @@ final class EventCollectionViewCell: UICollectionViewCell {
         timeRemainingLabel.translatesAutoresizingMaskIntoConstraints = false
         timeRemainingContainer.addSubview(timeRemainingLabel)
 
-        applyButton.setTitle("Apply", for: .normal)
+        applyButton.setTitle(DivoStrings.apply, for: .normal)
         applyButton.titleLabel?.font = .systemFont(ofSize: 11, weight: .semibold)
         applyButton.setTitleColor(.white, for: .normal)
         applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)

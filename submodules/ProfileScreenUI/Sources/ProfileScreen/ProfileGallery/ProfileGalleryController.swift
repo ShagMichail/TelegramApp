@@ -68,7 +68,7 @@ public class ProfileGalleryController: TelegramBaseController {
         self.supportedOrientations = ViewControllerSupportedOrientations(regularSize: .portrait, compactSize: .portrait)
         
         let totalCount = isVideoGallery ? videos.count : photos.count
-        self.title = "\(initialIndex + 1) of \(totalCount)"
+        self.title = DivoStrings.xOfY(initialIndex + 1, totalCount)
         
         if isOwnProfile {
             let editButtonImg = generateTintedImage(image: UIImage(bundleImageName: "Profile/MoreActionIcon"), color: .white)
@@ -113,7 +113,7 @@ public class ProfileGalleryController: TelegramBaseController {
         self.galleryNode.requestMoreData = self.requestMoreData
         
         self.galleryNode.onIndexChanged = { [weak self] index, total in
-            self?.title = "\(index + 1) of \(total)"
+            self?.title = DivoStrings.xOfY(index + 1, total)
         }
         
         self.displayNodeDidLoad()
@@ -123,11 +123,11 @@ public class ProfileGalleryController: TelegramBaseController {
         guard let publicationId = self.galleryNode.getCurrentPublicationId() else { return }
         let actionSheet = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
         
-        let deleteAction = UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
+        let deleteAction = UIAlertAction(title: DivoStrings.delete, style: .destructive) { [weak self] _ in
             self?.performDeletePublication(id: publicationId)
         }
         
-        let cancelAction = UIAlertAction(title: "Cancel", style: .cancel, handler: nil)
+        let cancelAction = UIAlertAction(title: DivoStrings.cancel, style: .cancel, handler: nil)
         
         actionSheet.addAction(deleteAction)
         actionSheet.addAction(cancelAction)
@@ -166,7 +166,7 @@ public class ProfileGalleryController: TelegramBaseController {
                     let totalCount = self.isVideoGallery ? self.videos.count : self.photos.count
                     if totalCount > 0 {
                         let currentIndex = min(self.galleryNode.currentIndex, totalCount - 1)
-                        self.title = "\(currentIndex + 1) of \(totalCount)"
+                        self.title = DivoStrings.xOfY(currentIndex + 1, totalCount)
                     } else {
                         if let nav = self.navigationController as? NavigationController {
                             _ = nav.popViewController(animated: true)
@@ -175,7 +175,7 @@ public class ProfileGalleryController: TelegramBaseController {
                         }
                     }
                 } else {
-                    self.showAlert(text: response.errors?.first ?? "Failed to delete")
+                    self.showAlert(text: response.errors?.first ?? DivoStrings.failedToDelete)
                 }
             } catch {
                 print("❌ Error deleting publication: \(error)")
@@ -185,8 +185,8 @@ public class ProfileGalleryController: TelegramBaseController {
     }
     
     private func showAlert(text: String) {
-        let alert = UIAlertController(title: "Error", message: text, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default, handler: nil))
+        let alert = UIAlertController(title: DivoStrings.error, message: text, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: DivoStrings.ok, style: .default, handler: nil))
         self.present(alert, animated: true)
     }
     
@@ -197,7 +197,7 @@ public class ProfileGalleryController: TelegramBaseController {
         self.galleryNode.updateData(photos: photos, videos: videos)
         
         let totalCount = self.isVideoGallery ? videos.count : photos.count
-        self.title = "\(self.galleryNode.currentIndex + 1) of \(totalCount)"
+        self.title = DivoStrings.xOfY(self.galleryNode.currentIndex + 1, totalCount)
     }
     
     public func finishLoadingWithoutNewData() {

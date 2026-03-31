@@ -136,19 +136,19 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
         let semiboldFont = Font.semibold(16)
 
         self.eventInfoLabel = ASTextNode()
-        self.eventInfoLabel.attributedText = NSAttributedString(string: "Work experience info", font: semiboldFont, textColor: headerColor)
+        self.eventInfoLabel.attributedText = NSAttributedString(string: DivoStrings.workExperienceInfo, font: semiboldFont, textColor: headerColor)
 
         self.nameEventLabel = ASTextNode()
-        self.nameEventLabel.attributedText = NSAttributedString(string: "Agency name", font: regularFont, textColor: labelColor)
+        self.nameEventLabel.attributedText = NSAttributedString(string: DivoStrings.agencyName, font: regularFont, textColor: labelColor)
 
-        self.nameEventTextField = getTextFiel(title: "Enter agency name")
+        self.nameEventTextField = getTextFiel(title: DivoStrings.enterAgencyName)
 
         self.startDateLabel = ASTextNode()
-        self.startDateLabel.attributedText = NSAttributedString(string: "Start date", font: regularFont, textColor: labelColor)
+        self.startDateLabel.attributedText = NSAttributedString(string: DivoStrings.startDate, font: regularFont, textColor: labelColor)
         self.startDateTextField = getTextFiel(title: "27 Jun 2025")
 
         self.endTimeLabel = ASTextNode()
-        self.endTimeLabel.attributedText = NSAttributedString(string: "End date", font: regularFont, textColor: labelColor)
+        self.endTimeLabel.attributedText = NSAttributedString(string: DivoStrings.endDate, font: regularFont, textColor: labelColor)
         self.endTimeTextField = getTextFiel(title: "27 Jun 2025")
 
         self.currentlyWorkingContainer = ASDisplayNode()
@@ -158,7 +158,7 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
 
         self.currentlyWorkingLabel = ASTextNode()
         self.currentlyWorkingLabel.attributedText = NSAttributedString(
-            string: "I am currently working in this role",
+            string: DivoStrings.currentlyWorking,
             font: semiboldFont,
             textColor: labelColor
         )
@@ -167,7 +167,7 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
         self.currentlyWorkingContainer.addSubnode(self.currentlyWorkingCheckbox)
         self.currentlyWorkingContainer.addSubnode(self.currentlyWorkingLabel)
 
-        let buttonTitle = editItem != nil ? "Save Changes" : "Create New Work Experience"
+        let buttonTitle = editItem != nil ? DivoStrings.saveChanges : DivoStrings.createNewWorkExperience
         self.applyButton = ButtonWithIconNode(title: buttonTitle, icon: nil, theme: presentationData.theme, spacing: 10, imageSize: CGSize(width: 24, height: 24))
         self.applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
 
@@ -258,7 +258,7 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
         let agencyName = nameEventTextField.textField.text ?? ""
 
         guard startTime > 0 else {
-            self.showAlert?("Please fill in the start date")
+            self.showAlert?(DivoStrings.pleaseFillStartDate)
             return
         }
 
@@ -316,7 +316,7 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
 
         let displayFormatter = DateFormatter()
         displayFormatter.dateFormat = "d MMM yyyy"
-        displayFormatter.locale = Locale(identifier: "en_US_POSIX")
+        displayFormatter.locale = Locale(identifier: DivoStrings.current.localeIdentifier)
 
         if let startStr = item.startDate, let startDate = inputFormatter.date(from: startStr) {
             startTime = Int32(startDate.timeIntervalSince1970)
@@ -350,7 +350,7 @@ final class AddWorkExperience: ASDisplayNode, UITextFieldDelegate {
     func updateTime(_ timestamp: Int32, type: TimeType) {
         let date = Date(timeIntervalSince1970: TimeInterval(timestamp))
         let dateFormatter = DateFormatter()
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.locale = Locale(identifier: DivoStrings.current.localeIdentifier)
         dateFormatter.dateFormat = "d MMM yyyy"
         let dateString = dateFormatter.string(from: date)
         dateFormatter.dateFormat = "d MMM yyyy"

@@ -27,6 +27,7 @@ final class SimilarProfileCell: UICollectionViewCell {
         label.font = Font.helveticaNeue(12)
         label.textColor = UIColor(hex: "#222222")
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 22).isActive = true
         return label
     }()
 
@@ -35,6 +36,7 @@ final class SimilarProfileCell: UICollectionViewCell {
         label.font = Font.helveticaNeue(12)
         label.textColor = UIColor(hex: "#222222").withAlphaComponent(0.6)
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 22).isActive = true
         return label
     }()
 
