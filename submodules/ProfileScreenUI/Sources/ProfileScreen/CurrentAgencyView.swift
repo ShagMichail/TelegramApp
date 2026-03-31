@@ -32,6 +32,7 @@ final class CurrentAgencyView: UIView {
         label.font = Font.helveticaNeue(12)
         label.textColor = .white
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 22).isActive = true
         return label
     }()
     
@@ -50,12 +51,14 @@ final class CurrentAgencyView: UIView {
         label.font = Font.helveticaNeue(12)
         label.textColor = .white
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 22).isActive = true
         return label
     }()
     
     private let seeHistoryButton: UIButton = {
         let button = UIButton(type: .system)
         button.titleLabel?.font = Font.helveticaNeue(10)
+        button.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 20).isActive = true
         button.setTitleColor(.white.withAlphaComponent(0.82), for: .normal)
         button.setTitle(DivoStrings.seeHistory, for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false

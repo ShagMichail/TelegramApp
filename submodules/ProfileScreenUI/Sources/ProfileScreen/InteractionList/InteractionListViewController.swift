@@ -48,6 +48,7 @@ final class InteractionListViewController: UIViewController {
         label.textColor = UIColor(hexString: "#000000")
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 38).isActive = true
         return label
     }()
     
@@ -57,6 +58,7 @@ final class InteractionListViewController: UIViewController {
         label.textColor = UIColor(hexString: "#222222")
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 26).isActive = true
         return label
     }()
 
@@ -66,6 +68,7 @@ final class InteractionListViewController: UIViewController {
         label.textColor = UIColor(hexString: "#222222")
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 30).isActive = true
         return label
     }()
 

@@ -261,7 +261,8 @@ final class CardCollectionViewCell: UICollectionViewCell {
             stackView.centerXAnchor.constraint(equalTo: dmButton.centerXAnchor),
             stackView.centerYAnchor.constraint(equalTo: dmButton.centerYAnchor),
             iconImageView.widthAnchor.constraint(equalToConstant: 20),
-            iconImageView.heightAnchor.constraint(equalToConstant: 20)
+            iconImageView.heightAnchor.constraint(equalToConstant: 20),
+            label.heightAnchor.constraint(greaterThanOrEqualToConstant: 24)
         ])
     }
 

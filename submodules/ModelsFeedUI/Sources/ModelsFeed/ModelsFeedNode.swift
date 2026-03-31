@@ -299,6 +299,7 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
             let button = UIButton(type: .system)
             button.setTitle(title, for: .normal)
             button.titleLabel?.font = Font.helveticaNeue(12)
+            button.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 22).isActive = true
             button.setTitleColor(index == 0 ? .black : UIColor(white: 0.5, alpha: 1.0), for: .normal)
             button.tag = index
             button.addTarget(self, action: #selector(tabButtonTapped(_:)), for: .touchUpInside)
@@ -318,8 +319,9 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
                     button.setTitle(self.tabTitles[index], for: .normal)
                 }
             }
-            self.tabsStackView.layoutIfNeeded()
-            self.layoutTabIndicator()
+            if let (layout, navigationBarHeight) = self.containerLayout {
+                self.containerLayoutUpdated(layout, navigationBarHeight: navigationBarHeight, transition: .immediate)
+            }
             self.storiesCollectionView.reloadData()
             self.mainCollectionView.reloadData()
         }
@@ -363,7 +365,7 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
 
         let indicatorHeight: CGFloat = 2
         let textSize: CGSize
-        if let title = selectedButton.titleLabel?.text, let font = selectedButton.titleLabel?.font {
+        if let title = selectedButton.title(for: .normal), let font = selectedButton.titleLabel?.font {
             textSize = (title as NSString).size(withAttributes: [.font: font])
         } else {
             textSize = selectedButton.bounds.size
@@ -375,7 +377,7 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
 
         tabIndicatorView.frame = CGRect(
             x: floor(indicatorX),
-            y: buttonFrame.maxY - indicatorHeight - 2,
+            y: tabsHeight - indicatorHeight,
             width: indicatorWidth,
             height: indicatorHeight
         )
@@ -406,13 +408,14 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         self.storiesCollectionView.contentInset = .zero
         self.storiesCollectionView.scrollIndicatorInsets = .zero
 
-        let stackSize = tabsStackView.systemLayoutSizeFitting(
-            CGSize(width: CGFloat.greatestFiniteMagnitude, height: tabsHeight),
-            withHorizontalFittingPriority: .fittingSizeLevel,
-            verticalFittingPriority: .required)
-        let stackWidth = max(stackSize.width + 30, layout.size.width)
-        tabsStackView.frame = CGRect(x: 15, y: 0, width: stackWidth, height: tabsHeight - 2)
-        tabsScrollView.contentSize = CGSize(width: stackWidth + 30, height: tabsHeight)
+        var buttonsWidth: CGFloat = 0
+        for view in tabsStackView.arrangedSubviews {
+            buttonsWidth += view.intrinsicContentSize.width
+        }
+        let spacing = tabsStackView.spacing * CGFloat(max(tabsStackView.arrangedSubviews.count - 1, 0))
+        let stackWidth = ceil(buttonsWidth + spacing)
+        tabsStackView.frame = CGRect(x: 16, y: 0, width: stackWidth, height: tabsHeight - 2)
+        tabsScrollView.contentSize = CGSize(width: stackWidth + 32, height: tabsHeight)
 
         let headerHeight = navigationBarHeight + storiesHeight + tabsHeight
         let collapsedHeaderHeight = navigationBarHeight + tabsHeight
@@ -444,7 +447,8 @@ final class ModelsFeedNode: ASDisplayNode, UICollectionViewDataSource, UICollect
         titleLabel.sizeToFit()
         let titleX: CGFloat = 16 + layout.safeInsets.left
         let titleY: CGFloat = navigationBarHeight - titleLabel.frame.height - 10
-        titleLabel.frame = CGRect(x: titleX, y: titleY, width: ceil(titleLabel.frame.width), height: ceil(titleLabel.frame.height) + 2)
+        let titleH: CGFloat = ceil(titleLabel.frame.height) + 6 // +4pt top / +2pt bottom for CJK
+        titleLabel.frame = CGRect(x: titleX, y: titleY - 4, width: ceil(titleLabel.frame.width), height: titleH)
 
         let scrollOffset = max(mainCollectionView.contentOffset.y, 0)
         let p = min(scrollOffset / storiesHeight, 1.0)

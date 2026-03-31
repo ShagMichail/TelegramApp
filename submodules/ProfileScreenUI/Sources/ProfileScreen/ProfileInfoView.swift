@@ -17,7 +17,7 @@ final class ProfileInfoView: UIView {
     private var isExpanded: Bool = false
     private var biographyText: String
     private var appearanceData: [AppearanceAttribute]
-    private let headerHeight: CGFloat = 26
+    private let headerHeight: CGFloat = 32
     
     private var selectedIndex: Int = 0 {
         didSet {
@@ -31,15 +31,17 @@ final class ProfileInfoView: UIView {
     private let biographyButton: UIButton = {
         let button = UIButton(type: .system)
         button.titleLabel?.font = Font.helveticaNeue(10)
+        button.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 20).isActive = true
         button.setTitleColor(.white, for: .normal)
         button.setTitle(DivoStrings.biography, for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
-    
+
     private let appearanceButton: UIButton = {
         let button = UIButton(type: .system)
         button.titleLabel?.font = Font.helveticaNeue(10)
+        button.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 20).isActive = true
         button.setTitleColor(.white, for: .normal)
         button.setTitle(DivoStrings.appearance, for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false

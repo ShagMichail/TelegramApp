@@ -262,6 +262,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         button.setTitle(DivoStrings.addWorkHistory, for: .normal)
         button.setTitleColor(.white.withAlphaComponent(0.88), for: .normal)
         button.titleLabel?.font = Font.helveticaNeue(13)
+        button.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 24).isActive = true
         button.contentHorizontalAlignment = .left
         button.contentEdgeInsets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
         button.backgroundColor = .black.withAlphaComponent(0.15)
@@ -296,12 +297,13 @@ final class PublicProfileScreenNode: ASDisplayNode {
     private let editLinksButton: UIButton = {
         let button = UIButton(type: .system)
         button.titleLabel?.font = Font.helveticaNeue(10)
+        button.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 20).isActive = true
         button.setTitleColor(.white, for: .normal)
         button.setTitle(DivoStrings.editLinks, for: .normal)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
-    
+
     private let editLinksLabel: UILabel = {
         let label = UILabel()
         label.font = Font.helveticaNeue(14)
@@ -309,6 +311,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         label.numberOfLines = 0
         label.translatesAutoresizingMaskIntoConstraints = false
         label.text = DivoStrings.myLinks
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 24).isActive = true
         return label
     }()
     
@@ -579,6 +582,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         label.font = Font.helveticaNeue(18)
         label.textColor = UIColor(hex: "#222222")
         label.translatesAutoresizingMaskIntoConstraints = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 30).isActive = true
         return label
     }()
     
@@ -1289,10 +1293,11 @@ final class PublicProfileScreenNode: ASDisplayNode {
             stackView.centerXAnchor.constraint(equalTo: dmButton.centerXAnchor),
             stackView.centerYAnchor.constraint(equalTo: dmButton.centerYAnchor),
             iconImageView.widthAnchor.constraint(equalToConstant: 20),
-            iconImageView.heightAnchor.constraint(equalToConstant: 20)
+            iconImageView.heightAnchor.constraint(equalToConstant: 20),
+            label.heightAnchor.constraint(greaterThanOrEqualToConstant: 24)
         ])
     }
-    
+
     // Создание кнопок счетчиков (лайки, просмотры, сохраненки)
     private func setupCounterView(_ container: UIControl, count: String, name: String, iconName: String) {
         // Важно: не пересоздаем subviews/constraints каждый раз.

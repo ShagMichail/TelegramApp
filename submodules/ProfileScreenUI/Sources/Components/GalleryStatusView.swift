@@ -44,6 +44,7 @@ final class GalleryStatusView: UIControl {
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
         label.isUserInteractionEnabled = false
+        label.heightAnchor.constraint(greaterThanOrEqualToConstant: 20).isActive = true
         return label
     }()
     

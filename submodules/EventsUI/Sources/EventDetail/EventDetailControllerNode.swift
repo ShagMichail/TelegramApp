@@ -134,6 +134,7 @@ final class EventDetailControllerNode: ASDisplayNode {
         eventTitleLabel.font = Font.helveticaNeue(30)
         eventTitleLabel.textColor = .white
         eventTitleLabel.textAlignment = .center
+        eventTitleLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 42).isActive = true
 
         eventSubtitleLabel.text = "May 27 · 5:00 PM · 🇺🇸 New York"
         eventSubtitleLabel.font = .systemFont(ofSize: 14)
@@ -158,6 +159,7 @@ final class EventDetailControllerNode: ASDisplayNode {
 
         applyButton.setTitle(DivoStrings.apply, for: .normal)
         applyButton.titleLabel?.font = Font.helveticaNeue(14)
+        applyButton.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 24).isActive = true
         applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
         applyButton.setTitleColor(.white, for: .normal)
         applyButton.layer.cornerRadius = 6
@@ -240,6 +242,7 @@ final class EventDetailControllerNode: ASDisplayNode {
         previousEventsTitleLabel.text = DivoStrings.previousEvents
         previousEventsTitleLabel.font = Font.helveticaNeue(20)
         previousEventsTitleLabel.textColor = UIColor(red: 0.13, green: 0.13, blue: 0.13, alpha: 1.00)
+        previousEventsTitleLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 30).isActive = true
 
         previousEventsCollectionView.backgroundColor = .clear
         previousEventsCollectionView.dataSource = self

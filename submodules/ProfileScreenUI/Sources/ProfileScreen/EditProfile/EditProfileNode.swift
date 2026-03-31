@@ -79,14 +79,16 @@ final class EditProfileNode: ASDisplayNode {
         let button = UIButton(type: .system)
         button.setTitle(DivoStrings.biography, for: .normal)
         button.titleLabel?.font = Font.helveticaNeue(12)
+        button.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 22).isActive = true
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
-    
+
     private let appearanceButton: UIButton = {
         let button = UIButton(type: .system)
         button.setTitle(DivoStrings.appearance, for: .normal)
         button.titleLabel?.font = Font.helveticaNeue(12)
+        button.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 22).isActive = true
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()

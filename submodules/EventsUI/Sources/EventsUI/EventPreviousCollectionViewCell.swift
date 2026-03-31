@@ -63,6 +63,7 @@ final class EventPreviousCollectionViewCell: UICollectionViewCell {
         tagLabel.font = Font.helveticaNeue(10)
         tagLabel.textColor = .black
         tagLabel.translatesAutoresizingMaskIntoConstraints = false
+        tagLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 20).isActive = true
         tagContainer.addSubview(tagLabel)
         
         
@@ -85,6 +86,7 @@ final class EventPreviousCollectionViewCell: UICollectionViewCell {
         titleLabel.textColor = .white
         titleLabel.numberOfLines = 0
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 30).isActive = true
         contentView.addSubview(titleLabel)
         
         subtitleLabel.font = .systemFont(ofSize: 10, weight: .regular)
@@ -95,6 +97,7 @@ final class EventPreviousCollectionViewCell: UICollectionViewCell {
         
         applyButton.setTitle(DivoStrings.apply, for: .normal)
         applyButton.titleLabel?.font = Font.helveticaNeue(11)
+        applyButton.titleLabel?.heightAnchor.constraint(greaterThanOrEqualToConstant: 20).isActive = true
         applyButton.setTitleColor(.white, for: .normal)
         applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
         applyButton.layer.cornerRadius = 6
