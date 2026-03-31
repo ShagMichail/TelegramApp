@@ -607,6 +607,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
     var onEditLinksTapped: (() -> Void)?
     var onAddPhotoTapped: (() -> Void)?
     var onAddVideoTapped: (() -> Void)?
+    var onAddEventTapped: (() -> Void)?
     var onGalleryItemTapped: ((Int, Int) -> Void)? 
     var onSocialLinkTapped: ((String) -> Void)?
 
@@ -1100,6 +1101,7 @@ final class PublicProfileScreenNode: ASDisplayNode {
         eventGalleryCollectionView.isHidden = true
         eventGalleryStatusView.isHidden = false
         eventGalleryStatusView.configure(isLoading: true, text: "Loading events...", isMyProfile: false)
+        eventGalleryStatusView.addTarget(self, action: #selector(eventGalleryStatusTapped), for: .touchUpInside)
     }
     
     private func setupSimilarProfiles() {
@@ -2658,6 +2660,10 @@ final class PublicProfileScreenNode: ASDisplayNode {
 
     @objc private func videoGalleryStatusTapped() {
         onAddVideoTapped?()
+    }
+
+    @objc private func eventGalleryStatusTapped() {
+        onAddEventTapped?()
     }
 }
 

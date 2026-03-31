@@ -58,7 +58,6 @@ final class EventParametersSheetController: UIViewController, UITableViewDelegat
         subtitle.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(subtitle)
         
-        // Таблица
         tableView.backgroundColor = .clear
         tableView.separatorStyle = .none
         tableView.delegate = self
@@ -97,7 +96,7 @@ final class EventParametersSheetController: UIViewController, UITableViewDelegat
     }
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return allParameters.count
+        return allParameters.count + 1
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -105,25 +104,38 @@ final class EventParametersSheetController: UIViewController, UITableViewDelegat
             return UITableViewCell()
         }
         
-        let param = allParameters[indexPath.row]
-        let isSelected = selectedParameters.contains(param)
-        
-        cell.configure(title: param.rawValue, isSelected: isSelected)
+        if indexPath.row == 0 {
+            let isAllSelected = selectedParameters.count == allParameters.count
+            cell.configure(title: "All Members", isSelected: isAllSelected)
+        } else {
+            let param = allParameters[indexPath.row - 1]
+            let isSelected = selectedParameters.contains(param)
+            cell.configure(title: param.rawValue, isSelected: isSelected)
+        }
         
         return cell
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return 30.0
+        return 36.0
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        let param = allParameters[indexPath.row]
-        if selectedParameters.contains(param) {
-            selectedParameters.remove(param)
+        if indexPath.row == 0 {
+            if selectedParameters.count == allParameters.count {
+                selectedParameters.removeAll()
+            } else {
+                selectedParameters = Set(allParameters)
+            }
         } else {
-            selectedParameters.insert(param)
+            let param = allParameters[indexPath.row - 1]
+            if selectedParameters.contains(param) {
+                selectedParameters.remove(param)
+            } else {
+                selectedParameters.insert(param)
+            }
         }
-        tableView.reloadRows(at: [indexPath], with: .fade)
+        
+        tableView.reloadData()
     }
 }

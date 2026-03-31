@@ -308,10 +308,14 @@ public final class PublicProfileScreenController: TelegramBaseController {
             }
         }
 
-         self.controllerNode.onAddVideoTapped = { [weak self] in
+        self.controllerNode.onAddVideoTapped = { [weak self] in
             if #available(iOS 14, *) {
                 self?.navigateToAddVideo()
             }
+        }
+
+        self.controllerNode.onAddEventTapped = { [weak self] in
+            self?.navigateToCreateEvent()
         }
 
         self.controllerNode.onSocialLinkTapped = { [weak self] url in

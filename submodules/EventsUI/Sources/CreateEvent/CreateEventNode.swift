@@ -20,6 +20,7 @@ enum EventParameter: String, CaseIterable {
     case age = "Age"
     case height = "Height"
     case weight = "Weight"
+    case breast = "Breast"
     case waist = "Waist"
     case hips = "Hips"
     case shoeSize = "Shoe size"
@@ -68,8 +69,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     private let aboutEventLabel: ASTextNode
     private let aboutEventTextField: MultilineTextFieldNode
 
-    private let eventTypeLabel: ASTextNode
-    private let eventTypeTextField: TextFieldNode
+    private var eventTypeDropdown: DropdownNode
 
     private let eventDateLabel: ASTextNode
     private let eventDateTextField: TextFieldNode
@@ -89,6 +89,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     private var ageSlider: AgeSliderNode<Int>?
     private var heightSlider: AgeSliderNode<Double>?
     private var weightSlider: AgeSliderNode<Double>?
+    private var breastSlider: AgeSliderNode<Double>?
     private var waistSlider: AgeSliderNode<Double>?
     private var hipsSlider: AgeSliderNode<Double>?
     private var shoeSizeSlider: AgeSliderNode<Double>?
@@ -121,14 +122,27 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
 
     private let applyButton: ASControlNode
 
+    var onCreateEventTapped: (() -> Void)?
     var onAddParametersTapped: ((Set<EventParameter>) -> Void)?
     private let addPhoto: () -> Void
     var selectCountryCode: (() -> Void)?
     var scheduleTimeController: ((TimeControllerMode) -> Void)?
     var showAlert: ((String) -> Void)?
     var onAddGalleryPhotoTapped: (() -> Void)?
+    var loadEventTypesList: ((Int, Int) -> Void)?
 
+    // private var isLoadingAgencies: Bool = false
     private var countryId: String = ""
+
+    private var eventTypeItems: [AgencyItem] = []
+    private var selectedEventTypeId: Int?
+    private var eventTypeOffset: Int = 0
+    private var eventTypeLimit: Int = 20
+    private var isLoadingEventTypes: Bool = false
+    private var hasMoreEventTypes: Bool = true
+    
+    var avatarFileUuid: String? = nil
+    var isAvatarUploading: Bool = false
 
     var currentPhoto: UIImage? = nil {
         didSet {
@@ -204,9 +218,19 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
 
         self.aboutEventTextField = getEditableText(placeholder: "Description event")
 
-        self.eventTypeLabel = ASTextNode()
-        self.eventTypeLabel.attributedText = NSAttributedString(string: "Event type", font: regularFont, textColor: labelColor)
-        self.eventTypeTextField = getTextFiel(title: "Choose event type")
+        let eventTypeDropdown = DropdownNode(
+            title: "Event type",
+            placeholder: "Choose event type",
+            options: [],
+            backgroundColor: UIColor(hexString: "#EFEFF0"),
+            placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
+            titleColor: UIColor(hexString: "#3C3C43"),
+            arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
+            apperTitleColor: UIColor(hexString: "#3C3C43"),
+            allowsMultipleSelection: false
+        )
+
+        self.eventTypeDropdown = eventTypeDropdown
 
         self.eventDateLabel = ASTextNode()
         self.eventDateLabel.attributedText = NSAttributedString(string: "Event Date", font: regularFont, textColor: labelColor)
@@ -235,6 +259,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         self.eventGalleryLabel.attributedText = NSAttributedString(string: "Event Gallery", font: semiboldFont, textColor: headerColor)
 
         super.init()
+        self.nameEventTextField.textField.delegate = self
         self.venueEventTextField.textField.delegate = self
         self.eventDateTextField.textField.delegate = self
         self.eventTimeTextField.textField.delegate = self
@@ -251,8 +276,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         self.scrollNode.addSubnode(self.aboutEventLabel)
         self.scrollNode.addSubnode(self.aboutEventTextField)
 
-        self.scrollNode.addSubnode(self.eventTypeLabel)
-        self.scrollNode.addSubnode(self.eventTypeTextField)
+        self.scrollNode.addSubnode(eventTypeDropdown)
 
         self.scrollNode.addSubnode(self.eventDateLabel)
         self.scrollNode.addSubnode(self.eventDateTextField)
@@ -332,6 +356,14 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         return true
     }
 
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        if textField == nameEventTextField.textField {
+            textField.resignFirstResponder()
+            return true
+        }
+        return true
+    }
+
     func uploadPhotoToCloud(context: AccountContext, image: UIImage) -> Signal<Int64?, NoError> {
         guard image.jpegData(compressionQuality: 0.9) != nil else {
             return .single(nil)
@@ -395,6 +427,43 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     func cancelPhotoUpload(item: EventGalleryItem) {
         removePhoto(item: item)
     }
+
+    func loadEventTypesComplete(_ items: [AgencyItem], totalCount: Int, offset: Int) {
+        self.isLoadingEventTypes = false
+        
+        if offset == 0 {
+            self.eventTypeItems = items
+        } else {
+            let existingIds = Set(self.eventTypeItems.map { $0.id })
+            let newItems = items.filter { !existingIds.contains($0.id) }
+            self.eventTypeItems.append(contentsOf: newItems)
+        }
+        
+        self.hasMoreEventTypes = self.eventTypeItems.count < totalCount
+        self.eventTypeDropdown.isLoading = false
+        
+        self.eventTypeDropdown.updateOptions(self.eventTypeItems.map { $0.title })
+
+        if self.hasMoreEventTypes {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.loadMoreEventTypes()
+            }
+        }
+    }
+    
+    func configureEventTypeList(_ items: [AgencyItem], totalCount: Int) {
+        self.eventTypeItems = items
+        self.eventTypeDropdown.options = items.map { $0.title }
+        self.eventTypeDropdown.isLoading = false
+        self.eventTypeDropdown.setNeedsLayout()
+        self.hasMoreEventTypes = self.eventTypeOffset + self.eventTypeLimit < totalCount
+    }
+    
+    func appendEventTypeItems(_ items: [AgencyItem]) {
+        self.eventTypeItems.append(contentsOf: items)
+        self.eventTypeDropdown.options = self.eventTypeItems.map { $0.title }
+        self.eventTypeDropdown.setNeedsLayout()
+    }
     
     func removePhoto(item: EventGalleryItem) {
         guard let index = galleryItems.firstIndex(of: item) else { return }
@@ -453,12 +522,8 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         transition.updateFrame(node: self.aboutEventTextField, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: fullWidth, height: aboutEventHeight)))
         currentY += aboutEventHeight + sectionSpacing
         
-        let eventTypeLabelSize = self.eventTypeLabel.measure(CGSize(width: fullWidth, height: .greatestFiniteMagnitude))
-        transition.updateFrame(node: self.eventTypeLabel, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: eventTypeLabelSize))
-        currentY += eventTypeLabelSize.height + halfItemSpacing
-        
-        transition.updateFrame(node: self.eventTypeTextField, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: fullWidth, height: itemHeight)))
-        currentY += itemHeight + sectionSpacing
+        transition.updateFrame(node: eventTypeDropdown, frame: CGRect(origin: CGPoint(x: sidePadding, y: currentY), size: CGSize(width: fullWidth, height: 80)))
+        currentY += 80 + sectionSpacing
         
         let dateWidth: CGFloat = floor((layout.size.width - sidePadding * 3) / 2.0)
         
@@ -609,7 +674,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
             }
         }
 
-        let allNodes: [ASDisplayNode?] = [genderDropdown, ageSlider, heightSlider, weightSlider, waistSlider, hipsSlider, shoeSizeSlider, hairLengthDropdown, hairColorDropdown, eyeColorDropdown, skinColorDropdown]
+        let allNodes: [ASDisplayNode?] = [genderDropdown, ageSlider, heightSlider, weightSlider, breastSlider, waistSlider, hipsSlider, shoeSizeSlider, hairLengthDropdown, hairColorDropdown, eyeColorDropdown, skinColorDropdown]
         for node in allNodes {
             node?.isHidden = true
         }
@@ -635,7 +700,19 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
     private func getOrCreateNode(for param: EventParameter) -> ASDisplayNode {
         switch param {
         case .gender:
-            if genderDropdown == nil { genderDropdown = DropdownNode(title: "Gender", placeholder: "Select Gender", options: ["Loading..."], backgroundColor: UIColor(hexString: "#EFEFF0"), placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), titleColor: UIColor(hexString: "#3C3C43"), arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), apperTitleColor: UIColor(hexString: "#3C3C43")) }
+            if genderDropdown == nil {
+                genderDropdown = DropdownNode(
+                    title: "Gender",
+                    placeholder: "Select Gender",
+                    options: [],
+                    backgroundColor: UIColor(hexString: "#EFEFF0"),
+                    placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
+                    titleColor: UIColor(hexString: "#3C3C43"),
+                    arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
+                    apperTitleColor: UIColor(hexString: "#3C3C43"),
+                    allowsMultipleSelection: true
+                )
+            }
             self.genderDropdown?.options = self.genderDictionaries?.data.map { $0.title } ?? []
             return genderDropdown!
         case .age:
@@ -682,6 +759,21 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
                 setupSliderTouchHandling(for: weightSlider!)
             }
             return weightSlider!
+        case .breast:
+            let singleBreastSlider = AgeSliderNode<Double>(
+                title: "Breast (cm)",
+                type: "cm",
+                mode: .range(minValue: 70, maxValue: 100),
+                minimumValue: 60,
+                maximumValue: 110,
+                configuration: .light
+            )
+
+            if breastSlider == nil {
+                breastSlider = singleBreastSlider
+                setupSliderTouchHandling(for: breastSlider!)
+            }
+            return breastSlider!
         case .waist:
             let singleWaistSlider = AgeSliderNode<Double>(
                 title: "Waist (cm)",
@@ -716,11 +808,13 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
             let singleShoeSizeSlider = AgeSliderNode<Double>(
                 title: "Shoe size (EU)",
                 type: "",
-                mode: .range(minValue: 37, maxValue: 40),
+                mode: .range(minValue: 37, maxValue: 38),
                 minimumValue: 36,
-                maximumValue: 42,
+                maximumValue: 38,
                 configuration: .light
             )
+            
+            // тут почему-то не больше 38
 
             if shoeSizeSlider == nil {
                 shoeSizeSlider = singleShoeSizeSlider
@@ -730,22 +824,66 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
             
             
         case .hairLength:
-            if hairLengthDropdown == nil { hairLengthDropdown = DropdownNode(title: "Hair length", placeholder: "Select hair length", options: ["Loading..."], backgroundColor: UIColor(hexString: "#EFEFF0"), placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), titleColor: UIColor(hexString: "#3C3C43"), arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), apperTitleColor: UIColor(hexString: "#3C3C43"))
+            if hairLengthDropdown == nil {
+                hairLengthDropdown = DropdownNode(
+                    title: "Hair length",
+                    placeholder: "Select hair length",
+                    options: [],
+                    backgroundColor: UIColor(hexString: "#EFEFF0"),
+                    placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
+                    titleColor: UIColor(hexString: "#3C3C43"),
+                    arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
+                    apperTitleColor: UIColor(hexString: "#3C3C43"),
+                    allowsMultipleSelection: true
+                )
             }
             self.hairLengthDropdown?.options = self.appearanceDictionaries?.hairLength.map { $0.title } ?? []
             return hairLengthDropdown!
         case .hairColor:
-            if hairColorDropdown == nil { hairColorDropdown = DropdownNode(title: "Hair color", placeholder: "Select hair color", options: ["Loading..."], backgroundColor: UIColor(hexString: "#EFEFF0"), placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), titleColor: UIColor(hexString: "#3C3C43"), arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), apperTitleColor: UIColor(hexString: "#3C3C43"))
+            if hairColorDropdown == nil {
+                hairColorDropdown = DropdownNode(
+                    title: "Hair color",
+                    placeholder: "Select hair color",
+                    options: [],
+                    backgroundColor: UIColor(hexString: "#EFEFF0"),
+                    placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
+                    titleColor: UIColor(hexString: "#3C3C43"),
+                    arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
+                    apperTitleColor: UIColor(hexString: "#3C3C43"),
+                    allowsMultipleSelection: true
+                )
             }
             self.hairColorDropdown?.options = self.appearanceDictionaries?.hairColor.map { $0.title } ?? []
             return hairColorDropdown!
         case .eyeColor:
-            if eyeColorDropdown == nil { eyeColorDropdown = DropdownNode(title: "Eye color", placeholder: "Select eye color", options: ["Loading..."], backgroundColor: UIColor(hexString: "#EFEFF0"), placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), titleColor: UIColor(hexString: "#3C3C43"), arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), apperTitleColor: UIColor(hexString: "#3C3C43"))
+            if eyeColorDropdown == nil {
+                eyeColorDropdown = DropdownNode(
+                    title: "Eye color",
+                    placeholder: "Select eye color",
+                    options: [],
+                    backgroundColor: UIColor(hexString: "#EFEFF0"),
+                    placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
+                    titleColor: UIColor(hexString: "#3C3C43"),
+                    arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
+                    apperTitleColor: UIColor(hexString: "#3C3C43"),
+                    allowsMultipleSelection: true
+                )
             }
             self.eyeColorDropdown?.options = self.appearanceDictionaries?.eyeColor.map { $0.title } ?? []
             return eyeColorDropdown!
         case .skinColor:
-            if skinColorDropdown == nil { skinColorDropdown = DropdownNode(title: "Skin color", placeholder: "Select skin color", options: ["Loading..."], backgroundColor: UIColor(hexString: "#EFEFF0"), placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), titleColor: UIColor(hexString: "#3C3C43"), arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6), apperTitleColor: UIColor(hexString: "#3C3C43"))
+            if skinColorDropdown == nil {
+                skinColorDropdown = DropdownNode(
+                    title: "Skin color",
+                    placeholder: "Select skin color",
+                    options: [],
+                    backgroundColor: UIColor(hexString: "#EFEFF0"),
+                    placeholderColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
+                    titleColor: UIColor(hexString: "#3C3C43"),
+                    arrowColor: UIColor(hexString: "#3C3C43")?.withAlphaComponent(0.6),
+                    apperTitleColor: UIColor(hexString: "#3C3C43"),
+                    allowsMultipleSelection: true
+                )
             }
             self.skinColorDropdown?.options = self.appearanceDictionaries?.skinColor.map { $0.title } ?? []
             return skinColorDropdown!
@@ -776,56 +914,203 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         node.view.addGestureRecognizer(panGesture)
     }
 
+    private func loadMoreEventTypesIfNeeded() {
+        guard !self.isLoadingEventTypes && self.hasMoreEventTypes else { return }
+        
+        let threshold = max(0, self.eventTypeItems.count - 2)
+        let selectedIndex = self.eventTypeItems.firstIndex(where: { $0.id == self.selectedEventTypeId }) ?? -1
+        
+        if selectedIndex >= threshold {
+            self.loadMoreEventTypes()
+        }
+    }
+    
+    private func loadMoreEventTypes() {
+        guard !self.isLoadingEventTypes && self.hasMoreEventTypes else { return }
+        
+        self.isLoadingEventTypes = true
+        
+        let currentOffset = self.eventTypeItems.count
+        self.loadEventTypesList?(currentOffset, self.eventTypeLimit)
+    }
+
     @objc private func addPhotoPressed() {
         self.addPhoto()
     }
 
     @objc func applyButtonTapped() {
-        print("applyButton Tapped!")
+        onCreateEventTapped?()
+    }
 
-        if let nameEventTextField = nameEventTextField.textField.text,
-           nameEventTextField.isEmpty,
-           aboutEventTextField.text.isEmpty,
-           eventTime != 0,
-           eventDate != 0
-        {
-            showAlert?("Please fill in all fields")
-        }
+    // MARK: - Сбор данных
+    func collectEventData() throws -> CreateEventRequest {
+        
+        let title = nameEventTextField.textField.text ?? ""
+        let description = aboutEventTextField.text
+        let selectedTypeName = eventTypeDropdown.selectedValue
 
-        let unixTimestampDate = TimeInterval(eventDate)
-        let unixTimestampTime = TimeInterval(eventTime)
-        let date = Date(timeIntervalSince1970: unixTimestampDate)
-        let time = Date(timeIntervalSince1970: unixTimestampTime)
+        let typeItem = eventTypeItems.first(where: { $0.title == selectedTypeName })
+        let eventTypeId = typeItem?.id ?? 0
 
+        let dateObj = Date(timeIntervalSince1970: TimeInterval(eventDate))
+        let timeObj = Date(timeIntervalSince1970: TimeInterval(eventTime))
+        
+        let calendar = Calendar.current
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: timeObj)
+        let finalDate = calendar.date(bySettingHour: timeComponents.hour ?? 0, minute: timeComponents.minute ?? 0, second: 0, of: dateObj) ?? dateObj
+        
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let formattedDate = formatter.string(from: date)
-
-        formatter.dateFormat = "HH:mm"
-        let formattedTime = formatter.string(from: time)
-
-        let _ = Promise<String?>()
-        let _ = EventModel(
-            title: nameEventTextField.textField.text ?? "",
-            description: aboutEventTextField.text,
-            eventDate: formattedDate,
-            eventTime: formattedTime,
-            coverPhoto: nil,
-            enabledParameterKeys: [])
-
-        if currentPhoto != nil {
-            // FIXME DIVO: заменить на REST — закомментирован вызов MTProto (upload + createEvent)
-            // let _ = uploadPhotoToCloud(context: context, image: currentPhoto).start(next: { id in
-            //     if let id = id {
-            //         print("⛳️", id)
-            //         supportPeer.set(self.context.engine.eventsEngine.createEvent(eventModel: eventModel, id: id))
-            //         self.supportPeerDisposable.set((supportPeer.get() |> take(1) |> deliverOnMainQueue).startStrict(next: { peerId in
-            //             print("🔕", peerId ?? "")
-            //             self.showAlert?("event added")
-            //         }))
-            //     }
-            // })
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        let dateString = formatter.string(from: finalDate)
+        
+        let dateToObj = calendar.date(byAdding: .hour, value: 2, to: finalDate) ?? finalDate
+        let dateToString = formatter.string(from: dateToObj)
+        
+        // let cityId = Int(self.countryId) ?? 1
+        let address = EventAddressRequest(
+            street: "Some street",
+            house: "100B",
+            apartment: "123",
+            formatted: "Some city, Some street, 100B, 123",
+            latitude: 51.507351,
+            longitude: -0.127758,
+            cityId: 1
+        )
+        
+        var eventFiles: [EventFileRequest] = []
+        var currentOrder = 0
+                
+        if let avatarUuid = avatarFileUuid {
+            eventFiles.append(EventFileRequest(order: currentOrder, fileUuid: avatarUuid))
+            currentOrder += 1
+        } 
+        
+        for item in galleryItems {
+            if let uuid = item.fileUuid {
+                eventFiles.append(EventFileRequest(order: currentOrder, fileUuid: uuid))
+                currentOrder += 1
+            }
         }
+        
+        var ageRange: EventRangeRequest?
+        var heightRange: EventRangeRequest?
+        var weightRange: EventRangeRequest?
+        var breastRange: EventRangeRequest?
+        var waistRange: EventRangeRequest?
+        var hipsRange: EventRangeRequest?
+        var shoesRange: EventRangeRequest?
+        var genders: [String]?
+        var hairColors: [Int]?
+        var hairLengths: [Int]?
+        var eyeColors: [Int]?
+        var skinColors: [Int]?
+        
+        if selectedParameters.contains(.age) {
+            let (min, max) = ageSlider?.currentRange ?? (0, 0)
+            ageRange = EventRangeRequest(from: Float(min), to: Float(max))
+        }
+        if selectedParameters.contains(.height) {
+            let (min, max) = heightSlider?.currentRange ?? (0, 0)
+            heightRange = EventRangeRequest(from: Float(min*100), to: Float(max*100))
+        }
+        if selectedParameters.contains(.weight) {
+            let (min, max) = weightSlider?.currentRange ?? (0, 0)
+            weightRange = EventRangeRequest(from: Float(min), to: Float(max))
+        }
+        if selectedParameters.contains(.breast) {
+            let (min, max) = breastSlider?.currentRange ?? (0, 0)
+            breastRange = EventRangeRequest(from: Float(min), to: Float(max))
+        }
+        if selectedParameters.contains(.waist) {
+            let (min, max) = waistSlider?.currentRange ?? (0, 0)
+            waistRange = EventRangeRequest(from: Float(min), to: Float(max))
+        }
+        if selectedParameters.contains(.hips) {
+            let (min, max) = hipsSlider?.currentRange ?? (0, 0)
+            hipsRange = EventRangeRequest(from: Float(min), to: Float(max))
+        }
+        if selectedParameters.contains(.shoeSize) {
+            let (min, max) = shoeSizeSlider?.currentRange ?? (0, 0)
+            shoesRange = EventRangeRequest(from: Float(min), to: Float(max))
+        }
+        
+        if selectedParameters.contains(.gender), let selectedGenders = genderDropdown?.selectedValues, !selectedGenders.isEmpty {
+            var selectedIds:[String] = []
+            for genderTitle in selectedGenders {
+                if let id = genderDictionaries?.data.first(where: { $0.title == genderTitle })?.id {
+                    selectedIds.append(id)
+                }
+            }
+            if !selectedIds.isEmpty { genders = selectedIds }
+        }
+        
+        if selectedParameters.contains(.hairColor), let selectedColors = hairColorDropdown?.selectedValues, !selectedColors.isEmpty {
+            var selectedIds: [Int] = []
+            for colorTitle in selectedColors {
+                if let id = appearanceDictionaries?.hairColor.first(where: { $0.title == colorTitle })?.id {
+                    selectedIds.append(id)
+                }
+            }
+            if !selectedIds.isEmpty { hairColors = selectedIds }
+        }
+        
+        if selectedParameters.contains(.hairLength), let selectedLengths = hairLengthDropdown?.selectedValues, !selectedLengths.isEmpty {
+            var selectedIds: [Int] = []
+            for lengthTitle in selectedLengths {
+                if let id = appearanceDictionaries?.hairLength.first(where: { $0.title == lengthTitle })?.id {
+                    selectedIds.append(id)
+                }
+            }
+            if !selectedIds.isEmpty { hairLengths = selectedIds }
+        }
+        
+        if selectedParameters.contains(.eyeColor), let selectedEyes = eyeColorDropdown?.selectedValues, !selectedEyes.isEmpty {
+            var selectedIds: [Int] = []
+            for eyeTitle in selectedEyes {
+                if let id = appearanceDictionaries?.eyeColor.first(where: { $0.title == eyeTitle })?.id {
+                    selectedIds.append(id)
+                }
+            }
+            if !selectedIds.isEmpty { eyeColors = selectedIds }
+        }
+        
+        if selectedParameters.contains(.skinColor), let selectedSkins = skinColorDropdown?.selectedValues, !selectedSkins.isEmpty {
+            var selectedIds: [Int] = []
+            for skinTitle in selectedSkins {
+                if let id = appearanceDictionaries?.skinColor.first(where: { $0.title == skinTitle })?.id {
+                    selectedIds.append(id)
+                }
+            }
+            if !selectedIds.isEmpty { skinColors = selectedIds }
+        }
+        
+        // 7. Собираем финальный запрос
+        return CreateEventRequest(
+            title: title,
+            description: description,
+            typeId: eventTypeId,
+            date: dateString,
+            dateTo: dateToString,
+            address: address,
+            measuringSystem: "metric",
+            files: eventFiles,
+            paymentType: 1,
+            paymentFrequency: 1,
+            cost: "0",
+            role: ["model"],
+            gender: genders,
+            age: ageRange,
+            height: heightRange,
+            weight: weightRange,
+            breastSize: breastRange,
+            waist: waistRange,
+            hips: hipsRange,
+            shoesSize: shoesRange,
+            hairColor: hairColors,
+            hairLength: hairLengths,
+            eyeColor: eyeColors,
+            skinColor: skinColors
+        )
     }
 
     @objc private func addParametersTapped() {
