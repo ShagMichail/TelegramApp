@@ -72,6 +72,8 @@ public final class EventsController: TelegramBaseController {
         }
         NotificationCenter.default.addObserver(forName: DivoStrings.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
             self?.tabBarItem.title = DivoStrings.tabEvents
+            self?.hasLoadedOnce = false
+            self?.getEvents()
         }
     }
 
@@ -115,8 +117,49 @@ public final class EventsController: TelegramBaseController {
                 )
                 let items = response.data.items
                 if !items.isEmpty {
+                    let divoLocale = Locale(identifier: DivoStrings.current.rawValue)
+                    let datePartFormatter: DateFormatter = {
+                        let f = DateFormatter()
+                        f.locale = divoLocale
+                        f.setLocalizedDateFormatFromTemplate("MMM d")
+                        return f
+                    }()
+                    let timePartFormatter: DateFormatter = {
+                        let f = DateFormatter()
+                        f.locale = divoLocale
+                        f.timeStyle = .short
+                        f.dateStyle = .none
+                        return f
+                    }()
+                    let isoFormatter: DateFormatter = {
+                        let f = DateFormatter()
+                        f.locale = Locale(identifier: "en_US_POSIX")
+                        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+                        return f
+                    }()
                     let eventDataArray: [EventData] = items.map { item in
-                        let dateString = item.date?.prefix(while: { $0 != "T" }).description ?? ""
+                        let dateString: String
+                        if let raw = item.date {
+                            // API может вернуть "2026-05-27 17:00:00" или "2026-05-27T17:00:00"
+                            let normalized = raw.replacingOccurrences(of: " ", with: "T")
+                            if let date = isoFormatter.date(from: normalized) {
+                                dateString = datePartFormatter.string(from: date) + " · " + timePartFormatter.string(from: date)
+                            } else {
+                                dateString = raw
+                            }
+                        } else {
+                            dateString = ""
+                        }
+                        let timeRemaining: String
+                        if let raw = item.date, let date = isoFormatter.date(from: raw.replacingOccurrences(of: " ", with: "T")) {
+                            let diff = Calendar.current.dateComponents([.day, .hour, .minute], from: Date(), to: date)
+                            let d = max(diff.day ?? 0, 0)
+                            let h = max(diff.hour ?? 0, 0)
+                            let m = max(diff.minute ?? 0, 0)
+                            timeRemaining = "\(d)d : \(h)h : \(m)m"
+                        } else {
+                            timeRemaining = ""
+                        }
                         let coverURL = item.files?.first?.fullUrl
                         let avatarURL = item.user?.avatar?.fullUrl
                         let cityName = item.address?.city?.title ?? ""
@@ -125,7 +168,7 @@ public final class EventsController: TelegramBaseController {
                             title: item.title,
                             subtitle: item.type?.title ?? "",
                             profileName: "@" + (item.user?.fullName ?? ""),
-                            timeRemaining: "4d : 4h : 0m",
+                            timeRemaining: timeRemaining,
                             type: item.type?.title ?? "",
                             coverPhotoURL: coverURL,
                             profilePhotoURL: avatarURL,

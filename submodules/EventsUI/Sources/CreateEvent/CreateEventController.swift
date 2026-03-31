@@ -63,7 +63,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
 
         self.navigationItem.backBarButtonItem = UIBarButtonItem(title: self.presentationData.strings.Common_Back, style: .plain, target: nil, action: nil)
 
-        let createFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 16) ?? UIFont.systemFont(ofSize: 16, weight: .bold)
+        let createFont = UIFont(name: "HelveticaNeue-CondensedBold", size: 16) ?? UIFont.systemFont(ofSize: 16, weight: .bold)
         let buttonTitle = isEditMode ? DivoStrings.save : DivoStrings.createEventButton
         let createButton = UIBarButtonItem(
             title: buttonTitle,

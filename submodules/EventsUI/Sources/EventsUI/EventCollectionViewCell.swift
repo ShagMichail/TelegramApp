@@ -94,6 +94,7 @@ final class EventCollectionViewCell: UICollectionViewCell {
         applyButton.setTitleColor(.white, for: .normal)
         applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
         applyButton.layer.cornerRadius = 10
+        applyButton.contentEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         applyButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(applyButton)
 
@@ -137,7 +138,6 @@ final class EventCollectionViewCell: UICollectionViewCell {
             applyButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
             applyButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
             applyButton.heightAnchor.constraint(equalToConstant: 20),
-            applyButton.widthAnchor.constraint(equalToConstant: 50),
 
             dateLocationLabel.bottomAnchor.constraint(equalTo: timeRemainingContainer.topAnchor, constant: -6),
         ])
