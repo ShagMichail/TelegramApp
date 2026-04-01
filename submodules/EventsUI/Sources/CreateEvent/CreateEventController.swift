@@ -376,7 +376,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
             updatedPresentationData: nil,
             peerId: peerId,
             mode: mode,
-            style: .default,
+            style: .media,
             currentTime: nil,
             minimalTime: nil,
             completion: { [weak self] time in
