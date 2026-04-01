@@ -692,13 +692,13 @@ extension PublicProfileScreenController {
         let body = EventListRequest(offset: 0, limit: 30)
         Task {
             do {
-                let response: EventListProfileResponse = try await DivoAPIClient.shared.request(
+                let response: EventListResponse = try await DivoAPIClient.shared.request(
                     path: "/event/list",
                     method: "POST",
                     body: body
                 )
-                
-                let items = response.data.items.filter({ $0.creator?.id == self.userID })
+
+                let items = response.data.items.filter({ ($0.creator?.id ?? $0.user?.id) == self.userID })
                 
                 if items.isEmpty {
                     await MainActor.run {
@@ -753,12 +753,12 @@ extension PublicProfileScreenController {
     }
     
     /// Асинхронно скачивает детали по списку ID
-    private func fetchEventDetails(for ids: [Int]) async -> [EventDetailData] {
-        return await withTaskGroup(of: EventDetailData?.self) { group in
+    private func fetchEventDetails(for ids: [Int]) async -> [EventFullDetailData] {
+        return await withTaskGroup(of: EventFullDetailData?.self) { group in
             for id in ids {
                 group.addTask {
                     do {
-                        let response: EventDetailProfileResponse = try await DivoAPIClient.shared.request(
+                        let response: EventFullDetailResponse = try await DivoAPIClient.shared.request(
                             path: "/event/\(id)",
                             method: "GET"
                         )
@@ -769,8 +769,8 @@ extension PublicProfileScreenController {
                     }
                 }
             }
-            
-            var results: [EventDetailData] = []
+
+            var results: [EventFullDetailData] = []
             for await detail in group {
                 if let validDetail = detail {
                     results.append(validDetail)

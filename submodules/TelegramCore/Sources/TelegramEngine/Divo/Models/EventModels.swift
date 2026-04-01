@@ -15,6 +15,7 @@ public struct EventListRequest: Encodable {
 public struct EventListResponse: Decodable {
     public let message: String?
     public let data: EventListData
+    public let error: String?
 }
 
 public struct EventListData: Decodable {
@@ -38,18 +39,55 @@ public struct EventListItem: Decodable {
     public let dateTo: String?
     public let type: EventTypeItem?
     public let address: EventAddress?
+    /// Legacy field name (older API versions)
     public let user: EventUser?
+    /// Current API field name
+    public let creator: EventUser?
     public let files: [EventFile]?
     public let likesCount: Int?
     public let isLikedByUser: Bool?
     public let appliesCount: Int?
     public let paymentType: Int?
     public let cost: String?
+
+    /// Returns `creator` if present, falls back to `user`
+    public var eventCreator: EventUser? { creator ?? user }
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, date, dateTo, address, user, creator
+        case files, likesCount, isLikedByUser, appliesCount, paymentType, cost, type
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(Int.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        description = try c.decodeIfPresent(String.self, forKey: .description)
+        date = try c.decodeIfPresent(String.self, forKey: .date)
+        dateTo = try c.decodeIfPresent(String.self, forKey: .dateTo)
+        address = try c.decodeIfPresent(EventAddress.self, forKey: .address)
+        user = try c.decodeIfPresent(EventUser.self, forKey: .user)
+        creator = try c.decodeIfPresent(EventUser.self, forKey: .creator)
+        files = try c.decodeIfPresent([EventFile].self, forKey: .files)
+        likesCount = try c.decodeIfPresent(Int.self, forKey: .likesCount)
+        isLikedByUser = try c.decodeIfPresent(Bool.self, forKey: .isLikedByUser)
+        appliesCount = try c.decodeIfPresent(Int.self, forKey: .appliesCount)
+        paymentType = try c.decodeIfPresent(Int.self, forKey: .paymentType)
+        cost = try c.decodeIfPresent(String.self, forKey: .cost)
+        // API может вернуть type как объект {"id":1,"title":"..."} или просто строку "Casting"
+        if let typeObject = try? c.decodeIfPresent(EventTypeItem.self, forKey: .type) {
+            type = typeObject
+        } else if let typeString = try? c.decodeIfPresent(String.self, forKey: .type) {
+            type = EventTypeItem(id: nil, title: typeString)
+        } else {
+            type = nil
+        }
+    }
 }
 
 public struct EventTypeItem: Decodable {
-    public let id: Int
-    public let title: String
+    public let id: Int?
+    public let title: String?
 }
 
 public struct EventAddress: Decodable {
@@ -71,12 +109,8 @@ public struct EventUser: Decodable {
     public let id: Int
     public let fullName: String?
     public let role: String?
-    public let avatar: EventFileInfo?
-}
-
-public struct EventFileInfo: Decodable {
-    public let fullUrl: String?
-    public let uuid: String?
+    public let photo: UserFile?
+    public let avatar: UserFile?
 }
 
 public struct EventFile: Decodable {
@@ -92,75 +126,99 @@ public struct EventFile: Decodable {
     }
 }
 
+// MARK: - Event Detail (Full)
 
-public struct EventListProfileResponse: Decodable {
+public struct EventFullDetailResponse: Decodable {
     public let message: String?
-    public let data: EventListProfileData
-    public let error: String?
-}
-
-public struct EventListProfileData: Decodable {
-    public let items: [EventListProfileItem]
-    public let pagination: Pagination?
-}
-
-public struct EventListProfileItem: Decodable {
-    public let id: Int
-    public let title: String
-    public let description: String?
-    public let type: String?
-    public let likesCount: Int?
-    public let appliesCount: Int?
-    public let isLikedByUser: Bool?
-    public let creator: Creator?
-    public let files: [EventFile]?
-}
-
-public struct Creator: Decodable {
-    public let id: Int
-    public let fullName: String?
-    public let role: String?
-    public let photo: UserFile?
-    public let avatar: UserFile?
-}
-
-// MARK: - Event Detail
-
-public struct EventDetailResponse: Decodable {
-    public let message: String?
-    public let data: EventListItem
-}
-
-public struct EventDetailProfileResponse: Codable {
-    public let message: String?
-    public let data: EventDetailData?
+    public let data: EventFullDetailData?
     public let errors: [String]?
 }
 
-public struct EventDetailData: Codable {
+public struct EventFullDetailData: Decodable {
     public let id: Int
     public let title: String?
     public let description: String?
+    public let type: EventFullIdTitle?
+    public let isApplied: Bool?
+    public let appliesCount: Int?
+    public let viewsCount: Int?
+    public let userReachCount: Int?
     public let date: String?
     public let dateTo: String?
-    public let address: EventDetailAddress?
-    public let files: [EventDetailFile]?
+    public let paymentType: EventFullIdTitle?
+    public let paymentFrequency: EventFullIdTitle?
+    public let cost: String?
+    public let address: EventFullAddress?
+    public let files: [EventFile]?
+    public let modelAttributes: EventFullModelAttributes?
+    public let creator: EventFullCreator?
 }
 
-public struct EventDetailAddress: Codable {
+// MARK: - Address & City (Full Detail)
+
+public struct EventFullAddress: Decodable {
+    public let street: String?
+    public let house: String?
+    public let apartment: String?
     public let formatted: String?
-    public let city: EventDetailCity?
+    public let latitude: Double?
+    public let longitude: Double?
+    public let city: EventFullDetailCity?
 }
 
-public struct EventDetailCity: Codable {
+public struct EventFullDetailCity: Decodable {
+    public let id: Int?
     public let countryCode: String?
     public let countryName: String?
+    public let areaName: String?
     public let name: String?
 }
 
-public struct EventDetailFile: Codable {
-    public let order: Int?
-    public let fullUrl: String?
+// MARK: - Model Attributes
+
+public struct EventFullModelAttributes: Decodable {
+    public let role: [String]?
+    public let age: EventFullRange?
+    public let gender: [EventFullStringIdTitle]?
+    public let height: EventFullRange?
+    public let weight: EventFullRange?
+    public let breastSize: EventFullRange?
+    public let waist: EventFullRange?
+    public let hips: EventFullRange?
+    public let shoesSize: EventFullRange?
+    public let hairColor: [EventFullIdTitle]?
+    public let hairLength: [EventFullIdTitle]?
+    public let eyeColor: [EventFullIdTitle]?
+    public let skinColor: [EventFullIdTitle]?
+    public let measuringSystem: String?
+}
+
+public struct EventFullRange: Decodable {
+    public let from: Float?
+    public let to: Float?
+}
+
+// MARK: - Creator (Full Detail)
+
+public struct EventFullCreator: Decodable {
+    public let id: Int?
+    public let fullName: String?
+    public let photo: UserFile?
+    public let avatar: UserFile?
+    public let roleLabel: String?
+}
+
+// MARK: - Helpers
+
+public struct EventFullIdTitle: Decodable {
+    public let id: Int?
+    public let title: String?
+}
+
+public struct EventFullStringIdTitle: Decodable {
+    /// e.g. "male", "female"
+    public let id: String?
+    public let title: String?
 }
 
 // MARK: - Event Types
@@ -184,7 +242,7 @@ public struct EventTypesData: Decodable {
     public let items: [EventTypeItem]
 }
 
-// MARK: - Create Event
+// MARK: - Create / Update Event
 
 public struct CreateEventRequest: Codable {
     public let title: String
@@ -194,7 +252,7 @@ public struct CreateEventRequest: Codable {
     public let dateTo: String
     public let address: EventAddressRequest
     public let measuringSystem: String
-    public let files:[EventFileRequest]
+    public let files: [EventFileRequest]
 
     public let paymentType: Int?
     public let paymentFrequency: Int?
@@ -277,12 +335,12 @@ public struct EventAddressRequest: Codable {
     public let cityId: Int
 
     public init(
-        street: String?, 
-        house: String?, 
+        street: String?,
+        house: String?,
         apartment: String?,
-        formatted: String?, 
-        latitude: Double?, 
-        longitude: Double?, 
+        formatted: String?,
+        latitude: Double?,
+        longitude: Double?,
         cityId: Int
     ) {
         self.street = street
@@ -299,10 +357,7 @@ public struct EventFileRequest: Codable {
     public let order: Int
     public let fileUuid: String
 
-    public init(
-        order: Int, 
-        fileUuid: String
-    ) {
+    public init(order: Int, fileUuid: String) {
         self.order = order
         self.fileUuid = fileUuid
     }
@@ -312,10 +367,7 @@ public struct EventRangeRequest: Codable {
     public let from: Float
     public let to: Float
 
-    public init(
-        from: Float, 
-        to: Float
-    ) {
+    public init(from: Float, to: Float) {
         self.from = from
         self.to = to
     }
@@ -325,10 +377,7 @@ public struct CreateEventResponse: Codable {
     public let message: String?
     public let errors: [String]?
 
-    public init(
-        message: String?, 
-        errors: [String]?
-    ) {
+    public init(message: String?, errors: [String]?) {
         self.message = message
         self.errors = errors
     }
@@ -346,110 +395,4 @@ public struct ApplyEventRequest: Encodable {
 
 public struct ApplyEventResponse: Decodable {
     public let message: String?
-}
-
-
-public struct EventFullDetailResponse: Decodable {
-    public let message: String?
-    public let data: EventFullDetailData?
-    public let errors:[String]?
-}
-
-public struct EventFullDetailData: Decodable {
-    public let id: Int
-    public let title: String?
-    public let description: String?
-    public let type: EventFullIdTitle?
-    public let isApplied: Bool?
-    public let appliesCount: Int?
-    public let viewsCount: Int?
-    public let userReachCount: Int?
-    public let date: String?
-    public let dateTo: String?
-    public let paymentType: EventFullIdTitle?
-    public let paymentFrequency: EventFullIdTitle?
-    public let cost: String?
-    public let address: EventFullAddress?
-    public let files: [EventFullDetailFile]?
-    public let modelAttributes: EventFullModelAttributes?
-    public let creator: EventFullCreator?
-}
-
-// MARK: - Address & City
-public struct EventFullAddress: Decodable {
-    public let street: String?
-    public let house: String?
-    public let apartment: String?
-    public let formatted: String?
-    public let latitude: Double?
-    public let longitude: Double?
-    public let city: EventFullDetailCity? // Исправлено: в JSON тут "city", а не "cityId"
-}
-
-public struct EventFullDetailCity: Decodable {
-    public let id: Int?
-    public let countryCode: String?
-    public let countryName: String?
-    public let areaName: String? 
-    public let name: String?
-}
-
-// MARK: - Files
-public struct EventFullDetailFile: Decodable {
-    public let order: Int?
-    public let fileName: String?
-    public let fullUrl: String?
-    public let fileUuid: String?
-    public let fileExtension: String?
-
-    enum CodingKeys: String, CodingKey {
-        case order, fullUrl, fileName, fileUuid
-        case fileExtension = "extension"
-    }
-}
-
-// MARK: - Model Attributes
-public struct EventFullModelAttributes: Decodable {
-    public let role: [String]?
-    public let age: EventFullRange?
-    public let gender: [EventFullStringIdTitle]?
-    public let height: EventFullRange?
-    public let weight: EventFullRange?
-    public let breastSize: EventFullRange?
-    public let waist: EventFullRange?
-    public let hips: EventFullRange?
-    public let shoesSize: EventFullRange?
-    
-    public let hairColor: [EventFullIdTitle]?
-    public let hairLength: [EventFullIdTitle]?
-    public let eyeColor: [EventFullIdTitle]?
-    public let skinColor: [EventFullIdTitle]?
-    
-    public let measuringSystem: String?
-}
-
-public struct EventFullRange: Decodable {
-    public let from: Float?
-    public let to: Float?
-}
-
-// MARK: - Creator
-public struct EventFullCreator: Decodable {
-    public let id: Int?
-    public let fullName: String?
-    // У creator'а photo и avatar имеют ту же структуру, что и файлы, только без order
-    public let photo: EventFullDetailFile?
-    public let avatar: EventFullDetailFile?
-    public let roleLabel: String?
-}
-
-// MARK: - Helpers (Для простых объектов {id, title})
-public struct EventFullIdTitle: Decodable {
-    public let id: Int?
-    public let title: String?
-}
-
-public struct EventFullStringIdTitle: Decodable {
-    public let id: String? // Для таких вещей как "gender": [{"id": "male", "title": "Male"}]
-    public let title: String?
 }

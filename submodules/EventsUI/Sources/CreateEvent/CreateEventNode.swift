@@ -489,7 +489,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         }
     }
     
-    private func loadExistingFiles(_ files: [EventFullDetailFile]) {
+    private func loadExistingFiles(_ files: [EventFile]) {
         // Очищаем текущие файлы на случай повторной загрузки
         self.galleryItems.removeAll()
         self.avatarFileUuid = nil
