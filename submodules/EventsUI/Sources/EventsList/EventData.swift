@@ -71,11 +71,14 @@ struct EventData {
         iso.locale = Locale(identifier: "en_US_POSIX")
         iso.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         guard let date = iso.date(from: isoDate) else { return "" }
-        let diff = Calendar.current.dateComponents([.day, .hour, .minute], from: Date(), to: date)
-        let d = max(diff.day ?? 0, 0)
-        let h = max(diff.hour ?? 0, 0)
-        let m = max(diff.minute ?? 0, 0)
-        return "\(d)d : \(h)h : \(m)m"
+        let interval = date.timeIntervalSince(Date())
+        guard interval > 0 else { return "" }
+        let f = DateComponentsFormatter()
+        f.unitsStyle = .abbreviated
+        f.allowedUnits = [.day, .hour, .minute]
+        f.calendar = Calendar.current
+        f.calendar?.locale = Locale(identifier: DivoStrings.current.rawValue)
+        return f.string(from: interval) ?? ""
     }
 
     static func mockEvents() -> [EventData] {

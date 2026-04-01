@@ -205,9 +205,7 @@ class AgeSliderNode<T: SliderValue>: ASDisplayNode {
         self.maxAgeNode.displaysAsynchronously = false
         
         super.init()
-        
-        print("AgeSliderNode.init: mode = \(mode), isRangeSlider = \(isRangeSlider)")
-        
+
         if isRangeSlider {
             let rangeValues: (lower: Float, upper: Float)
             switch mode {

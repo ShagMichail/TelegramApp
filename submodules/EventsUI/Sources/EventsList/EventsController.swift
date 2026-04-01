@@ -151,12 +151,13 @@ public final class EventsController: TelegramBaseController {
                             dateString = ""
                         }
                         let timeRemaining: String
-                        if let raw = item.date, let date = isoFormatter.date(from: raw.replacingOccurrences(of: " ", with: "T")) {
-                            let diff = Calendar.current.dateComponents([.day, .hour, .minute], from: Date(), to: date)
-                            let d = max(diff.day ?? 0, 0)
-                            let h = max(diff.hour ?? 0, 0)
-                            let m = max(diff.minute ?? 0, 0)
-                            timeRemaining = "\(d)d : \(h)h : \(m)m"
+                        if let raw = item.date, let date = isoFormatter.date(from: raw.replacingOccurrences(of: " ", with: "T")), date > Date() {
+                            let f = DateComponentsFormatter()
+                            f.unitsStyle = .abbreviated
+                            f.allowedUnits = [.day, .hour, .minute]
+                            f.calendar = Calendar.current
+                            f.calendar?.locale = divoLocale
+                            timeRemaining = f.string(from: Date(), to: date) ?? ""
                         } else {
                             timeRemaining = ""
                         }

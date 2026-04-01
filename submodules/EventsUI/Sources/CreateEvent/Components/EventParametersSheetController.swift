@@ -111,7 +111,7 @@ final class EventParametersSheetController: UIViewController, UITableViewDelegat
         } else {
             let param = allParameters[indexPath.row - 1]
             let isSelected = selectedParameters.contains(param)
-            cell.configure(title: param.rawValue, isSelected: isSelected)
+            cell.configure(title: param.localizedTitle, isSelected: isSelected)
         }
         
         return cell

@@ -133,7 +133,7 @@ final class EventListCell: UICollectionViewCell {
         }
         
         // Обновляем текст кнопки в зависимости от профиля
-        let buttonTitle = isMyProfile ? "Edit" : "Apply"
+        let buttonTitle = isMyProfile ? DivoStrings.edit : DivoStrings.apply
         applyButton.setTitle(buttonTitle, for: .normal)
     }
 }

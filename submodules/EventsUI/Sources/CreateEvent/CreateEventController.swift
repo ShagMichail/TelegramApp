@@ -182,7 +182,7 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
 
     override public func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        self.loadEventTypesList(offset: 0, limit: 5)
+        self.loadEventTypesList(offset: 0, limit: 20)
     }
 
     override public func viewDidDisappear(_ animated: Bool) {
@@ -286,7 +286,6 @@ public class CreateEventController: ViewController, UINavigationControllerDelega
                 
                 await MainActor.run {
                     self.createEventNode.avatarFileUuid = fileUuid
-                    print("✅ Cover photo uploaded successfully: \(fileUuid)")
                 }
                 
             } catch {

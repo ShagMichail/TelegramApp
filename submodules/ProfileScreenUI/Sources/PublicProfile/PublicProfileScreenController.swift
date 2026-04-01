@@ -166,7 +166,7 @@ public final class PublicProfileScreenController: TelegramBaseController {
                 self?.navigateToManageExperience()
             }))
         } else {
-            items.append(.init(title: "Create Event", action: { [weak self] in
+            items.append(.init(title: DivoStrings.createEvent, action: { [weak self] in
                 self?.navigateToCreateEvent()
             }))
         }

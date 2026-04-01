@@ -16,18 +16,35 @@ import Postbox
 import ChatScheduleTimeController
 
 enum EventParameter: String, CaseIterable {
-    case gender = "Gender"
-    case age = "Age"
-    case height = "Height"
-    case weight = "Weight"
-    case breast = "Breast"
-    case waist = "Waist"
-    case hips = "Hips"
-    case shoeSize = "Shoe size"
-    case hairLength = "Hair length"
-    case hairColor = "Hair color"
-    case eyeColor = "Eye color"
-    case skinColor = "Skin color"
+    case gender = "gender"
+    case age = "age"
+    case height = "height"
+    case weight = "weight"
+    case breast = "breast"
+    case waist = "waist"
+    case hips = "hips"
+    case shoeSize = "shoeSize"
+    case hairLength = "hairLength"
+    case hairColor = "hairColor"
+    case eyeColor = "eyeColor"
+    case skinColor = "skinColor"
+
+    var localizedTitle: String {
+        switch self {
+        case .gender: return DivoStrings.paramGender
+        case .age: return DivoStrings.paramAge
+        case .height: return DivoStrings.paramHeight
+        case .weight: return DivoStrings.paramWeight
+        case .breast: return DivoStrings.paramBreast
+        case .waist: return DivoStrings.paramWaist
+        case .hips: return DivoStrings.paramHips
+        case .shoeSize: return DivoStrings.paramShoeSize
+        case .hairLength: return DivoStrings.paramHairLength
+        case .hairColor: return DivoStrings.paramHairColor
+        case .eyeColor: return DivoStrings.paramEyeColor
+        case .skinColor: return DivoStrings.paramSkinColor
+        }
+    }
 }
 
 final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
@@ -494,7 +511,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
                         if let image = UIImage(data: data) {
                             self.currentPhoto = image
                         }
-                    } catch { print("Error loading cover image") }
+                    } catch { }
                 }
             } else {
                 // Это картинка для галереи
@@ -510,7 +527,7 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
                             // Вызываем перерасчет UI, чтобы сетка раздвинулась
                             self.triggerLayoutUpdate()
                         }
-                    } catch { print("Error loading gallery image") }
+                    } catch { }
                 }
             }
         }
@@ -782,11 +799,11 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
 
         if params.isEmpty {
             if let button = self.addParametersButton as? ButtonWithIconNode {
-                button.setTitle("+ Add parameters")
+                button.setTitle(DivoStrings.addParameters)
             }
         } else {
             if let button = self.addParametersButton as? ButtonWithIconNode {
-                button.setTitle("+ Add")
+                button.setTitle(DivoStrings.addShort)
             }
         }
 
@@ -854,108 +871,93 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
             self.genderDropdown?.options = self.genderDictionaries?.data.map { $0.title } ?? []
             return genderDropdown!
         case .age:
-            let singleAgeSlider = AgeSliderNode<Int>(
-                title: DivoStrings.ageYo,
-                type: "y.o",
-                mode: .range(minValue: 17, maxValue: 30),
-                minimumValue: 14,
-                maximumValue: 45,
-                configuration: .light
-            )
             if ageSlider == nil {
-                ageSlider = singleAgeSlider
+                ageSlider = AgeSliderNode<Int>(
+                    title: DivoStrings.ageYo,
+                    type: "y.o",
+                    mode: .range(minValue: 17, maxValue: 30),
+                    minimumValue: 14,
+                    maximumValue: 45,
+                    configuration: .light
+                )
                 setupSliderTouchHandling(for: ageSlider!)
             }
             return ageSlider!
         case .height:
-            let singleHeightSlider = AgeSliderNode<Double>(
-                title: DivoStrings.heightCm,
-                type: "cm",
-                mode: .range(minValue: 1.78, maxValue: 2.20),
-                minimumValue: 1.68,
-                maximumValue: 2.50,
-                configuration: .light
-            )
-
             if heightSlider == nil {
-                heightSlider = singleHeightSlider
+                heightSlider = AgeSliderNode<Double>(
+                    title: DivoStrings.heightCm,
+                    type: "cm",
+                    mode: .range(minValue: 1.78, maxValue: 2.20),
+                    minimumValue: 1.68,
+                    maximumValue: 2.50,
+                    configuration: .light
+                )
                 setupSliderTouchHandling(for: heightSlider!)
             }
             return heightSlider!
         case .weight:
-            let singleWeightSlider = AgeSliderNode<Double>(
-                title: DivoStrings.weightKg,
-                type: "kg",
-                mode: .range(minValue: 50, maxValue: 70),
-                minimumValue: 48,
-                maximumValue: 90,
-                configuration: .light
-            )
-
             if weightSlider == nil {
-                weightSlider = singleWeightSlider
+                weightSlider = AgeSliderNode<Double>(
+                    title: DivoStrings.weightKg,
+                    type: "kg",
+                    mode: .range(minValue: 50, maxValue: 70),
+                    minimumValue: 48,
+                    maximumValue: 90,
+                    configuration: .light
+                )
                 setupSliderTouchHandling(for: weightSlider!)
             }
             return weightSlider!
         case .breast:
-            let singleBreastSlider = AgeSliderNode<Double>(
-                title: DivoStrings.breastCm,
-                type: "cm",
-                mode: .range(minValue: 70, maxValue: 100),
-                minimumValue: 60,
-                maximumValue: 110,
-                configuration: .light
-            )
-
             if breastSlider == nil {
-                breastSlider = singleBreastSlider
+                breastSlider = AgeSliderNode<Double>(
+                    title: DivoStrings.breastCm,
+                    type: "cm",
+                    mode: .range(minValue: 70, maxValue: 100),
+                    minimumValue: 60,
+                    maximumValue: 110,
+                    configuration: .light
+                )
                 setupSliderTouchHandling(for: breastSlider!)
             }
             return breastSlider!
         case .waist:
-            let singleWaistSlider = AgeSliderNode<Double>(
-                title: DivoStrings.waistCm,
-                type: "cm",
-                mode: .range(minValue: 55, maxValue: 85),
-                minimumValue: 48,
-                maximumValue: 90,
-                configuration: .light
-            )
-
             if waistSlider == nil {
-                waistSlider = singleWaistSlider
+                waistSlider = AgeSliderNode<Double>(
+                    title: DivoStrings.waistCm,
+                    type: "cm",
+                    mode: .range(minValue: 55, maxValue: 85),
+                    minimumValue: 48,
+                    maximumValue: 90,
+                    configuration: .light
+                )
                 setupSliderTouchHandling(for: waistSlider!)
             }
             return waistSlider!
         case .hips:
-            let singleHipsSlider = AgeSliderNode<Double>(
-                title: DivoStrings.hipsCm,
-                type: "cm",
-                mode: .range(minValue: 90, maxValue: 100),
-                minimumValue: 80,
-                maximumValue: 110,
-                configuration: .light
-            )
-
             if hipsSlider == nil {
-                hipsSlider = singleHipsSlider
+                hipsSlider = AgeSliderNode<Double>(
+                    title: DivoStrings.hipsCm,
+                    type: "cm",
+                    mode: .range(minValue: 90, maxValue: 100),
+                    minimumValue: 80,
+                    maximumValue: 110,
+                    configuration: .light
+                )
                 setupSliderTouchHandling(for: hipsSlider!)
             }
             return hipsSlider!
         case .shoeSize:
-            let singleShoeSizeSlider = AgeSliderNode<Double>(
-                title: DivoStrings.shoeSizeEU,
-                type: "",
-                mode: .range(minValue: 37, maxValue: 38),
-                minimumValue: 36,
-                maximumValue: 38,
-                configuration: .light
-            )
-            
-            // тут почему-то не больше 38
-
             if shoeSizeSlider == nil {
-                shoeSizeSlider = singleShoeSizeSlider
+                shoeSizeSlider = AgeSliderNode<Double>(
+                    title: DivoStrings.shoeSizeEU,
+                    type: "",
+                    mode: .range(minValue: 37, maxValue: 42),
+                    minimumValue: 36,
+                    maximumValue: 46,
+                    configuration: .light
+                )
                 setupSliderTouchHandling(for: shoeSizeSlider!)
             }
             return shoeSizeSlider!
@@ -1104,15 +1106,15 @@ final class CreateEventNode: ASDisplayNode, UITextFieldDelegate {
         let dateToObj = calendar.date(byAdding: .hour, value: 2, to: finalDate) ?? finalDate
         let dateToString = formatter.string(from: dateToObj)
         
-        // let cityId = Int(self.countryId) ?? 1
+        let cityId = Int(self.countryId) ?? 0
         let address = EventAddressRequest(
-            street: "Some street",
-            house: "100B",
-            apartment: "123",
-            formatted: "Some city, Some street, 100B, 123",
-            latitude: 51.507351,
-            longitude: -0.127758,
-            cityId: 1
+            street: nil,
+            house: nil,
+            apartment: nil,
+            formatted: venueEventTextField.textField.text,
+            latitude: nil,
+            longitude: nil,
+            cityId: cityId
         )
         
         var eventFiles: [EventFileRequest] = []
