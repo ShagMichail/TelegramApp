@@ -94,6 +94,7 @@ final class EventCollectionViewCell: UICollectionViewCell {
         applyButton.setTitleColor(.white, for: .normal)
         applyButton.backgroundColor = UIColor(red: 0.77, green: 0.54, blue: 0.38, alpha: 1.0)
         applyButton.layer.cornerRadius = 10
+        applyButton.contentEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
         applyButton.translatesAutoresizingMaskIntoConstraints = false
         contentView.addSubview(applyButton)
 
@@ -137,7 +138,6 @@ final class EventCollectionViewCell: UICollectionViewCell {
             applyButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
             applyButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
             applyButton.heightAnchor.constraint(equalToConstant: 20),
-            applyButton.widthAnchor.constraint(equalToConstant: 50),
 
             dateLocationLabel.bottomAnchor.constraint(equalTo: timeRemainingContainer.topAnchor, constant: -6),
         ])
@@ -155,6 +155,7 @@ final class EventCollectionViewCell: UICollectionViewCell {
         profileNameLabel.text = event.profileName
         titleLabel.text = event.title
         timeRemainingLabel.text = event.timeRemaining
+        timeRemainingContainer.isHidden = event.timeRemaining.isEmpty
 
         let flag = "\u{1F1FA}\u{1F1F8}"
         if !event.location.isEmpty {
@@ -325,5 +326,10 @@ final class ButtonWithIconNode: ASControlNode {
                                          width: textSize.width,
                                          height: textSize.height)
         }
+    }
+
+    func setTitle(_ title: String) {
+        self.textNode.attributedText = NSAttributedString(string: title, font: Font.helveticaNeue(16), textColor: .white)
+        self.setNeedsLayout()
     }
 }

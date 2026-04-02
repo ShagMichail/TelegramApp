@@ -40,9 +40,9 @@ public final class DivoSettingsController: TelegramBaseController {
         )
         super.init(context: context, navigationBarPresentationData: NavigationBarPresentationData(theme: navTheme, strings: NavigationBarStrings(presentationStrings: self.presentationData.strings)))
 
-        // Custom title label: HelveticaNeueLTCom-BdCn 20px, centered
+        // Custom title label: HelveticaNeue-CondensedBold 20px, centered
         let titleLabel = UILabel()
-        let titleFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 20) ?? UIFont.systemFont(ofSize: 20, weight: .bold)
+        let titleFont = UIFont(name: "HelveticaNeue-CondensedBold", size: 20) ?? UIFont.systemFont(ofSize: 20, weight: .bold)
         let titleAttr = NSAttributedString(string: DivoStrings.settings, attributes: [
             .font: titleFont,
             .foregroundColor: UIColor.black,
@@ -73,7 +73,7 @@ public final class DivoSettingsController: TelegramBaseController {
         NotificationCenter.default.addObserver(forName: DivoStrings.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
             guard let self = self else { return }
             self.tabBarItem.title = DivoStrings.tabSettings
-            let titleFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 20) ?? UIFont.systemFont(ofSize: 20, weight: .bold)
+            let titleFont = UIFont(name: "HelveticaNeue-CondensedBold", size: 20) ?? UIFont.systemFont(ofSize: 20, weight: .bold)
             let titleAttr = NSAttributedString(string: DivoStrings.settings, attributes: [
                 .font: titleFont,
                 .foregroundColor: UIColor.black,
@@ -86,7 +86,7 @@ public final class DivoSettingsController: TelegramBaseController {
 
     private func makeEditButton() -> UIBarButtonItem {
         let copperColor = UIColor(red: 191.0/255.0, green: 122.0/255.0, blue: 84.0/255.0, alpha: 1.0)
-        let editFont = UIFont(name: "HelveticaNeueLTCom-BdCn", size: 16) ?? UIFont.systemFont(ofSize: 16, weight: .bold)
+        let editFont = UIFont(name: "HelveticaNeue-CondensedBold", size: 16) ?? UIFont.systemFont(ofSize: 16, weight: .bold)
         let button = UIBarButtonItem(title: DivoStrings.settingsEdit, style: .plain, target: self, action: #selector(editTapped))
         button.setTitleTextAttributes([.foregroundColor: copperColor, .font: editFont], for: .normal)
         button.setTitleTextAttributes([.foregroundColor: copperColor.withAlphaComponent(0.5), .font: editFont], for: .highlighted)
@@ -442,13 +442,17 @@ private final class DivoSettingsNode: ASDisplayNode {
 
     // MARK: - Data loading
 
+    private var isProfileLoaded = false
+
     func loadProfile() {
+        guard !isProfileLoaded else { return }
         startProfileShimmer()
         Task { @MainActor in
             do {
                 let response: UserDetailResponse = try await DivoAPIClient.shared.request(
                     path: "/user/info"
                 )
+                self.isProfileLoaded = true
                 self.updateWithProfile(response.data)
             } catch {
                 self.stopProfileShimmer()
