@@ -155,6 +155,7 @@ final class EventCollectionViewCell: UICollectionViewCell {
         profileNameLabel.text = event.profileName
         titleLabel.text = event.title
         timeRemainingLabel.text = event.timeRemaining
+        timeRemainingContainer.isHidden = event.timeRemaining.isEmpty
 
         let flag = "\u{1F1FA}\u{1F1F8}"
         if !event.location.isEmpty {

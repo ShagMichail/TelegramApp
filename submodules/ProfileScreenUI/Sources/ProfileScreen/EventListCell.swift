@@ -57,6 +57,7 @@ final class EventListCell: UICollectionViewCell {
         button.setTitleColor(.white, for: .normal)
         button.layer.cornerRadius = 6
         button.clipsToBounds = true
+        button.contentEdgeInsets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
         button.translatesAutoresizingMaskIntoConstraints = false
         return button
     }()
@@ -100,7 +101,7 @@ final class EventListCell: UICollectionViewCell {
             applyButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             applyButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             applyButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
-            applyButton.widthAnchor.constraint(equalToConstant: 68)
+            applyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 68)
         ])
     }
     

@@ -34,7 +34,6 @@ public final class EventsController: TelegramBaseController {
     private let peerViewDisposable = MetaDisposable()
 
     private var isEmpty: Bool?
-    private var hasLoadedOnce = false
     private var tokenChangeObserver: NSObjectProtocol?
 
     private let createActionDisposable = MetaDisposable()
@@ -67,12 +66,10 @@ public final class EventsController: TelegramBaseController {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.hasLoadedOnce = false
             self?.getEvents()
         }
         NotificationCenter.default.addObserver(forName: DivoStrings.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
             self?.tabBarItem.title = DivoStrings.tabEvents
-            self?.hasLoadedOnce = false
             self?.getEvents()
         }
     }
@@ -100,10 +97,7 @@ public final class EventsController: TelegramBaseController {
 
     override public func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        if !hasLoadedOnce {
-            hasLoadedOnce = true
-            getEvents()
-        }
+        getEvents()
     }
 
     private func getEvents() {
